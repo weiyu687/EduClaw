@@ -5,6 +5,4 @@
   </h1>
 </div>
 
----
-
 ![](assets/logo.png)
