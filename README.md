@@ -1,7 +1,7 @@
 <div align="left">
-  <img src="assets/bluelobster_px.png" width="50" align="left">
+  <img src="assets/bluelobster_px.png" width="60" align="left">
   <h1>
-    &nbsp;<font size="7">EduClaw — Educational AI Assistant</font>
+    &nbsp;EduClaw — Educational AI Assistant
   </h1>
 </div>
 
