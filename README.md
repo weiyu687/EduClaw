@@ -1,5 +1,5 @@
 <div align="left">
-  <img src="assets/bluelobster_px.png" width="60" align="left">
+  <img src="assets/bluelobster_px.png" width="45" align="left">
   <h1>
     &nbsp;EduClaw — Educational AI Assistant
   </h1>
