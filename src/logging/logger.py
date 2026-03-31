@@ -12,31 +12,27 @@ from rich.console import Console
 from rich.theme import Theme
 
 def get_root() -> Path:
-    """获取根目录。"""
     return Path(__file__).resolve().parent.parent.parent
 
-def setup_logger(project_name: str = "EduClaw"):
+def setup_global_logging():
+    """
+    配置根Logger。
+    """
     root_dir = get_root()
     log_dir = root_dir / "logs"
     log_dir.mkdir(exist_ok=True)
     log_file = log_dir / "educlaw.log"
 
-    logger = logging.getLogger(project_name)
-    logger.setLevel(logging.INFO)
+    root_logger = logging.getLogger("")
+    root_logger.setLevel(logging.INFO)
 
-    if logger.handlers:
-        logger.handlers.clear()
+    if root_logger.handlers:
+        root_logger.handlers.clear()
 
-    # 规定文件日志格式
     file_formatter = logging.Formatter(
         '%(asctime)s - %(name)s - %(levelname)s - [%(filename)s:%(lineno)d] - %(message)s'
     )
-    file_handler = RotatingFileHandler(
-        log_file,
-        maxBytes=10 * 1024 * 1024,
-        backupCount=5,
-        encoding='utf-8'
-    )
+    file_handler = RotatingFileHandler(log_file, maxBytes=10*1024*1024, backupCount=5, encoding='utf-8')
     file_handler.setFormatter(file_formatter)
 
     custom_theme = Theme({
@@ -46,20 +42,25 @@ def setup_logger(project_name: str = "EduClaw"):
         "logging.level.error": "orange1",
         "logging.level.critical": "reverse white",
     })
-
     console = Console(stderr=True, theme=custom_theme)
-
     console_handler = RichHandler(
         console=console,
         show_time=True,
         show_path=False,
         markup=True,
-        log_time_format="[%X]"
+        log_time_format="[%X]",
+        rich_tracebacks=True
     )
 
-    logger.addHandler(file_handler)
-    logger.addHandler(console_handler)
+    console_formatter = logging.Formatter("[%(name)s] %(message)s")
+    console_handler.setFormatter(console_formatter)
 
-    return logger
+    root_logger.addHandler(file_handler)
+    root_logger.addHandler(console_handler)
 
-logger = setup_logger()
+setup_global_logging()
+
+def get_logger(module_name: str):
+    return logging.getLogger(module_name.upper())
+
+logger = get_logger("CORE")
