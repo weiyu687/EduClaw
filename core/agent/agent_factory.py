@@ -1,19 +1,3 @@
-"""
-EduClaw 智能体客户端 (Agent)
-职责：理解用户意图，调用 MCP Server 工具
-
-Author: Gongmin Wei
-Date: 2026-03-31
-"""
-from typing import List
-from langchain_core.messages import HumanMessage
-from core.llm import get_llm
-from core.mcp import MCPClient
-from core.logging import get_logger
-
-logger = get_logger("CLIENT")
-
-
 class EduClawAgent:
     def __init__(self):
         self.llm = get_llm()

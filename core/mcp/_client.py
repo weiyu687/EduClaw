@@ -1,10 +1,21 @@
 """
-EduClaw MCP 客户端封装，
-包括 Transport Layer，Capabilities Discovery，Request Dispatching
+EduClaw 智能体客户端 (Agent)
+职责：理解用户意图，调用 MCP Server 工具
 
 Author: Gongmin Wei
-Date: 2026-04-01
+Date: 2026-03-31
 """
+from typing import List
+from langchain_core.messages import HumanMessage
+from core.llm import get_llm
+from core.mcp import MCPClient
+from core.logging import get_logger
+from typing import List
+from langchain_core.messages import HumanMessage
+from core.llm import get_llm
+from core.mcp import MCPClient
+from core.logging import get_logger
+logger = get_logger("CLIENT")
 import os
 from pathlib import Path
 from contextlib import AsyncExitStack
@@ -13,32 +24,34 @@ from mcp import ClientSession
 from mcp.client.stdio import stdio_client, StdioServerParameters
 from core.logging import get_logger
 
-logger = get_logger("CLIENT")
-
-
 class MCPClient:
-    def __init__(self, server_script: str = "core.mcp.startup_server"):
+    def __init__(self, server_script: str = "core.mcp.server"):
         """
-        初始化客户端(客户端 -> 启动 -> 服务端)
+        初始化客户端
         :param server_script: 要启动的服务端模块路径 (python -m 模式)
         """
-        project_dir_root = str(Path(__file__).parent.parent.parent.resolve())
+        project_root = str(Path(__file__).parent.parent.parent.resolve())
 
-        env_info = os.environ.copy()
-        env_info["PYTHONPATH"] = project_dir_root
+        # 2. 准备环境变量
+        current_env = os.environ.copy()
+        # 强制将 PYTHONPATH 设置为项目根目录的绝对路径
+        current_env["PYTHONPATH"] = project_root
+
+        # 调试信息：看看路径对不对
+        # logger.info(f"Project Root Detected: {project_root}")
 
         self.server_params = StdioServerParameters(
             command="python",
             args=["-m", server_script],
-            env=env_info
+            env=current_env
         )
         self.session = None
         self._exit_stack = None
 
     async def connect(self):
         """
-        Transport Layer: 建立握手通道
-        启动服务端进程，建立Stdio传输
+        [A] 建立握手通道 (Handshake)
+        启动服务端进程并建立 Stdio 传输
         """
         logger.info(f"Connecting to server: [bold white]{self.server_params.args[1]}[/bold white]...",
                     extra={"markup": True})
@@ -96,3 +109,38 @@ class MCPClient:
         if self._exit_stack:
             await self._exit_stack.aclose()
             logger.info("Disconnected from EduClaw Server.")
+
+
+class EduClawAgent:
+    def __init__(self):
+        self.llm = get_llm()
+        self.mcp_client = MCPClient()
+        self.history: List = []
+
+    async def start(self):
+        """启动并连接 MCP Server"""
+        await self.mcp_client.connect()
+        logger.info("[bold green]Agent Brain is now connected to Tool Server.[/bold green]", extra={"markup": True})
+
+    async def chat(self, user_text: str):
+        """
+        核心思考循环：
+        1. 接收用户文本 -> 2. LLM 思考 -> 3. 若需工具则通过 MCP 调用 -> 4. 返回最终答案
+        """
+        logger.info(f"Thinking about: [dim]'{user_text}'[/dim]", extra={"markup": True})
+
+        # 简单起见，这里演示一个逻辑：
+        # 实际开发中，这里可以使用 LangChain 的 create_react_agent
+        # 这里模拟 LLM 决定调用工具的过程
+        if "天气" in user_text:
+            logger.info("Decision: [bold cyan]Needs Weather Tool[/bold cyan]", extra={"markup": True})
+            # 通过 MCP 协议调遣 Server 执行
+            result = await self.mcp_client.use_tool("get_weather", {"city": "上海"})
+            return f"Agent分析结果：{result.content[0].text}"
+        else:
+            # 普通对话
+            response = await self.llm.ainvoke([HumanMessage(content=user_text)])
+            return response.content
+
+    async def stop(self):
+        await self.mcp_client.disconnect()

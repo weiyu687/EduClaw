@@ -400,3 +400,16 @@ TypeError: 'Status' object does not support the asynchronous context manager pro
 2026-04-01 18:41:02,810 - CLIENT - INFO - [agent_client.py:26] - [bold green]Agent Brain is now connected to Tool Server.[/bold green]
 2026-04-01 18:41:23,858 - CLIENT - INFO - [client.py:104] - Disconnected from EduClaw Server.
 2026-04-01 18:41:23,858 - USER - INFO - [main.py:55] - System closed safely.
+2026-04-01 20:41:58,748 - CORE - INFO - [llm_factory.py:19] - LLM Factory: Initializing [bold white]qwen-plus[/bold white]
+2026-04-01 20:41:58,954 - USER - INFO - [main.py:27] - Starting EduClaw System...
+2026-04-01 20:41:58,956 - CLIENT - INFO - [client.py:49] - Connecting to server: [bold white]core.mcp.server[/bold white]...
+2026-04-01 20:41:59,602 - SERVER - INFO - [server.py:56] - EduClaw MCP [bold blue]Transport Online[/bold blue]
+2026-04-01 20:41:59,606 - CLIENT - INFO - [client.py:64] - [bold green]Connection established.[/bold green] Handshake successful.
+2026-04-01 20:41:59,608 - CLIENT - INFO - [agent_client.py:26] - [bold green]Agent Brain is now connected to Tool Server.[/bold green]
+2026-04-01 20:42:54,335 - CLIENT - INFO - [agent_client.py:33] - Thinking about: [dim]'上海的天气怎么样？'[/dim]
+2026-04-01 20:42:54,337 - CLIENT - INFO - [agent_client.py:39] - Decision: [bold cyan]Needs Weather Tool[/bold cyan]
+2026-04-01 20:42:54,338 - CLIENT - INFO - [client.py:87] - Calling tool [bold cyan]get_weather[/bold cyan] with args: {'city': '上海'}
+2026-04-01 20:42:54,340 - mcp.server.lowlevel.server - INFO - [server.py:720] - Processing request of type CallToolRequest
+2026-04-01 20:42:54,344 - SERVER - INFO - [server.py:43] - AI requested tool: [bold cyan]get_weather[/bold cyan]
+2026-04-01 20:42:54,360 - mcp.server.lowlevel.server - INFO - [server.py:720] - Processing request of type ListToolsRequest
+2026-04-01 20:42:54,362 - CLIENT - INFO - [client.py:94] - [bold white]Server Response:[/bold white] EduClaw 实时监测：最近 上海 总是晴天，适合学习！

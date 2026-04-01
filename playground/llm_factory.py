@@ -46,9 +46,13 @@ agent = create_agent(
 
 
 if __name__ == "__main__":
-    result = agent.invoke(
-        {"messages": [("user", "上海的天气怎么样？")]}
-    )
+    result = agent.invoke({
+        "messages": [
+            ("human", "你好"),
+            ("ai", "你好！我是AI助手"),
+            ("human", "上海的天气怎么样？")
+        ]
+    })
 
     print("\nAI回复:")
     print(result["messages"][-1].content)

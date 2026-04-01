@@ -1,25 +1,23 @@
 """
-EduClaw 用户交互层 (User Interface)
-职责：展示 UI、接收用户输入、驱动 Agent
+项目入口
 
 Author: Gongmin Wei
-Date: 2026-03-31
+Date: 2026-04-01
 """
 import asyncio
 from rich.console import Console
 from core.logging import get_logger
 from core.usr.startup_info import print_startup_info
-from core.client.agent_client import EduClawAgent
+from core.agent.agent_client import EduClawAgent
 
-# 获取专属 USER 前缀的日志
 logger = get_logger("USER")
 console = Console()
 
+
 async def run_interactive_app():
-    # 1. 打印 Banner 和系统信息
+    # 打印启动卡片
     print_startup_info()
 
-    # 2. 初始化智能体
     agent = EduClawAgent()
 
     try:

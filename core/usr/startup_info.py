@@ -1,5 +1,5 @@
 """
-设置启动卡片。
+设置启动卡片
 
 Author: Gongmin Wei
 Date: 2026-03-31
