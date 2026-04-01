@@ -20,18 +20,18 @@ def get_llm(test_connection_test: bool = True) -> ChatOpenAI:
     base_url = os.getenv("EDUCLAW_MODEL_API_URL")
 
     if not model_name:
-        logger.critical("LLM初始化失败： 环境变量 EDUCLAW_MODEL_NAME 未配置")
+        logger.critical("LLM Factory: LLM初始化失败--环境变量 EDUCLAW_MODEL_NAME 未配置")
         raise ValueError("EDUCLAW_MODEL_NAME cannot be empty")
 
     if not api_key:
-        logger.critical("LLM初始化失败： 环境变量 EDUCLAW_MODEL_API_KEY 未配置")
+        logger.critical("LLM Factory: LLM初始化失败--环境变量 EDUCLAW_MODEL_API_KEY 未配置")
         raise ValueError("EDUCLAW_MODEL_API_KEY cannot be empty")
 
     if not base_url:
-        logger.critical("LLM初始化失败： 环境变量 EDUCLAW_MODEL_API_URL 未配置")
+        logger.critical("LLM Factory: LLM初始化失败--环境变量 EDUCLAW_MODEL_API_URL 未配置")
         raise ValueError("EDUCLAW_MODEL_API_URL cannot be empty")
 
-    logger.info(f"LLM Factory: 正在初始化模型： [bold white]{model_name}[/bold white] ...", extra={"markup": True})
+    logger.info(f"LLM Factory: 正在初始化模型--[bold white]{model_name}[/bold white] ...", extra={"markup": True})
 
     llm = ChatOpenAI(
         model=model_name,

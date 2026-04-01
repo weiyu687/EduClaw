@@ -19,7 +19,7 @@ logger = get_logger("CLIENT")
 class MCPClient:
     def __init__(self, server_script: str = "core.mcp.startup_server"):
         """
-        初始化客户端(客户端 -> 启动 -> 服务端)
+        初始化客户端
         :param server_script: 要启动的服务端模块路径 (python -m 模式)
         """
         project_dir_root = str(Path(__file__).parent.parent.parent.resolve())
@@ -38,12 +38,10 @@ class MCPClient:
     async def connect(self):
         """
         Transport Layer: 建立握手通道
-        启动服务端进程，建立Stdio传输
+        启动服务端进程，建立Stdio传输(客户端 -> 启动并连接 -> 服务端)
         """
-        logger.info(f"Connecting to server: [bold white]{self.server_params.args[1]}[/bold white]...",
-                    extra={"markup": True})
+        logger.info("MCP Client: 正在启动服务器并建立连接 ...", extra={"markup": True})
 
-        # 使用 stdio_client 建立双向管道
         self._exit_stack = AsyncExitStack()
         read_stream, write_stream = await self._exit_stack.enter_async_context(
             stdio_client(self.server_params)
@@ -55,44 +53,38 @@ class MCPClient:
         )
 
         await self.session.initialize()
-        logger.info("[bold green]Connection established.[/bold green] Handshake successful.", extra={"markup": True})
+        logger.info("MCP Client: Client 和 Server 建立连接 [bold green]成功[/bold green]", extra={"markup": True})
 
     async def get_tools(self):
-        """
-        [B] 工具发现：获取服务端提供的菜单
-        """
+        """获取服务端提供的工具列表"""
         if not self.session:
             raise RuntimeError("Client not connected.")
 
-        logger.info("Fetching available educational tools from server...")
+        logger.info("MCP Client: 正在向Server调取工具列表 ...")
         tools = await self.session.list_tools()
+        logger.info("MCP Client: 获取工具列表 [bold green]成功[/bold green]")
 
-        for tool in tools:
-            logger.info(f"Found Tool: [cyan]{tool.name}[/cyan] - {tool.description}", extra={"markup": True})
         return tools
 
     async def use_tool(self, tool_name: str, arguments: Dict[str, Any]):
-        """
-        [C] 请求分发：调用具体工具
-        """
+        """调用工具"""
         if not self.session:
             raise RuntimeError("Client not connected.")
 
-        logger.info(f"Calling tool [bold cyan]{tool_name}[/bold cyan] with args: {arguments}", extra={"markup": True})
+        logger.info(f"MCP Client: 正在调用工具 [bold cyan]{tool_name}[/bold cyan] ...", extra={"markup": True})
 
         try:
             result = await self.session.call_tool(tool_name, arguments)
-            # 解析返回的内容 (通常是 TextContent)
-            for content in result.content:
-                if content.type == "text":
-                    logger.info(f"[bold white]Server Response:[/bold white] {content.text}", extra={"markup": True})
+            # result 包括 TextContent, ImageContent, ResourceContent
+
+            logger.info(f"MCP Client: 工具调用 [bold green]成功[/bold green]")
             return result
         except Exception as e:
-            logger.error(f"Tool execution failed: {str(e)}")
+            logger.error(f"MCP Client: 工具调用失败--{str(e)}")
             return None
 
     async def disconnect(self):
         """断开连接"""
         if self._exit_stack:
             await self._exit_stack.aclose()
-            logger.info("Disconnected from EduClaw Server.")
+            logger.info("MCP Client: 连接已断开 ...")
