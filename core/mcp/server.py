@@ -1,5 +1,6 @@
 """
-封装MCP类，包括建立握手通道、注册工具与资源、监听请求。
+EduClaw MCP Server 封装，
+
 
 Author: Gongmin Wei
 Date: 2026-03-31

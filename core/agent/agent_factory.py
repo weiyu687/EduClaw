@@ -1,3 +1,18 @@
+"""
+创建智能体
+
+Author: Gongmin Wei
+Date: 2026-04-02
+"""
+from typing import List
+from langchain_core.messages import HumanMessage
+from core.llm import get_llm
+from core.mcp import MCPClient
+from logging import getLogger
+
+logger = getLogger("Client")
+
+
 class EduClawAgent:
     def __init__(self):
         self.llm = get_llm()

@@ -1,5 +1,5 @@
 """
-EduClaw MCP 客户端封装，
+EduClaw MCP Client 封装，
 包括 Transport Layer，Capabilities Discovery，Request Dispatching
 
 Author: Gongmin Wei

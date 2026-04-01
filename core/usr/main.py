@@ -8,7 +8,7 @@ import asyncio
 from rich.console import Console
 from core.logging import get_logger
 from core.usr.startup_info import print_startup_info
-from core.agent.agent_client import EduClawAgent
+from core.agent import EduClawAgent
 
 logger = get_logger("USER")
 console = Console()
