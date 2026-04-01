@@ -28,3 +28,375 @@
 2026-03-31 22:40:03,132 - CLIENT - INFO - [main.py:30] - Scanning for skills in ./skills...
 2026-03-31 22:40:03,644 - CLIENT - INFO - [main.py:33] - EduClaw is now [bold white]listening[/bold white] for MCP requests.
 2026-03-31 22:41:29,735 - CLIENT - WARNING - [main.py:23] - Shutdown signal received (Ctrl+C).
+2026-04-01 17:59:11,578 - SERVER - INFO - [main.py:38] - EduClaw Server core has been initialized.
+2026-04-01 17:59:11,580 - CORE - INFO - [llm_factory.py:19] - LLM Factory: Initializing [bold white]qwen-plus[/bold white]
+2026-04-01 17:59:11,875 - SERVER - INFO - [main.py:20] - [bold green]LLM Brain connected successfully.[/bold green]
+2026-04-01 17:59:11,876 - SERVER - INFO - [main.py:26] - Scanning [bold white]./skills[/bold white] for pedagogical strategies...
+2026-04-01 17:59:12,386 - SERVER - INFO - [main.py:31] - EduClaw is [bold white]listening[/bold white] for MCP requests.
+2026-04-01 17:59:12,393 - SERVER - CRITICAL - [main.py:45] - Server crashed: unhandled errors in a TaskGroup (1 sub-exception)
+  + Exception Group Traceback (most recent call last):
+  |   File "D:\wgm\EduClaw\core\client\main.py", line 41, in start_server
+  |     asyncio.run(main_loop())
+  |   File "C:\ProgramData\Anaconda3\envs\educlaw\Lib\asyncio\runners.py", line 190, in run
+  |     return runner.run(main)
+  |            ^^^^^^^^^^^^^^^^
+  |   File "C:\ProgramData\Anaconda3\envs\educlaw\Lib\asyncio\runners.py", line 118, in run
+  |     return self._loop.run_until_complete(task)
+  |            ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  |   File "C:\ProgramData\Anaconda3\envs\educlaw\Lib\asyncio\base_events.py", line 654, in run_until_complete
+  |     return future.result()
+  |            ^^^^^^^^^^^^^^^
+  |   File "D:\wgm\EduClaw\core\client\main.py", line 32, in main_loop
+  |     await server.run()
+  |   File "D:\wgm\EduClaw\core\mcp\server.py", line 53, in run
+  |     async with stdio_server() as (read_stream, write_stream):
+  |   File "C:\ProgramData\Anaconda3\envs\educlaw\Lib\contextlib.py", line 231, in __aexit__
+  |     await self.gen.athrow(typ, value, traceback)
+  |   File "C:\ProgramData\Anaconda3\envs\educlaw\Lib\site-packages\mcp\server\stdio.py", line 85, in stdio_server
+  |     async with anyio.create_task_group() as tg:
+  |   File "C:\ProgramData\Anaconda3\envs\educlaw\Lib\site-packages\anyio\_backends\_asyncio.py", line 799, in __aexit__
+  |     raise BaseExceptionGroup(
+  | ExceptionGroup: unhandled errors in a TaskGroup (1 sub-exception)
+  +-+---------------- 1 ----------------
+    | Traceback (most recent call last):
+    |   File "C:\ProgramData\Anaconda3\envs\educlaw\Lib\site-packages\mcp\server\stdio.py", line 88, in stdio_server
+    |     yield read_stream, write_stream
+    |   File "D:\wgm\EduClaw\core\mcp\server.py", line 54, in run
+    |     logger.info("EduClaw MCP [bold blue]Transport Online[/bold blue]", extra={"markup": True})
+    |     ^^^^^^
+    | NameError: name 'logger' is not defined
+    +------------------------------------
+2026-04-01 17:59:12,546 - SERVER - INFO - [main.py:47] - EduClaw has been safely terminated.
+2026-04-01 18:00:38,648 - SERVER - INFO - [main.py:38] - EduClaw Server core has been initialized.
+2026-04-01 18:00:38,649 - CORE - INFO - [llm_factory.py:19] - LLM Factory: Initializing [bold white]qwen-plus[/bold white]
+2026-04-01 18:00:38,844 - SERVER - INFO - [main.py:20] - [bold green]LLM Brain connected successfully.[/bold green]
+2026-04-01 18:00:38,845 - SERVER - INFO - [main.py:26] - Scanning [bold white]./skills[/bold white] for pedagogical strategies...
+2026-04-01 18:00:39,357 - SERVER - INFO - [main.py:31] - EduClaw is [bold white]listening[/bold white] for MCP requests.
+2026-04-01 18:00:39,362 - SERVER - INFO - [server.py:56] - EduClaw MCP [bold blue]Transport Online[/bold blue]
+2026-04-01 18:06:30,977 - SERVER - CRITICAL - [main.py:45] - Server crashed: unhandled errors in a TaskGroup (1 sub-exception)
+  + Exception Group Traceback (most recent call last):
+  |   File "D:\wgm\EduClaw\core\client\main.py", line 41, in start_server
+  |     asyncio.run(main_loop())
+  |   File "C:\ProgramData\Anaconda3\envs\educlaw\Lib\asyncio\runners.py", line 190, in run
+  |     return runner.run(main)
+  |            ^^^^^^^^^^^^^^^^
+  |   File "C:\ProgramData\Anaconda3\envs\educlaw\Lib\asyncio\runners.py", line 118, in run
+  |     return self._loop.run_until_complete(task)
+  |            ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  |   File "C:\ProgramData\Anaconda3\envs\educlaw\Lib\asyncio\base_events.py", line 654, in run_until_complete
+  |     return future.result()
+  |            ^^^^^^^^^^^^^^^
+  |   File "D:\wgm\EduClaw\core\client\main.py", line 32, in main_loop
+  |     await server.run()
+  |   File "D:\wgm\EduClaw\core\mcp\server.py", line 55, in run
+  |     async with stdio_server() as (read_stream, write_stream):
+  |   File "C:\ProgramData\Anaconda3\envs\educlaw\Lib\contextlib.py", line 231, in __aexit__
+  |     await self.gen.athrow(typ, value, traceback)
+  |   File "C:\ProgramData\Anaconda3\envs\educlaw\Lib\site-packages\mcp\server\stdio.py", line 85, in stdio_server
+  |     async with anyio.create_task_group() as tg:
+  |   File "C:\ProgramData\Anaconda3\envs\educlaw\Lib\site-packages\anyio\_backends\_asyncio.py", line 799, in __aexit__
+  |     raise BaseExceptionGroup(
+  | ExceptionGroup: unhandled errors in a TaskGroup (1 sub-exception)
+  +-+---------------- 1 ----------------
+    | Traceback (most recent call last):
+    |   File "C:\ProgramData\Anaconda3\envs\educlaw\Lib\site-packages\mcp\server\stdio.py", line 63, in stdin_reader
+    |     async for line in stdin:
+    |   File "C:\ProgramData\Anaconda3\envs\educlaw\Lib\site-packages\anyio\_core\_fileio.py", line 83, in __aiter__
+    |     line = await self.readline()
+    |            ^^^^^^^^^^^^^^^^^^^^^
+    |   File "C:\ProgramData\Anaconda3\envs\educlaw\Lib\site-packages\anyio\_core\_fileio.py", line 99, in readline
+    |     return await to_thread.run_sync(self._fp.readline)
+    |            ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+    |   File "C:\ProgramData\Anaconda3\envs\educlaw\Lib\site-packages\anyio\to_thread.py", line 63, in run_sync
+    |     return await get_async_backend().run_sync_in_worker_thread(
+    |            ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+    |   File "C:\ProgramData\Anaconda3\envs\educlaw\Lib\site-packages\anyio\_backends\_asyncio.py", line 2518, in run_sync_in_worker_thread
+    |     return await future
+    |            ^^^^^^^^^^^^
+    |   File "C:\ProgramData\Anaconda3\envs\educlaw\Lib\site-packages\anyio\_backends\_asyncio.py", line 1002, in run
+    |     result = context.run(func, *args)
+    |              ^^^^^^^^^^^^^^^^^^^^^^^^
+    |   File "<frozen codecs>", line 322, in decode
+    | UnicodeDecodeError: 'utf-8' codec can't decode byte 0xff in position 0: invalid start byte
+    +------------------------------------
+2026-04-01 18:06:31,282 - SERVER - INFO - [main.py:47] - EduClaw has been safely terminated.
+2026-04-01 18:14:10,391 - CORE - INFO - [llm_factory.py:19] - LLM Factory: Initializing [bold white]qwen-plus[/bold white]
+2026-04-01 18:15:51,236 - CORE - INFO - [llm_factory.py:19] - LLM Factory: Initializing [bold white]qwen-plus[/bold white]
+2026-04-01 18:15:51,427 - USER - INFO - [main.py:28] - Starting EduClaw System...
+2026-04-01 18:15:51,428 - CLIENT - INFO - [client.py:41] - Connecting to server: [bold white]core.server.main[/bold white]...
+2026-04-01 18:15:51,429 - USER - ERROR - [main.py:53] - Application Error: module 'asyncio' has no attribute 'ExitStack'
+Traceback (most recent call last):
+  File "D:\wgm\EduClaw\core\usr\main.py", line 29, in run_interactive_app
+    await agent.start()
+  File "D:\wgm\EduClaw\core\client\agent_client.py", line 26, in start
+    await self.mcp_client.connect()
+  File "D:\wgm\EduClaw\core\mcp\client.py", line 45, in connect
+    self._exit_stack = asyncio.ExitStack()
+                       ^^^^^^^^^^^^^^^^^
+AttributeError: module 'asyncio' has no attribute 'ExitStack'
+2026-04-01 18:15:51,456 - USER - INFO - [main.py:56] - System closed safely.
+2026-04-01 18:17:52,216 - CORE - INFO - [llm_factory.py:19] - LLM Factory: Initializing [bold white]qwen-plus[/bold white]
+2026-04-01 18:17:52,413 - USER - INFO - [main.py:28] - Starting EduClaw System...
+2026-04-01 18:17:52,413 - CLIENT - INFO - [client.py:41] - Connecting to server: [bold white]core.server.main[/bold white]...
+2026-04-01 18:17:52,414 - USER - ERROR - [main.py:53] - Application Error: 'dict' object has no attribute 'command'
+Traceback (most recent call last):
+  File "D:\wgm\EduClaw\core\usr\main.py", line 29, in run_interactive_app
+    await agent.start()
+  File "D:\wgm\EduClaw\core\client\agent_client.py", line 26, in start
+    await self.mcp_client.connect()
+  File "D:\wgm\EduClaw\core\mcp\client.py", line 46, in connect
+    read_stream, write_stream = await self._exit_stack.enter_async_context(
+                                ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "C:\ProgramData\Anaconda3\envs\educlaw\Lib\contextlib.py", line 650, in enter_async_context
+    result = await _enter(cm)
+             ^^^^^^^^^^^^^^^^
+  File "C:\ProgramData\Anaconda3\envs\educlaw\Lib\contextlib.py", line 210, in __aenter__
+    return await anext(self.gen)
+           ^^^^^^^^^^^^^^^^^^^^^
+  File "C:\ProgramData\Anaconda3\envs\educlaw\Lib\site-packages\mcp\client\stdio\__init__.py", line 121, in stdio_client
+    command = _get_executable_command(server.command)
+                                      ^^^^^^^^^^^^^^
+AttributeError: 'dict' object has no attribute 'command'
+2026-04-01 18:17:52,504 - CLIENT - INFO - [client.py:96] - Disconnected from EduClaw Server.
+2026-04-01 18:17:52,505 - USER - INFO - [main.py:56] - System closed safely.
+2026-04-01 18:19:36,480 - CORE - INFO - [llm_factory.py:19] - LLM Factory: Initializing [bold white]qwen-plus[/bold white]
+2026-04-01 18:19:36,675 - USER - INFO - [main.py:28] - Starting EduClaw System...
+2026-04-01 18:19:36,676 - USER - ERROR - [main.py:53] - Application Error: 'StdioServerParameters' object is not subscriptable
+Traceback (most recent call last):
+  File "D:\wgm\EduClaw\core\usr\main.py", line 29, in run_interactive_app
+    await agent.start()
+  File "D:\wgm\EduClaw\core\client\agent_client.py", line 26, in start
+    await self.mcp_client.connect()
+  File "D:\wgm\EduClaw\core\mcp\client.py", line 41, in connect
+    logger.info(f"Connecting to server: [bold white]{self.server_params['args'][1]}[/bold white]...",
+                                                     ~~~~~~~~~~~~~~~~~~^^^^^^^^
+TypeError: 'StdioServerParameters' object is not subscriptable
+2026-04-01 18:19:36,703 - USER - INFO - [main.py:56] - System closed safely.
+2026-04-01 18:20:36,970 - CORE - INFO - [llm_factory.py:19] - LLM Factory: Initializing [bold white]qwen-plus[/bold white]
+2026-04-01 18:20:37,165 - USER - INFO - [main.py:28] - Starting EduClaw System...
+2026-04-01 18:20:37,166 - CLIENT - INFO - [client.py:41] - Connecting to server: [bold white]core.server.main[/bold white]...
+2026-04-01 18:20:37,208 - USER - ERROR - [main.py:53] - Application Error: Connection closed
+Traceback (most recent call last):
+  File "D:\wgm\EduClaw\core\usr\main.py", line 29, in run_interactive_app
+    await agent.start()
+  File "D:\wgm\EduClaw\core\client\agent_client.py", line 26, in start
+    await self.mcp_client.connect()
+  File "D:\wgm\EduClaw\core\mcp\client.py", line 55, in connect
+    await self.session.initialize()
+  File "C:\ProgramData\Anaconda3\envs\educlaw\Lib\site-packages\mcp\client\session.py", line 171, in initialize
+    result = await self.send_request(
+             ^^^^^^^^^^^^^^^^^^^^^^^^
+  File "C:\ProgramData\Anaconda3\envs\educlaw\Lib\site-packages\mcp\shared\session.py", line 306, in send_request
+    raise McpError(response_or_error.error)
+mcp.shared.exceptions.McpError: Connection closed
+2026-04-01 18:20:37,288 - CLIENT - INFO - [client.py:96] - Disconnected from EduClaw Server.
+2026-04-01 18:20:37,289 - USER - INFO - [main.py:56] - System closed safely.
+2026-04-01 18:24:20,950 - CORE - INFO - [llm_factory.py:19] - LLM Factory: Initializing [bold white]qwen-plus[/bold white]
+2026-04-01 18:24:21,145 - USER - INFO - [main.py:27] - Starting EduClaw System...
+2026-04-01 18:24:21,146 - CLIENT - INFO - [client.py:49] - Connecting to server: [bold white]core.server.main[/bold white]...
+2026-04-01 18:24:21,187 - USER - ERROR - [main.py:52] - Application Error: Connection closed
+Traceback (most recent call last):
+  File "D:\wgm\EduClaw\core\usr\main.py", line 28, in run_interactive_app
+    await agent.start()
+  File "D:\wgm\EduClaw\core\client\agent_client.py", line 25, in start
+    await self.mcp_client.connect()
+  File "D:\wgm\EduClaw\core\mcp\client.py", line 63, in connect
+    await self.session.initialize()
+  File "C:\ProgramData\Anaconda3\envs\educlaw\Lib\site-packages\mcp\client\session.py", line 171, in initialize
+    result = await self.send_request(
+             ^^^^^^^^^^^^^^^^^^^^^^^^
+  File "C:\ProgramData\Anaconda3\envs\educlaw\Lib\site-packages\mcp\shared\session.py", line 306, in send_request
+    raise McpError(response_or_error.error)
+mcp.shared.exceptions.McpError: Connection closed
+2026-04-01 18:24:21,262 - CLIENT - INFO - [client.py:104] - Disconnected from EduClaw Server.
+2026-04-01 18:24:21,263 - USER - INFO - [main.py:55] - System closed safely.
+2026-04-01 18:24:49,699 - CORE - INFO - [llm_factory.py:19] - LLM Factory: Initializing [bold white]qwen-plus[/bold white]
+2026-04-01 18:24:49,896 - USER - INFO - [main.py:27] - Starting EduClaw System...
+2026-04-01 18:24:49,897 - CLIENT - INFO - [client.py:49] - Connecting to server: [bold white]core.server.main[/bold white]...
+2026-04-01 18:24:49,936 - USER - ERROR - [main.py:52] - Application Error: Connection closed
+Traceback (most recent call last):
+  File "D:\wgm\EduClaw\core\usr\main.py", line 28, in run_interactive_app
+    await agent.start()
+  File "D:\wgm\EduClaw\core\agent\agent_client.py", line 25, in start
+    await self.mcp_client.connect()
+  File "D:\wgm\EduClaw\core\mcp\client.py", line 63, in connect
+    await self.session.initialize()
+  File "C:\ProgramData\Anaconda3\envs\educlaw\Lib\site-packages\mcp\client\session.py", line 171, in initialize
+    result = await self.send_request(
+             ^^^^^^^^^^^^^^^^^^^^^^^^
+  File "C:\ProgramData\Anaconda3\envs\educlaw\Lib\site-packages\mcp\shared\session.py", line 306, in send_request
+    raise McpError(response_or_error.error)
+mcp.shared.exceptions.McpError: Connection closed
+2026-04-01 18:24:50,011 - CLIENT - INFO - [client.py:104] - Disconnected from EduClaw Server.
+2026-04-01 18:24:50,012 - USER - INFO - [main.py:55] - System closed safely.
+2026-04-01 18:26:14,934 - CORE - INFO - [llm_factory.py:19] - LLM Factory: Initializing [bold white]qwen-plus[/bold white]
+2026-04-01 18:26:15,131 - USER - INFO - [main.py:27] - Starting EduClaw System...
+2026-04-01 18:26:15,132 - CLIENT - INFO - [client.py:49] - Connecting to server: [bold white]core.server.main[/bold white]...
+2026-04-01 18:26:15,177 - USER - ERROR - [main.py:52] - Application Error: Connection closed
+Traceback (most recent call last):
+  File "D:\wgm\EduClaw\core\usr\main.py", line 28, in run_interactive_app
+    await agent.start()
+  File "D:\wgm\EduClaw\core\client\agent_client.py", line 25, in start
+    await self.mcp_client.connect()
+  File "D:\wgm\EduClaw\core\mcp\client.py", line 63, in connect
+    await self.session.initialize()
+  File "C:\ProgramData\Anaconda3\envs\educlaw\Lib\site-packages\mcp\client\session.py", line 171, in initialize
+    result = await self.send_request(
+             ^^^^^^^^^^^^^^^^^^^^^^^^
+  File "C:\ProgramData\Anaconda3\envs\educlaw\Lib\site-packages\mcp\shared\session.py", line 306, in send_request
+    raise McpError(response_or_error.error)
+mcp.shared.exceptions.McpError: Connection closed
+2026-04-01 18:26:15,252 - CLIENT - INFO - [client.py:104] - Disconnected from EduClaw Server.
+2026-04-01 18:26:15,253 - USER - INFO - [main.py:55] - System closed safely.
+2026-04-01 18:27:06,330 - CORE - INFO - [llm_factory.py:19] - LLM Factory: Initializing [bold white]qwen-plus[/bold white]
+2026-04-01 18:27:06,521 - USER - INFO - [main.py:27] - Starting EduClaw System...
+2026-04-01 18:27:06,523 - CLIENT - INFO - [client.py:49] - Connecting to server: [bold white]core.server.main[/bold white]...
+2026-04-01 18:27:06,564 - USER - ERROR - [main.py:52] - Application Error: Connection closed
+Traceback (most recent call last):
+  File "D:\wgm\EduClaw\core\usr\main.py", line 28, in run_interactive_app
+    await agent.start()
+  File "D:\wgm\EduClaw\core\client\agent_client.py", line 25, in start
+    await self.mcp_client.connect()
+  File "D:\wgm\EduClaw\core\mcp\client.py", line 63, in connect
+    await self.session.initialize()
+  File "C:\ProgramData\Anaconda3\envs\educlaw\Lib\site-packages\mcp\client\session.py", line 171, in initialize
+    result = await self.send_request(
+             ^^^^^^^^^^^^^^^^^^^^^^^^
+  File "C:\ProgramData\Anaconda3\envs\educlaw\Lib\site-packages\mcp\shared\session.py", line 306, in send_request
+    raise McpError(response_or_error.error)
+mcp.shared.exceptions.McpError: Connection closed
+2026-04-01 18:27:06,642 - CLIENT - INFO - [client.py:104] - Disconnected from EduClaw Server.
+2026-04-01 18:27:06,643 - USER - INFO - [main.py:55] - System closed safely.
+2026-04-01 18:29:36,426 - CORE - INFO - [llm_factory.py:19] - LLM Factory: Initializing [bold white]qwen-plus[/bold white]
+2026-04-01 18:29:36,618 - USER - INFO - [main.py:27] - Starting EduClaw System...
+2026-04-01 18:29:36,658 - USER - ERROR - [main.py:52] - Application Error: Connection closed
+Traceback (most recent call last):
+  File "D:\wgm\EduClaw\core\usr\main.py", line 28, in run_interactive_app
+    await agent.start()
+  File "D:\wgm\EduClaw\core\client\agent_client.py", line 25, in start
+    await self.mcp_client.connect()
+  File "D:\wgm\EduClaw\core\mcp\client.py", line 63, in connect
+    await self.session.initialize()
+  File "C:\ProgramData\Anaconda3\envs\educlaw\Lib\site-packages\mcp\client\session.py", line 171, in initialize
+    result = await self.send_request(
+             ^^^^^^^^^^^^^^^^^^^^^^^^
+  File "C:\ProgramData\Anaconda3\envs\educlaw\Lib\site-packages\mcp\shared\session.py", line 306, in send_request
+    raise McpError(response_or_error.error)
+mcp.shared.exceptions.McpError: Connection closed
+2026-04-01 18:29:36,734 - CLIENT - INFO - [client.py:104] - Disconnected from EduClaw Server.
+2026-04-01 18:29:36,735 - USER - INFO - [main.py:55] - System closed safely.
+2026-04-01 18:30:33,677 - CORE - INFO - [llm_factory.py:19] - LLM Factory: Initializing [bold white]qwen-plus[/bold white]
+2026-04-01 18:30:33,871 - USER - INFO - [main.py:27] - Starting EduClaw System...
+2026-04-01 18:30:33,871 - CLIENT - INFO - [client.py:49] - Connecting to server: [bold white]core.server.main[/bold white]...
+2026-04-01 18:30:33,912 - USER - ERROR - [main.py:52] - Application Error: Connection closed
+Traceback (most recent call last):
+  File "D:\wgm\EduClaw\core\usr\main.py", line 28, in run_interactive_app
+    await agent.start()
+  File "D:\wgm\EduClaw\core\client\agent_client.py", line 25, in start
+    await self.mcp_client.connect()
+  File "D:\wgm\EduClaw\core\mcp\client.py", line 63, in connect
+    await self.session.initialize()
+  File "C:\ProgramData\Anaconda3\envs\educlaw\Lib\site-packages\mcp\client\session.py", line 171, in initialize
+    result = await self.send_request(
+             ^^^^^^^^^^^^^^^^^^^^^^^^
+  File "C:\ProgramData\Anaconda3\envs\educlaw\Lib\site-packages\mcp\shared\session.py", line 306, in send_request
+    raise McpError(response_or_error.error)
+mcp.shared.exceptions.McpError: Connection closed
+2026-04-01 18:30:33,989 - CLIENT - INFO - [client.py:104] - Disconnected from EduClaw Server.
+2026-04-01 18:30:33,990 - USER - INFO - [main.py:55] - System closed safely.
+2026-04-01 18:31:39,209 - CORE - INFO - [llm_factory.py:19] - LLM Factory: Initializing [bold white]qwen-plus[/bold white]
+2026-04-01 18:31:39,406 - USER - INFO - [main.py:27] - Starting EduClaw System...
+2026-04-01 18:31:39,407 - CLIENT - INFO - [client.py:49] - Connecting to server: [bold white]core.mcp.server[/bold white]...
+2026-04-01 18:31:40,105 - USER - ERROR - [main.py:52] - Application Error: Connection closed
+Traceback (most recent call last):
+  File "D:\wgm\EduClaw\core\usr\main.py", line 28, in run_interactive_app
+    await agent.start()
+  File "D:\wgm\EduClaw\core\client\agent_client.py", line 25, in start
+    await self.mcp_client.connect()
+  File "D:\wgm\EduClaw\core\mcp\client.py", line 63, in connect
+    await self.session.initialize()
+  File "C:\ProgramData\Anaconda3\envs\educlaw\Lib\site-packages\mcp\client\session.py", line 171, in initialize
+    result = await self.send_request(
+             ^^^^^^^^^^^^^^^^^^^^^^^^
+  File "C:\ProgramData\Anaconda3\envs\educlaw\Lib\site-packages\mcp\shared\session.py", line 306, in send_request
+    raise McpError(response_or_error.error)
+mcp.shared.exceptions.McpError: Connection closed
+2026-04-01 18:31:40,181 - CLIENT - INFO - [client.py:104] - Disconnected from EduClaw Server.
+2026-04-01 18:31:40,181 - USER - INFO - [main.py:55] - System closed safely.
+2026-04-01 18:33:25,567 - CORE - INFO - [llm_factory.py:19] - LLM Factory: Initializing [bold white]qwen-plus[/bold white]
+2026-04-01 18:33:25,763 - USER - INFO - [main.py:27] - Starting EduClaw System...
+2026-04-01 18:33:25,764 - CLIENT - INFO - [client.py:49] - Connecting to server: [bold white]core.mcp.server[/bold white]...
+2026-04-01 18:33:26,438 - SERVER - INFO - [server.py:56] - EduClaw MCP [bold blue]Transport Online[/bold blue]
+2026-04-01 18:33:26,443 - CLIENT - INFO - [client.py:64] - [bold green]Connection established.[/bold green] Handshake successful.
+2026-04-01 18:33:26,444 - CLIENT - INFO - [agent_client.py:26] - [bold green]Agent Brain is now connected to Tool Server.[/bold green]
+2026-04-01 18:34:44,822 - USER - INFO - [main.py:39] - User requested shutdown.
+2026-04-01 18:34:44,890 - CLIENT - INFO - [client.py:104] - Disconnected from EduClaw Server.
+2026-04-01 18:34:44,891 - USER - INFO - [main.py:55] - System closed safely.
+2026-04-01 18:34:48,046 - CORE - INFO - [llm_factory.py:19] - LLM Factory: Initializing [bold white]qwen-plus[/bold white]
+2026-04-01 18:34:48,240 - USER - INFO - [main.py:27] - Starting EduClaw System...
+2026-04-01 18:34:48,241 - CLIENT - INFO - [client.py:49] - Connecting to server: [bold white]core.mcp.server[/bold white]...
+2026-04-01 18:34:48,879 - SERVER - INFO - [server.py:56] - EduClaw MCP [bold blue]Transport Online[/bold blue]
+2026-04-01 18:34:48,884 - CLIENT - INFO - [client.py:64] - [bold green]Connection established.[/bold green] Handshake successful.
+2026-04-01 18:34:48,885 - CLIENT - INFO - [agent_client.py:26] - [bold green]Agent Brain is now connected to Tool Server.[/bold green]
+2026-04-01 18:35:13,817 - USER - ERROR - [main.py:52] - Application Error: 'Status' object does not support the asynchronous context manager protocol
+Traceback (most recent call last):
+  File "D:\wgm\EduClaw\core\usr\main.py", line 46, in run_interactive_app
+    async with console.status("[bold blue]Agent 正在思考并调遣工具..."):
+TypeError: 'Status' object does not support the asynchronous context manager protocol
+2026-04-01 18:35:13,907 - CLIENT - INFO - [client.py:104] - Disconnected from EduClaw Server.
+2026-04-01 18:35:13,908 - USER - INFO - [main.py:55] - System closed safely.
+2026-04-01 18:36:05,533 - CORE - INFO - [llm_factory.py:19] - LLM Factory: Initializing [bold white]qwen-plus[/bold white]
+2026-04-01 18:36:05,726 - USER - INFO - [main.py:27] - Starting EduClaw System...
+2026-04-01 18:36:05,727 - CLIENT - INFO - [client.py:49] - Connecting to server: [bold white]core.mcp.server[/bold white]...
+2026-04-01 18:36:06,377 - SERVER - INFO - [server.py:56] - EduClaw MCP [bold blue]Transport Online[/bold blue]
+2026-04-01 18:36:06,382 - CLIENT - INFO - [client.py:64] - [bold green]Connection established.[/bold green] Handshake successful.
+2026-04-01 18:36:06,383 - CLIENT - INFO - [agent_client.py:26] - [bold green]Agent Brain is now connected to Tool Server.[/bold green]
+2026-04-01 18:36:07,903 - CLIENT - INFO - [agent_client.py:33] - Thinking about: [dim]'上海的天气怎么样？'[/dim]
+2026-04-01 18:36:07,904 - CLIENT - INFO - [agent_client.py:39] - Decision: [bold cyan]Needs Weather Tool[/bold cyan]
+2026-04-01 18:36:07,905 - CLIENT - INFO - [client.py:87] - Calling tool [bold cyan]get_weather[/bold cyan] with args: {'city': '上海'}
+2026-04-01 18:36:07,907 - mcp.server.lowlevel.server - INFO - [server.py:720] - Processing request of type CallToolRequest
+2026-04-01 18:36:07,910 - SERVER - INFO - [server.py:43] - AI requested tool: [bold cyan]get_weather[/bold cyan]
+2026-04-01 18:36:07,925 - mcp.server.lowlevel.server - INFO - [server.py:710] - Warning: PydanticDeprecatedSince20: The `schema` method is deprecated; use `model_json_schema` instead. Deprecated in Pydantic V2.0 to be removed in V3.0. See Pydantic V2 Migration Guide at https://errors.pydantic.dev/2.12/migration/
+2026-04-01 18:36:07,927 - mcp.server.lowlevel.server - INFO - [server.py:720] - Processing request of type ListToolsRequest
+2026-04-01 18:36:07,928 - mcp.server.lowlevel.server - INFO - [server.py:710] - Warning: PydanticDeprecatedSince20: The `schema` method is deprecated; use `model_json_schema` instead. Deprecated in Pydantic V2.0 to be removed in V3.0. See Pydantic V2 Migration Guide at https://errors.pydantic.dev/2.12/migration/
+2026-04-01 18:36:07,929 - CLIENT - INFO - [client.py:94] - [bold white]Server Response:[/bold white] EduClaw 实时监测：最近 上海 总是晴天，适合学习！
+2026-04-01 18:38:16,225 - CLIENT - INFO - [client.py:104] - Disconnected from EduClaw Server.
+2026-04-01 18:38:16,226 - USER - INFO - [main.py:55] - System closed safely.
+2026-04-01 18:38:18,111 - CORE - INFO - [llm_factory.py:19] - LLM Factory: Initializing [bold white]qwen-plus[/bold white]
+2026-04-01 18:38:18,305 - USER - INFO - [main.py:27] - Starting EduClaw System...
+2026-04-01 18:38:18,306 - CLIENT - INFO - [client.py:49] - Connecting to server: [bold white]core.mcp.server[/bold white]...
+2026-04-01 18:38:18,948 - SERVER - INFO - [server.py:56] - EduClaw MCP [bold blue]Transport Online[/bold blue]
+2026-04-01 18:38:18,952 - CLIENT - INFO - [client.py:64] - [bold green]Connection established.[/bold green] Handshake successful.
+2026-04-01 18:38:18,953 - CLIENT - INFO - [agent_client.py:26] - [bold green]Agent Brain is now connected to Tool Server.[/bold green]
+2026-04-01 18:38:29,737 - CLIENT - INFO - [agent_client.py:33] - Thinking about: [dim]'上海的天气怎么样？'[/dim]
+2026-04-01 18:38:29,739 - CLIENT - INFO - [agent_client.py:39] - Decision: [bold cyan]Needs Weather Tool[/bold cyan]
+2026-04-01 18:38:29,739 - CLIENT - INFO - [client.py:87] - Calling tool [bold cyan]get_weather[/bold cyan] with args: {'city': '上海'}
+2026-04-01 18:38:29,741 - mcp.server.lowlevel.server - INFO - [server.py:720] - Processing request of type CallToolRequest
+2026-04-01 18:38:29,744 - SERVER - INFO - [server.py:43] - AI requested tool: [bold cyan]get_weather[/bold cyan]
+2026-04-01 18:38:29,761 - mcp.server.lowlevel.server - INFO - [server.py:720] - Processing request of type ListToolsRequest
+2026-04-01 18:38:29,762 - CLIENT - INFO - [client.py:94] - [bold white]Server Response:[/bold white] EduClaw 实时监测：最近 上海 总是晴天，适合学习！
+2026-04-01 18:40:26,200 - CLIENT - INFO - [client.py:104] - Disconnected from EduClaw Server.
+2026-04-01 18:40:26,200 - USER - INFO - [main.py:55] - System closed safely.
+2026-04-01 18:40:27,433 - CORE - INFO - [llm_factory.py:19] - LLM Factory: Initializing [bold white]qwen-plus[/bold white]
+2026-04-01 18:40:27,626 - USER - INFO - [main.py:27] - Starting EduClaw System...
+2026-04-01 18:40:27,627 - CLIENT - INFO - [client.py:49] - Connecting to server: [bold white]core.mcp.server[/bold white]...
+2026-04-01 18:40:28,265 - SERVER - INFO - [server.py:56] - EduClaw MCP [bold blue]Transport Online[/bold blue]
+2026-04-01 18:40:28,270 - CLIENT - INFO - [client.py:64] - [bold green]Connection established.[/bold green] Handshake successful.
+2026-04-01 18:40:28,271 - CLIENT - INFO - [agent_client.py:26] - [bold green]Agent Brain is now connected to Tool Server.[/bold green]
+2026-04-01 18:40:48,368 - CLIENT - INFO - [agent_client.py:33] - Thinking about: [dim]'上海的天气怎么样？'[/dim]
+2026-04-01 18:40:48,370 - CLIENT - INFO - [agent_client.py:39] - Decision: [bold cyan]Needs Weather Tool[/bold cyan]
+2026-04-01 18:40:48,371 - CLIENT - INFO - [client.py:87] - Calling tool [bold cyan]get_weather[/bold cyan] with args: {'city': '上海'}
+2026-04-01 18:40:48,373 - mcp.server.lowlevel.server - INFO - [server.py:720] - Processing request of type CallToolRequest
+2026-04-01 18:40:48,376 - SERVER - INFO - [server.py:43] - AI requested tool: [bold cyan]get_weather[/bold cyan]
+2026-04-01 18:40:48,392 - mcp.server.lowlevel.server - INFO - [server.py:720] - Processing request of type ListToolsRequest
+2026-04-01 18:40:48,393 - CLIENT - INFO - [client.py:94] - [bold white]Server Response:[/bold white] EduClaw 实时监测：最近 上海 总是晴天，适合学习！
+2026-04-01 18:41:00,774 - CLIENT - INFO - [client.py:104] - Disconnected from EduClaw Server.
+2026-04-01 18:41:00,775 - USER - INFO - [main.py:55] - System closed safely.
+2026-04-01 18:41:01,974 - CORE - INFO - [llm_factory.py:19] - LLM Factory: Initializing [bold white]qwen-plus[/bold white]
+2026-04-01 18:41:02,172 - USER - INFO - [main.py:27] - Starting EduClaw System...
+2026-04-01 18:41:02,172 - CLIENT - INFO - [client.py:49] - Connecting to server: [bold white]core.mcp.server[/bold white]...
+2026-04-01 18:41:02,804 - SERVER - INFO - [server.py:56] - EduClaw MCP [bold blue]Transport Online[/bold blue]
+2026-04-01 18:41:02,809 - CLIENT - INFO - [client.py:64] - [bold green]Connection established.[/bold green] Handshake successful.
+2026-04-01 18:41:02,810 - CLIENT - INFO - [agent_client.py:26] - [bold green]Agent Brain is now connected to Tool Server.[/bold green]
+2026-04-01 18:41:23,858 - CLIENT - INFO - [client.py:104] - Disconnected from EduClaw Server.
+2026-04-01 18:41:23,858 - USER - INFO - [main.py:55] - System closed safely.
