@@ -4,7 +4,10 @@ EduClaw MCP Server 封装
 Author: Gongmin Wei
 Date: 2026-03-31
 """
+import os
+import dotenv
 import asyncio
+from typing import List, Union
 import mcp.types as types
 from mcp.server import Server, NotificationOptions
 from mcp.server.models import InitializationOptions
@@ -13,6 +16,7 @@ from mcp.server.stdio import stdio_server
 from core.logging import get_logger
 from core.tools import all_tools
 
+dotenv.load_dotenv()
 logger = get_logger("SERVER")
 
 
@@ -58,26 +62,34 @@ class MCPServer:
             return mcp_tools
 
         @self.app.call_tool()
-        async def call_tool(name: str, arguments: dict) -> list[types.TextContent]:
-            logger.info(f"AI requested tool: [bold cyan]{name}[/bold cyan]", extra={"markup": True})
+        async def call_tool(tool_name: str, arguments: dict)\
+                -> List[Union[types.TextContent, types.ImageContent, types.EmbeddedResource]]:
+            logger.info(f"MCP Server: Agent 正在调用工具: [bold cyan]{tool_name}[/bold cyan]", extra={"markup": True})
 
-            # 匹配并执行 LangChain 工具
-            target_tool = next((t for t in self.tools if t.name == name), None)
+            target_tool = next((t for t in self.tools if t.name == tool_name), None)
+
+            # 处理工具查找失败
             if not target_tool:
-                raise ValueError(f"Unknown tool: {name}")
+                return [types.TextContent(type="text", text=f"Error: Tool '{tool_name}' not found.")]
 
-            # 执行 LangChain 工具逻辑
-            result = target_tool.invoke(arguments)
-            return [types.TextContent(type="text", text=str(result))]
+            # 执行 MCP 工具逻辑
+            try:
+                result = target_tool.invoke(arguments)
+                logger.info(f"MCP Server: 工具{tool_name}调用 [bold green]成功[/bold green]")
+            except Exception as e:
+                logger.error(f"MCP Server: 工具{tool_name}调用失败--{str(e)}")
+                return [types.TextContent(type="text", text=f"Tool Execution Error: {str(e)}")]
+
+            return result
 
     async def run(self):
         async with stdio_server() as (read_stream, write_stream):
-            logger.info("EduClaw MCP [bold blue]Transport Online[/bold blue]", extra={"markup": True})
+            logger.info("MCP Server: EduClaw MCP [bold blue]Transport Online[/bold blue]", extra={"markup": True})
             await self.app.run(
                 read_stream, write_stream,
                 InitializationOptions(
                     server_name="EduClaw",
-                    server_version="0.1.0",
+                    server_version=os.getenv("VERSION"),
                     capabilities=self.app.get_capabilities(
                         notification_options=NotificationOptions(),
                         experimental_capabilities={},
@@ -90,7 +102,6 @@ if __name__ == "__main__":
     async def run():
         server = MCPServer()
         await server.run()
-
 
     try:
         asyncio.run(run())

@@ -4,7 +4,6 @@
 Author: Gongmin Wei
 Date: 2026-04-02
 """
-
 from langchain_core.tools import tool
 
 @tool
