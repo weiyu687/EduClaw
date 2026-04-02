@@ -6,6 +6,7 @@ Date: 2026-04-01
 """
 import os
 from dotenv import load_dotenv
+from langchain_core.messages import HumanMessage
 from langchain_openai import ChatOpenAI
 from core.logging import get_logger
 
@@ -44,11 +45,9 @@ def get_llm(test_connection_test: bool = True) -> ChatOpenAI:
         logger.info("LLM Factory: 正在测试模型是否可用 ...")
 
         try:
-            llm.invoke({
-                "messages": [
-                    ("human", "模型连接测试")
-                ]
-            })
+            llm.invoke([
+                HumanMessage(content="模型连接测试")
+            ])
             logger.info(f"LLM Factory: [bold green]模型 {model_name} 可用[/bold green]")
         except Exception as e:
             logger.error(f"LLM Factory: 模型 [bold orange1]{model_name}[/bold orange1] 连接测试失败： {str(e)}")

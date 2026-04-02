@@ -60,7 +60,8 @@ class MCPClient:
             raise RuntimeError("Client not connected.")
 
         logger.info("MCP Client: 正在向Server调取工具列表 ...")
-        tools = await self.session.list_tools()
+        result = await self.session.list_tools()
+        tools = result.tools
         logger.info("MCP Client: 获取工具列表 [bold green]成功[/bold green]")
 
         return tools
@@ -73,8 +74,8 @@ class MCPClient:
         logger.info(f"MCP Client: 正在调用工具 [bold cyan]{tool_name}[/bold cyan] ...", extra={"markup": True})
 
         try:
-            result = await self.session.call_tool(tool_name, arguments)
             # result 包括 TextContent, ImageContent, ResourceContent
+            result = await self.session.call_tool(tool_name, arguments)
 
             logger.info(f"MCP Client: 工具调用 [bold green]成功[/bold green]")
             return result

@@ -4,10 +4,11 @@
 Author: Gongmin Wei
 Date: 2026-04-02
 """
-from typing import List
-from langchain_core.messages import HumanMessage
+from langchain.agents import create_agent
+
 from core.llm import get_llm
 from core.mcp import MCPClient
+from .adaptor import convert_mcp_tools_to_langchain
 from logging import getLogger
 
 logger = getLogger("Client")
@@ -15,34 +16,38 @@ logger = getLogger("Client")
 
 class EduClawAgent:
     def __init__(self):
-        self.llm = get_llm()
         self.mcp_client = MCPClient()
-        self.history: List = []
+
+        self.model = get_llm()
+        self.tools = None
+        self.prompt = """
+        你是一个智能助手，你需要根据用户的输入，进行智能判断，并给出相应的建议。
+        """
+        self.agent = None
+
+        # self.history: List = []
 
     async def start(self):
-        """启动并连接 MCP Server"""
+        """启动并连接 MCP Server， 获取工具列表"""
         await self.mcp_client.connect()
-        logger.info("[bold green]Agent Brain is now connected to Tool Server.[/bold green]", extra={"markup": True})
+
+        mcp_tools = await self.mcp_client.get_tools()
+        self.tools = convert_mcp_tools_to_langchain(mcp_tools, self.mcp_client)
+
+        self.agent = create_agent(
+            model=self.model,
+            tools=self.tools,
+            system_prompt=self.prompt,
+        )
+
+        logger.info("MCP Client: Agent已就绪")
 
     async def chat(self, user_text: str):
-        """
-        核心思考循环：
-        1. 接收用户文本 -> 2. LLM 思考 -> 3. 若需工具则通过 MCP 调用 -> 4. 返回最终答案
-        """
-        logger.info(f"Thinking about: [dim]'{user_text}'[/dim]", extra={"markup": True})
+        response = await self.agent.ainvoke({
+            "input": user_text
+        })
 
-        # 简单起见，这里演示一个逻辑：
-        # 实际开发中，这里可以使用 LangChain 的 create_react_agent
-        # 这里模拟 LLM 决定调用工具的过程
-        if "天气" in user_text:
-            logger.info("Decision: [bold cyan]Needs Weather Tool[/bold cyan]", extra={"markup": True})
-            # 通过 MCP 协议调遣 Server 执行
-            result = await self.mcp_client.use_tool("get_weather", {"city": "上海"})
-            return f"Agent分析结果：{result.content[0].text}"
-        else:
-            # 普通对话
-            response = await self.llm.ainvoke([HumanMessage(content=user_text)])
-            return response.content
+        return response["messages"][-1].content
 
     async def stop(self):
         await self.mcp_client.disconnect()
