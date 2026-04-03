@@ -44,8 +44,7 @@ async def run_interactive_app():
                 continue
 
             # 4. 驱动 Agent 思考并回答
-            with console.status("[bold blue]Agent 正在思考并调遣工具..."):
-                response = await agent.chat(user_input)
+            response = await agent.chat(user_input)
 
             console.print(f"\n[bold white]Agent:[/bold white] {response}\n")
 

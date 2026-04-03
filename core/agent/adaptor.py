@@ -59,20 +59,20 @@ def mcp_tool_to_langchain_tool(
 
         result = await mcp_client.use_tool(mcp_tool.name, kwargs)
 
-        raw_text = ""
         if hasattr(result, 'content') and len(result.content) > 0:
             raw_text = result.content[0].text
         else:
             raw_text = str(result)
 
         structured_response = (
-            f"\n--- 工具 {mcp_tool.name} 执行结果开始 ---\n"
+            f"\n--- 工具 {mcp_tool.name} 执行开始 ---\n"
             f"{raw_text}\n"
-            f"--- 工具执行结果结束 ---\n"
+            f"--- 工具执行结束 ---\n"
         )
         return structured_response
 
     def sync_func(*args, **kwargs):
+        # 不支持同步调用
         raise NotImplementedError("MCP Tool only supports asynchronous calls (ainvoke)")
 
     return StructuredTool.from_function(
