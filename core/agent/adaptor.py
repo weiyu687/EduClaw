@@ -4,7 +4,7 @@ MCP Tool -> LangChain BaseTool
 Author: Gongmin Wei
 Date: 2026-04-02
 """
-from langchain_core.tools import BaseTool, Tool
+from langchain_core.tools import BaseTool, StructuredTool
 from pydantic import BaseModel, create_model
 from mcp import types
 
@@ -47,28 +47,45 @@ def convert_schema_to_pydantic(schema: dict) -> type[BaseModel]:
     return create_model("ToolArgs", **fields)
 
 def mcp_tool_to_langchain_tool(
-    mcp_tool: types.Tool,
-    mcp_client: MCPClient
+        mcp_tool: types.Tool,
+        mcp_client: MCPClient
 ) -> BaseTool:
     validate_mcp_tool(mcp_tool)
     args_schema = convert_schema_to_pydantic(mcp_tool.inputSchema)
 
-    async def async_func(**kwargs):
-        result = await mcp_client.use_tool(mcp_tool.name, kwargs)
-        return result.content[0].text
+    async def async_func(*args, **kwargs):
+        if args and isinstance(args[0], dict):
+            kwargs.update(args[0])
 
-    return Tool(
+        result = await mcp_client.use_tool(mcp_tool.name, kwargs)
+
+        raw_text = ""
+        if hasattr(result, 'content') and len(result.content) > 0:
+            raw_text = result.content[0].text
+        else:
+            raw_text = str(result)
+
+        structured_response = (
+            f"\n--- 工具 {mcp_tool.name} 执行结果开始 ---\n"
+            f"{raw_text}\n"
+            f"--- 工具执行结果结束 ---\n"
+        )
+        return structured_response
+
+    def sync_func(*args, **kwargs):
+        raise NotImplementedError("MCP Tool only supports asynchronous calls (ainvoke)")
+
+    return StructuredTool.from_function(
         name=mcp_tool.name,
         description=mcp_tool.description,
-        func=lambda **kws: async_func(**kws),
+        func=sync_func,
+        coroutine=async_func,
         args_schema=args_schema,
-        coroutine=async_func
     )
 
 def convert_mcp_tools_to_langchain(
-    mcp_tools: list[types.Tool],
-    mcp_client: MCPClient
+        mcp_tools: list[types.Tool],
+        mcp_client: MCPClient
 ) -> list[BaseTool]:
     """批量转换"""
-
     return [mcp_tool_to_langchain_tool(t, mcp_client) for t in mcp_tools]

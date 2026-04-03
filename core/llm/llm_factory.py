@@ -48,7 +48,7 @@ def get_llm(test_connection_test: bool = True) -> ChatOpenAI:
             llm.invoke([
                 HumanMessage(content="模型连接测试")
             ])
-            logger.info(f"LLM Factory: [bold green]模型 {model_name} 可用[/bold green]")
+            logger.info(f"LLM Factory: 模型 {model_name} [bold green]可用[/bold green]")
         except Exception as e:
             logger.error(f"LLM Factory: 模型 [bold orange1]{model_name}[/bold orange1] 连接测试失败： {str(e)}")
             raise ConnectionError(f"Failed to connect to LLM model.Please check your API_KEY, BASE_URL, or network connection: {str(e)}")

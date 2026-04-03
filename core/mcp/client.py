@@ -77,10 +77,10 @@ class MCPClient:
             # result 包括 TextContent, ImageContent, ResourceContent
             result = await self.session.call_tool(tool_name, arguments)
 
-            logger.info(f"MCP Client: 工具调用 [bold green]成功[/bold green]")
+            logger.info(f"MCP Client: 工具 {tool_name} 调用 [bold green]成功[/bold green]")
             return result
         except Exception as e:
-            logger.error(f"MCP Client: 工具调用失败--{str(e)}")
+            logger.error(f"MCP Client: 工具 {tool_name} 调用失败--{str(e)}")
             return None
 
     async def disconnect(self):

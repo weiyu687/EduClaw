@@ -56,9 +56,9 @@ class MCPServer:
 
             try:
                 result = target_tool(**arguments)
-                logger.info(f"MCP Server: 工具{tool_name}调用 [bold green]成功[/bold green]")
+                logger.info(f"MCP Server: 工具 {tool_name} 调用 [bold green]成功[/bold green]")
             except Exception as e:
-                logger.error(f"MCP Server: 工具{tool_name}调用失败--{str(e)}")
+                logger.error(f"MCP Server: 工具 {tool_name} 调用失败--{str(e)}")
                 return [types.TextContent(type="text", text=f"Tool Execution Error: {str(e)}")]
 
             return [types.TextContent(type="text", text=result)]

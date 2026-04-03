@@ -6,10 +6,13 @@ Date: 2026-04-01
 """
 import asyncio
 from rich.console import Console
+import logging
+
 from core.logging import get_logger
 from core.usr.startup_info import print_startup_info
 from core.agent import EduClawAgent
 
+logging.getLogger("httpx").setLevel(logging.WARNING)
 logger = get_logger("USER")
 console = Console()
 
