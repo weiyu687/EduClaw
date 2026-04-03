@@ -4,6 +4,8 @@
 Author: Gongmin Wei
 Date: 2026-04-03
 """
+import os
+from pathlib import Path
 from langchain.agents import create_agent
 from langchain_core.messages import HumanMessage
 
@@ -21,11 +23,18 @@ class EduClawAgent:
 
         self.model = get_llm()
         self.tools = None
-        self.prompt = """
-        你是一个拥有强大工具调用能力的智能助手 EduClaw。
-        当用户需要获取天气、数据或其他需要外部查询的信息时，你**必须**调用相应的工具！
-        绝不能捏造数据。如果用户没有提供工具所需参数，请引导用户提供。
-        """
+
+        project_dir_root = Path(__file__).parent.parent.parent.resolve()
+        prompt_file = project_dir_root / "prompts/agent.prompt"
+
+        try:
+            with open(prompt_file, "r", encoding="utf-8") as f:
+                prompt = f.read()
+        except Exception as e:
+            prompt = "未能成功载入提示词"
+            logger.error(f"Agent Factory: 未能成功载入提示词--{str(e)}")
+
+        self.prompt = prompt
         self.agent = None
 
         self.history: list = []
