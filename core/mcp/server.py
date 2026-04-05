@@ -44,7 +44,7 @@ class MCPServer:
                 ),
                 types.Tool(
                     name="extract_pdf",
-                    description="从 PDF 文件中提取内容 (文本 ＋ 表格)",
+                    description="从 PDF 文件中提取内容 (文本 + 表格)",
                     inputSchema={
                         "type": "object",
                         "properties": {

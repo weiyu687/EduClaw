@@ -10,7 +10,7 @@ import pdfplumber
 
 def extract_pdf(pdf_path: str) -> str:
     """
-    从 PDF 文件中提取内容 (文本 ＋ 表格)
+    从 PDF 文件中提取内容 (文本 + 表格)
     :param pdf_path: PDF 文件路径
     :return: PDF 文件内容
     """
