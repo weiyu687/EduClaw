@@ -86,9 +86,9 @@ def extract_word(word_path: str) -> str:
 
 if __name__ == "__main__":
     # 测试 docx
-    word_content = extract_word("./test_data/dual_page_with_tables.docx")
-    print(word_content)
+    # word_content = extract_word("./test_data/dual_page_with_tables.docx")
+    # print(word_content)
 
     # 测试 doc
-    # word_content = extract_word("./test_data/dual_page_with_tables.doc")
-    # print(word_content)
+    word_content = extract_word("./test_data/dual_page_with_tables.doc")
+    print(word_content)
