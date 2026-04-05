@@ -52,6 +52,17 @@ class MCPServer:
                         },
                         "required": ["pdf_path"]
                     }
+                ),
+                types.Tool(
+                    name="extract_word",
+                    description="从 Word 文件中提取内容 (文本 + 表格)，支持 doc/docx",
+                    inputSchema={
+                        "type": "object",
+                        "properties": {
+                            "word_path": {"type": "string"}
+                        },
+                        "required": ["word_path"]
+                    }
                 )
             ]
 

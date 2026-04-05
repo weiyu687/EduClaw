@@ -43,16 +43,9 @@ class MCPClient:
 
         self._exit_stack = AsyncExitStack()
 
-        # read_stream, write_stream = await self._exit_stack.enter_async_context(
-        #     stdio_client(self.server_params)
-        # )
-
-        # 解决 SERVER 日志无法显示
-        transport = await self._exit_stack.enter_async_context(
+        read_stream, write_stream = await self._exit_stack.enter_async_context(
             stdio_client(self.server_params)
         )
-
-        read_stream, write_stream = transport
 
         # 创建并初始化会话
         self.session = await self._exit_stack.enter_async_context(
