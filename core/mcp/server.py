@@ -41,6 +41,17 @@ class MCPServer:
                         },
                         "required": ["city"]
                     }
+                ),
+                types.Tool(
+                    name="extract_pdf",
+                    description="从 PDF 文件中提取内容 (文本 ＋ 表格)",
+                    inputSchema={
+                        "type": "object",
+                        "properties": {
+                            "pdf_path": {"type": "string"}
+                        },
+                        "required": ["pdf_path"]
+                    }
                 )
             ]
 
