@@ -1,5 +1,5 @@
 """
-测试 tool: python_interpreter Python 解释器工具
+测试 tool: run_python_code Python 解释器工具
 
 Author: Gongmin Wei
 Date: 2026-04-07
