@@ -74,6 +74,22 @@ class MCPServer:
                         },
                         "required": ["pptx_path"]
                     }
+                ),
+                types.Tool(
+                    name="python_interpreter",
+                    description="""
+                    执行 Python 代码，
+                    适用于计算、逻辑校验、数据处理等场景，
+                    环境依赖仅包括 numpy、pandas，
+                    暂不支持生成文件、绘图、联网等操作。
+                    """,
+                    inputSchema={
+                        "type": "object",
+                        "properties": {
+                            "code": {"type": "string"}
+                        },
+                        "required": ["code"]
+                    }
                 )
             ]
 
