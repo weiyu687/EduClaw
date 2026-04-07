@@ -1,5 +1,5 @@
 """
-提取 pptx 内容 (skill: Document Pro)
+测试 tool: extract_pptx 提取 pptx 内容 (skill: Document Pro)
 
 Author: Gongmin Wei
 Date: 2026-04-07
