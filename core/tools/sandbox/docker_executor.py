@@ -88,30 +88,3 @@ class DockerExecutor:
             except (APIError, NotFound):
                 pass
 
-
-if __name__ == "__main__":
-    executor = DockerExecutor()
-
-    # 测试常规运行 [代码段]
-    # print("--- Test 1: Normal ---")
-    # print(executor.run_python_code("print(1 + 1)"))
-
-    # 测试超时逻辑 / 多行代码 [代码段]
-    # print("\n--- Test 2: Timeout ---")
-    # print(executor.run_python_code("import time; time.sleep(5)", timeout=2))
-
-    # 测试代码报错 [代码段]
-    # print("\n--- Test 3: Code Error ---")
-    # print(executor.run_python_code("raise ValueError('Oops!')"))
-
-    # 测试常规运行 [代码文件]
-    print("--- Test 1: Normal ---")
-    print(executor.run_python_file("./test_data/normal.py"))
-
-    # 测试超时逻辑 / 多行代码 [代码文件]
-    print("\n--- Test 2: Timeout ---")
-    print(executor.run_python_file("./test_data/timeout.py", timeout=2))
-
-    # 测试代码报错 [代码文件]
-    print("\n--- Test 3: Code Error ---")
-    print(executor.run_python_file("./test_data/codeerr.py"))

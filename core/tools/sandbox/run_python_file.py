@@ -9,7 +9,7 @@ from .docker_executor import DockerExecutor
 
 def run_python_file(py_file_path: str) -> str:
     """运行 Python 本地文件，
-    环境依赖仅包括 numpy、pandas
+    环境仅依赖 Python 3.10 自带标准库，
     """
     executor = DockerExecutor()
 

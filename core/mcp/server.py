@@ -76,11 +76,11 @@ class MCPServer:
                     }
                 ),
                 types.Tool(
-                    name="python_interpreter",
+                    name="run_python_code",
                     description="""
                     执行 Python 代码，
                     适用于计算、逻辑校验、数据处理等场景，
-                    环境依赖仅包括 numpy、pandas，
+                    环境仅依赖 Python 3.10 自带标准库，
                     暂不支持生成文件、绘图、联网等操作。
                     """,
                     inputSchema={
@@ -89,6 +89,20 @@ class MCPServer:
                             "code": {"type": "string"}
                         },
                         "required": ["code"]
+                    }
+                ),
+                types.Tool(
+                    name="run_python_file",
+                    description="""
+                    运行 Python 本地文件，
+                    环境仅依赖 Python 3.10 自带标准库，
+                    """,
+                    inputSchema={
+                        "type": "object",
+                        "properties": {
+                            "py_file_path": {"type": "string"}
+                        },
+                        "required": ["py_file_path"]
                     }
                 )
             ]
