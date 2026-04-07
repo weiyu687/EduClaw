@@ -63,6 +63,17 @@ class MCPServer:
                         },
                         "required": ["word_path"]
                     }
+                ),
+                types.Tool(
+                    name="extract_pptx",
+                    description="从 PPTX 文件中提取内容 (文本 + 表格)",
+                    inputSchema={
+                        "type": "object",
+                        "properties": {
+                            "pptx_path": {"type": "string"}
+                        },
+                        "required": ["pptx_path"]
+                    }
                 )
             ]
 
