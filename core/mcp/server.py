@@ -104,6 +104,17 @@ class MCPServer:
                         },
                         "required": ["py_file_path"]
                     }
+                ),
+                types.Tool(
+                    name="extract_py",
+                    description="""从 Python 文件中提取代码""",
+                    inputSchema={
+                        "type": "object",
+                        "properties": {
+                            "py_path": {"type": "string"}
+                        },
+                        "required": ["py_path"]
+                    }
                 )
             ]
 
