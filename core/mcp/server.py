@@ -115,6 +115,17 @@ class MCPServer:
                         },
                         "required": ["py_path"]
                     }
+                ),
+                types.Tool(
+                    name="get_all_files",
+                    description="""获取指定文件夹下的所有文件的绝对路径""",
+                    inputSchema={
+                        "type": "object",
+                        "properties": {
+                            "folder_path": {"type": "string"}
+                        },
+                        "required": ["folder_path"]
+                    }
                 )
             ]
 
