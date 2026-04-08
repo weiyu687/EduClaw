@@ -1,5 +1,5 @@
 """
-提取 word 内容 (skill: Document Pro)
+提取 word 内容
 功能: 支持 doc/docx，文本与表格按物理顺序混合排列
 Author: Gongmin Wei
 Date: 2026-04-05

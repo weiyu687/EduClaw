@@ -1,5 +1,5 @@
 """
-提取 pdf 内容 (skill: Document Pro)
+提取 pdf 内容
 
 Author: Gongmin Wei
 Date: 2026-04-05

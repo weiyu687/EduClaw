@@ -1,5 +1,5 @@
 """
-测试 tool: extract_pdf 提取 pdf 内容 (skill: Document Pro)
+测试 tool: extract_pdf 提取 pdf 内容
 
 Author: Gongmin Wei
 Date: 2026-04-05

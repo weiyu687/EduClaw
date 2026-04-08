@@ -1,5 +1,5 @@
 """
-pptx 内容 (skill: Document Pro)
+pptx 内容
 
 Author: Gongmin Wei
 Date: 2026-04-07
