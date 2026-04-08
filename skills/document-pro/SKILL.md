@@ -34,51 +34,6 @@ description: 文档处理技能 - 让 AI 能够读取、解析、提取 PDF、DO
 | TXT | ✅ | ✅ | 内置 |
 | Markdown | ✅ | ✅ | 内置 |
 
-## 工具使用
-
-### PDF 处理
-
-```python
-# 提取文本
-import pdfplumber
-
-with pdfplumber.open("document.pdf") as pdf:
-    for page in pdf.pages:
-        text = page.extract_text()
-        print(text)
-
-# 提取表格
-with pdfplumber.open("document.pdf") as pdf:
-    table = pdf.pages[0].extract_tables()
-```
-
-### Word 文档
-
-```python
-from docx import Document
-
-doc = Document("document.docx")
-for para in doc.paragraphs:
-    print(para.text)
-
-# 提取表格
-for table in doc.tables:
-    for row in table.rows:
-        print([cell.text for cell in row.cells])
-```
-
-### PowerPoint
-
-```python
-from pptx import Presentation
-
-prs = Presentation("presentation.pptx")
-for slide in prs.slides:
-    for shape in slide.shapes:
-        if shape.has_text_frame:
-            print(shape.text)
-```
-
 ## 工作流
 
 ```

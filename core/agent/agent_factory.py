@@ -5,6 +5,7 @@ Author: Gongmin Wei
 Date: 2026-04-03
 """
 from pathlib import Path
+import re
 from langchain.agents import create_agent
 from langchain_core.messages import HumanMessage
 
@@ -33,7 +34,31 @@ class EduClawAgent:
             prompt = "未能成功载入提示词"
             logger.error(f"Agent Factory: 未能成功载入提示词--{str(e)}")
 
-        self.prompt = prompt
+        # 读取 SKILL.md
+        skills_dir = project_dir_root / "skills"
+        skill_content = []
+        for skill_folder in skills_dir.iterdir():
+            if skill_folder.is_dir():
+                skill_file = skill_folder / "SKILL.md"
+                if not skill_file.exists():
+                    continue
+                try:
+                    with open(skill_file, "r", encoding="utf-8") as f:
+                        content = f.read()
+                    # 移除 YAML 头
+                    cleaned_content = re.sub(r'^---\n.*?\n---', '', content, flags=re.DOTALL)
+                    cleaned_content = cleaned_content.strip()
+
+                    if cleaned_content:
+                        skill_content.append(cleaned_content)
+                        skill_content.append("\n" + "="*16 + "\n")
+                except Exception as e:
+                    logger.error(f"Agent Factory: 未能成功载入 SKILL--{str(e)}")
+                    continue
+
+        skill_content = "\n".join(skill_content)
+
+        self.prompt = prompt + "Skills:\n" + skill_content
         self.agent = None
 
         self.history: list = []
