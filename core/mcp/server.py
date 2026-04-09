@@ -76,6 +76,27 @@ class MCPServer:
                     }
                 ),
                 types.Tool(
+                    name="extract_xlsx",
+                    description="提取 Excel (.xlsx) 文件内容。支持通过序号或名称读取单个工作表。",
+                    inputSchema={
+                        "type": "object",
+                        "properties": {
+                            "xlsx_path": {
+                                "type": "string",
+                                "description": "Excel 文件的绝对路径"
+                            },
+                            "sheet_index": {
+                                "anyOf": [
+                                    {"type": "integer", "description": "工作表序号，0表示第一个表"},
+                                    {"type": "string", "description": "工作表名称或序号字符串"}
+                                ],
+                                "default": 0
+                            }
+                        },
+                        "required": ["xlsx_path"]
+                    }
+                ),
+                types.Tool(
                     name="run_python_code",
                     description="""
                     执行 Python 代码，

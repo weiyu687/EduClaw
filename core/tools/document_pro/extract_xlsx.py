@@ -1,5 +1,5 @@
 """
-测试 tool: extract_xlsx 提取 xlsx 文件内容
+提取 xlsx 文件内容
 
 Author: Gongmin Wei
 Date: 2026-04-09
@@ -49,7 +49,3 @@ def extract_xlsx(
 
     except Exception as e:
         return f"读取 Excel 失败: {str(e)}"
-
-
-if __name__ == "__main__":
-    print(extract_xlsx("./test_data/test.xlsx"))
