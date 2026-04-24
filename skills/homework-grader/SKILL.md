@@ -6,7 +6,7 @@ Author: Gongmin Wei
 Date: 2026-04-08
 ---
 
-# Sandbox - 批改学生作业
+# Homework Grader - 批改学生作业
 
 ## 工作流
 
