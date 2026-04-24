@@ -1,5 +1,8 @@
 # 忽略日志
 logs/
 
+# 忽略ChromaDB索引
+chroma_db/
+
 # 通用
 .idea/
