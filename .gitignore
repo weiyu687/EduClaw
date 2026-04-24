@@ -4,5 +4,8 @@ logs/
 # 忽略ChromaDB索引
 chroma_db/
 
+# 忽略模型文件
+models/
+
 # 通用
 .idea/
