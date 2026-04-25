@@ -8,7 +8,7 @@ import os
 import dotenv
 from pathlib import Path
 import chromadb
-from chromadb.utils import embedding_functions
+from chromadb.utils.embedding_functions import SentenceTransformerEmbeddingFunction
 from langchain_community.document_loaders import PyPDFLoader, TextLoader, Docx2txtLoader
 from langchain_text_splitters import RecursiveCharacterTextSplitter
 
@@ -22,9 +22,14 @@ CHROMA_PERSIST_DIR = str(CHROMA_PERSIST_DIR)
 
 CHUNK_SIZE = int(os.getenv("CHUNK_SIZE"))
 CHUNK_OVERLAP = int(os.getenv("CHUNK_OVERLAP"))
+
 COLLECTION_NAME = os.getenv("COLLECTION_NAME")
 
-embedding_function = embedding_functions.DefaultEmbeddingFunction()
+EMBEDDING_MODEL = os.getenv("EMBEDDING_MODEL")
+model_path = str(BASE_DIR / "models" / EMBEDDING_MODEL)
+embedding_function = SentenceTransformerEmbeddingFunction(
+    model_name=model_path
+)
 
 # 创建 Chroma 客户端 (https://docs.chroma.org.cn/docs/overview/getting-started)
 client = chromadb.PersistentClient(path=CHROMA_PERSIST_DIR)
@@ -32,7 +37,6 @@ collection = client.get_or_create_collection(
     name=COLLECTION_NAME,
     embedding_function=embedding_function
 )
-
 
 def process_doc(doc_path: str) -> str:
     """读取文档进行切片，向量化后存入Chroma向量库"""
