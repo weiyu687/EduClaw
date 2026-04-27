@@ -7,13 +7,15 @@ Date: 2026-4-24
 import os
 import dotenv
 from pathlib import Path
+import logging
 import chromadb
 from chromadb.utils.embedding_functions import SentenceTransformerEmbeddingFunction
 from langchain_community.document_loaders import PyPDFLoader, TextLoader, Docx2txtLoader
 from langchain_text_splitters import RecursiveCharacterTextSplitter
 
-
+logging.getLogger("sentence_transformers").setLevel(logging.CRITICAL)
 dotenv.load_dotenv()
+
 
 BASE_DIR = Path(__file__).parent.parent.parent.parent
 CHROMA_PERSIST_DIR = BASE_DIR / os.getenv("CHROMA_PERSIST_DIR")

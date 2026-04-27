@@ -147,6 +147,17 @@ class MCPServer:
                         },
                         "required": ["folder_path"]
                     }
+                ),
+                types.Tool(
+                    name="process_doc",
+                    description="""读取文档进行切片，向量化后存入Chroma向量库,支持pdf/docx/txt""",
+                    inputSchema={
+                        "type": "object",
+                        "properties": {
+                            "doc_path": {"type": "string"}
+                        },
+                        "required": ["doc_path"]
+                    }
                 )
             ]
 
