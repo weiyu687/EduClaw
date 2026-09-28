@@ -258,7 +258,7 @@ async def main():
 
     passed = sum(1 for v in results.values() if v)
     total = len(results)
-    print(f"\n总计: {passed}/{total} 测试通过")
+    print(f"\n总计:  {passed}/{total} 测试通过")
 
     if passed == total:
         print("\n🎉 所有端到端测试通过！")

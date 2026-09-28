@@ -1,37 +1,45 @@
 """
-创建智能体并初始化，集成记忆系统
+修改后的 agent_factory.py - 集成错误处理模块
 
-Author: Gongmin Wei
-Date: 2026-04-03
-Updated: 2026-09-27
+Author: Gongmin Wei (modified with error handling)
+Date: 2026-04-03 (modified 2026-09-28)
 """
 from pathlib import Path
 import re
 from langchain.agents import create_agent
 from langchain_core.messages import HumanMessage, AIMessage
+from logging import getLogger
 
 from core.llm import get_llm
 from core.mcp import MCPClient
 from core.memory import MemoryManager, ChromaStorageBackend
-from .adaptor import convert_mcp_tools_to_langchain
-from logging import getLogger
+from core.error_handling import (
+    get_error_handler, SafeToolAdapter,
+    ToolError, MCPConnectionError
+)
 
 logger = getLogger("CLIENT")
 
 
 class EduClawAgent:
-    def __init__(self, enable_memory: bool = True, memory_persist_dir: str = None):
+    def __init__(self, enable_memory: bool = True, memory_persist_dir: str = None,
+                 enable_error_handling: bool = True):
         """
-        初始化 EduClaw Agent，集成记忆系统
+        初始化 EduClaw Agent，集成记忆系统和错误处理
 
         Args:
             enable_memory: 是否启用记忆系统，默认启用
             memory_persist_dir: 记忆数据库持久化目录
+            enable_error_handling: 是否启用错误处理，默认启用
         """
         self.mcp_client = MCPClient()
-
         self.model = get_llm()
         self.tools = None
+        self.enable_error_handling = enable_error_handling
+
+        # 初始化错误处理器
+        self.error_handler = get_error_handler()
+        self.tool_adapter = SafeToolAdapter(enable_recovery=enable_error_handling)
 
         project_dir_root = Path(__file__).parent.parent.parent.resolve()
         prompt_file = project_dir_root / "prompts/agent.prompt"
@@ -105,13 +113,38 @@ class EduClawAgent:
             logger.info(f"Session context set: session_id={session_id}, user_id={user_id}")
 
     async def start(self):
-        """启动并连接 MCP Server， 获取工具列表"""
-        await self.mcp_client.connect()
+        """启动并连接 MCP Server，获取工具列表"""
+        try:
+            await self.mcp_client.connect()
+        except Exception as e:
+            error = MCPConnectionError("Failed to connect to MCP Server", e)
+            self.error_handler.handle_tool_error(
+                error, "MCPServer", "connection", self.session_id, self.user_id
+            )
+            logger.error(f"Agent Factory: 无法连接到 MCP 服务器--{str(e)}")
+            raise error
 
-        mcp_tools = await self.mcp_client.get_tools()
-        self.tools = convert_mcp_tools_to_langchain(mcp_tools, self.mcp_client)
+        try:
+            mcp_tools = await self.mcp_client.get_tools()
 
-        logger.info(f"Agent Factory: 成功加载工具: {[t.name for t in self.tools]}")
+            # 使用 SafeToolAdapter 转换工具
+            if self.enable_error_handling:
+                self.tools = self.tool_adapter.convert_mcp_tools_to_langchain(
+                    mcp_tools, self.mcp_client, self.session_id, self.user_id
+                )
+            else:
+                # 原始转换逻辑（向后兼容）
+                from core.agent.adaptor import convert_mcp_tools_to_langchain
+                self.tools = convert_mcp_tools_to_langchain(
+                    mcp_tools, self.mcp_client, False, self.session_id, self.user_id
+                )
+
+            logger.info(f"Agent Factory: 成功加载工具: {[t.name for t in self.tools]}")
+
+        except Exception as e:
+            error_msg = f"Failed to load tools: {str(e)}"
+            logger.error(f"Agent Factory: {error_msg}")
+            raise
 
         self.agent = create_agent(
             model=self.model,
@@ -158,7 +191,7 @@ class EduClawAgent:
 
     async def chat(self, user_text: str) -> str:
         """
-        对话方法，集成记忆系统
+        对话方法，集成记忆系统和错误处理
 
         Args:
             user_text: 用户输入
@@ -192,7 +225,19 @@ class EduClawAgent:
 
             return ai_response
 
+        except ToolError as e:
+            # 已处理的工具错误
+            logger.error(f"Tool error during chat: {e.message}")
+            error_response = f"工具执行出错: {e.message}\n请尝试重新提问或使用其他工具。"
+
+            # 记录错误
+            self.error_handler.handle_tool_error(
+                e, "Agent", "execution", self.session_id, self.user_id
+            )
+
+            return error_response
         except Exception as e:
+            # 捕获其他异常
             logger.error(f"Error in chat: {e}")
             raise
 
@@ -208,13 +253,20 @@ class EduClawAgent:
         """
         self.history.append(HumanMessage(content=user_text))
 
-        response = await self.agent.ainvoke({
-            "messages": self.history
-        })
+        try:
+            response = await self.agent.ainvoke({
+                "messages": self.history
+            })
 
-        self.history = response["messages"]
+            self.history = response["messages"]
+            return self.history[-1].content
 
-        return self.history[-1].content
+        except ToolError as e:
+            logger.error(f"Tool error during chat: {e.message}")
+            self.error_handler.handle_tool_error(
+                e, "Agent", "execution", self.session_id, self.user_id
+            )
+            return f"工具执行出错: {e.message}"
 
     async def save_knowledge(self, title: str, content: str, tags: list = None) -> str:
         """
@@ -293,5 +345,10 @@ class EduClawAgent:
         except Exception as e:
             logger.error(f"Error clearing memory: {e}")
 
+    def get_error_report(self):
+        """获取错误报告"""
+        return self.error_handler.get_error_report(session_id=self.session_id)
+
     async def stop(self):
+        """停止 Agent"""
         await self.mcp_client.disconnect()
