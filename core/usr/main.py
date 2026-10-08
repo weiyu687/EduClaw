@@ -26,6 +26,8 @@ async def run_interactive_app():
     try:
         logger.info("Main: 正在运行程序 EduClaw...")
         await agent.start()
+        console.print(f"[cyan]当前会话: {agent.session_id}[/cyan]")
+        console.print("命令: /new | /use <session_id> | /sessions | /runs | /events <run_id>")
 
         console.print("\n[bold green]EduClaw 已就绪，请输入您的指令 (输入 'exit' 退出):[/bold green]")
 
@@ -39,6 +41,29 @@ async def run_interactive_app():
             if not user_input.strip():
                 continue
 
+            command = user_input.strip()
+            if command == '/new':
+                import uuid
+                agent.set_session_context(str(uuid.uuid4()))
+                console.print(f"新会话: {agent.session_id}")
+                continue
+            if command == '/sessions':
+                for item in agent.list_sessions():
+                    console.print(f"{item['id']}  {item['updated_at']}")
+                continue
+            if command.startswith('/use '):
+                sid = command.split(maxsplit=1)[1]
+                agent.set_session_context(sid)
+                console.print(f"已切换到: {agent.session_id}")
+                continue
+            if command == '/runs':
+                for item in agent.list_runs():
+                    console.print(f"{item['id']}  {item['status']}")
+                continue
+            if command.startswith('/events '):
+                for item in agent.list_events(command.split(maxsplit=1)[1]):
+                    console.print(item)
+                continue
             response = await agent.chat(user_input)
 
             console.print(f"\n[bold white]Agent:[/bold white] {response}\n")
