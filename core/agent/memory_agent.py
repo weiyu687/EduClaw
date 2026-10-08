@@ -18,95 +18,15 @@ logger = getLogger("AGENT_MEMORY")
 class MemoryAwareEduClawAgent(EduClawAgent):
     """集成记忆系统的 EduClaw Agent"""
 
-    def __init__(self, enable_memory: bool = True, memory_persist_dir: Optional[str] = None):
-        """
-        初始化带记忆的 Agent
+    def __init__(self, enable_memory=True, memory_persist_dir=None, **kwargs):
+        super().__init__(enable_memory=enable_memory,
+                         memory_persist_dir=memory_persist_dir, **kwargs)
 
-        Args:
-            enable_memory: 是否启用记忆系统
-            memory_persist_dir: 记忆持久化目录
-        """
-        super().__init__()
+    def set_user_context(self, session_id, user_id=None):
+        self.set_session_context(session_id, user_id)
 
-        self.enable_memory = enable_memory
-        self.memory_manager: Optional[MemoryManager] = None
-
-        if enable_memory:
-            backend = ChromaStorageBackend(persist_dir=memory_persist_dir)
-            self.memory_manager = MemoryManager(backend)
-            logger.info("Memory system enabled")
-
-    def set_user_context(self, session_id: str, user_id: Optional[str] = None):
-        """设置用户和会话上下文"""
-        if self.memory_manager:
-            self.memory_manager.set_session(session_id, user_id)
-            logger.info(f"User context set: session_id={session_id}, user_id={user_id}")
-
-    async def chat_with_memory(self, user_text: str) -> str:
-        """
-        带记忆的对话
-
-        Args:
-            user_text: 用户输入
-
-        Returns:
-            str: Agent 的回复
-        """
-        # 添加用户消息
-        self.history.append(HumanMessage(content=user_text))
-
-        # 如果启用记忆，召回相关上下文
-        context_prefix = ""
-        if self.memory_manager:
-            related_memories = await self.memory_manager.recall_relevant_memories(
-                query=user_text,
-                limit=3
-            )
-
-            if related_memories:
-                context_prefix = "【基于历史记忆的参考信息】\n"
-                for i, memory in enumerate(related_memories, 1):
-                    context_prefix += f"{i}. {memory[:200]}\n"
-                context_prefix += "\n---\n\n"
-                logger.debug(f"Recalled {len(related_memories)} memories")
-
-        # 增强用户消息（在 history 中注入上下文）
-        if context_prefix:
-            enhanced_message = context_prefix + user_text
-            # 替换最后添加的消息
-            self.history[-1] = HumanMessage(content=enhanced_message)
-
-        # 调用 Agent
-        try:
-            response = await self.agent.ainvoke({
-                "messages": self.history
-            })
-
-            self.history = response["messages"]
-            agent_response = self.history[-1].content
-
-            # 保存对话到记忆
-            if self.memory_manager:
-                await self.memory_manager.save_conversation(self.history)
-                logger.debug("Conversation saved to memory")
-
-            return agent_response
-
-        except Exception as e:
-            logger.error(f"Error in chat_with_memory: {e}")
-            raise
-
-    async def chat(self, user_text: str) -> str:
-        """
-        兼容原有的 chat 方法
-
-        如果启用了记忆系统，使用带记忆的对话
-        """
-        if self.enable_memory and self.memory_manager:
-            return await self.chat_with_memory(user_text)
-        else:
-            # 调用父类方法
-            return await super().chat(user_text)
+    async def chat_with_memory(self, user_text):
+        return await super().chat(user_text)
 
     async def get_user_profile_from_memory(self) -> dict:
         """从记忆中获取用户档案"""

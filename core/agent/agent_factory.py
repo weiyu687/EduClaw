@@ -5,6 +5,11 @@ Author: Gongmin Wei (modified with error handling)
 Date: 2026-04-03 (modified 2026-09-28)
 """
 from pathlib import Path
+from contextlib import AsyncExitStack
+import uuid
+from langgraph.checkpoint.sqlite.aio import AsyncSqliteSaver
+from core.state import StateManager
+from core.state.tracking import StateTrackingHandler
 import re
 from langchain.agents import create_agent
 from langchain_core.messages import HumanMessage, AIMessage
@@ -23,7 +28,8 @@ logger = getLogger("CLIENT")
 
 class EduClawAgent:
     def __init__(self, enable_memory: bool = True, memory_persist_dir: str = None,
-                 enable_error_handling: bool = True):
+                 enable_error_handling: bool = True,
+                 state_db_path: str = "data/educlaw_state.sqlite3"):
         """
         初始化 EduClaw Agent，集成记忆系统和错误处理
 
@@ -35,6 +41,11 @@ class EduClawAgent:
         self.mcp_client = MCPClient()
         self.model = get_llm()
         self.tools = None
+        self.state_manager = StateManager(state_db_path)
+        self._checkpoint_path = str(Path(state_db_path).with_name("educlaw_checkpoints.sqlite3"))
+        self._checkpoint_stack = None
+        self._checkpointer = None
+        self.state_manager.mark_interrupted()
         self.enable_error_handling = enable_error_handling
 
         # 初始化错误处理器
@@ -54,7 +65,7 @@ class EduClawAgent:
         # 读取 SKILL.md
         skills_dir = project_dir_root / "skills"
         skill_content = []
-        for skill_folder in skills_dir.iterdir():
+        for skill_folder in (skills_dir.iterdir() if skills_dir.exists() else []):
             if skill_folder.is_dir():
                 skill_file = skill_folder / "SKILL.md"
                 if not skill_file.exists():
@@ -105,7 +116,7 @@ class EduClawAgent:
             session_id: 会话ID
             user_id: 用户ID（可选）
         """
-        self.session_id = session_id
+        self.session_id = self.state_manager.ensure_session(session_id, user_id)
         self.user_id = user_id
 
         if self.memory_manager:
@@ -136,7 +147,7 @@ class EduClawAgent:
                 # 原始转换逻辑（向后兼容）
                 from core.agent.adaptor import convert_mcp_tools_to_langchain
                 self.tools = convert_mcp_tools_to_langchain(
-                    mcp_tools, self.mcp_client, False, self.session_id, self.user_id
+                    mcp_tools, self.mcp_client
                 )
 
             logger.info(f"Agent Factory: 成功加载工具: {[t.name for t in self.tools]}")
@@ -146,10 +157,23 @@ class EduClawAgent:
             logger.error(f"Agent Factory: {error_msg}")
             raise
 
+        self._checkpoint_stack = AsyncExitStack()
+        try:
+            self._checkpointer = await self._checkpoint_stack.enter_async_context(
+                AsyncSqliteSaver.from_conn_string(self._checkpoint_path)
+            )
+            await self._checkpointer.setup()
+        except Exception:
+            await self._checkpoint_stack.aclose()
+            self._checkpoint_stack = None
+            raise
+        if self.session_id is None:
+            self.set_session_context(str(uuid.uuid4()))
         self.agent = create_agent(
             model=self.model,
             tools=self.tools,
-            system_prompt=self.prompt
+            system_prompt=self.prompt,
+            checkpointer=self._checkpointer
         )
 
         logger.info("Agent Factory: Agent 已就绪")
@@ -190,83 +214,57 @@ class EduClawAgent:
             return user_text
 
     async def chat(self, user_text: str) -> str:
-        """
-        对话方法，集成记忆系统和错误处理
-
-        Args:
-            user_text: 用户输入
-
-        Returns:
-            str: Agent 的回复
-        """
-        # 如果启用记忆，先增强用户输入
-        if self.enable_memory and self.memory_manager:
-            enhanced_text = await self._enhance_with_memory(user_text)
-            self.history.append(HumanMessage(content=enhanced_text))
-        else:
-            self.history.append(HumanMessage(content=user_text))
-
+        """One turn, checkpointed under the current session/thread ID."""
+        if self.agent is None:
+            raise RuntimeError('Call start() before chat()')
+        if self.session_id is None:
+            self.set_session_context(str(uuid.uuid4()))
+        run_id = self.state_manager.start_run(self.session_id, user_text)
+        handler = StateTrackingHandler(self.state_manager, run_id)
         try:
-            # 调用 Agent
-            response = await self.agent.ainvoke({
-                "messages": self.history
-            })
-
-            self.history = response["messages"]
-            ai_response = self.history[-1].content
-
-            # 保存对话到记忆
+            enhanced = (await self._enhance_with_memory(user_text)
+                        if self.enable_memory and self.memory_manager else user_text)
+            response = await self.agent.ainvoke(
+                {'messages': [HumanMessage(content=enhanced)]},
+                config={'configurable': {'thread_id': self.session_id}, 'callbacks': [handler]}
+            )
+            answer = response['messages'][-1].content
+            self.history = response['messages']  # compatibility, not the source of truth
             if self.enable_memory and self.memory_manager:
                 try:
-                    await self.memory_manager.save_conversation(user_text, ai_response)
-                    logger.debug("Conversation saved to memory")
-                except Exception as e:
-                    logger.error(f"Error saving conversation to memory: {e}")
-
-            return ai_response
-
-        except ToolError as e:
-            # 已处理的工具错误
-            logger.error(f"Tool error during chat: {e.message}")
-            error_response = f"工具执行出错: {e.message}\n请尝试重新提问或使用其他工具。"
-
-            # 记录错误
-            self.error_handler.handle_tool_error(
-                e, "Agent", "execution", self.session_id, self.user_id
-            )
-
-            return error_response
-        except Exception as e:
-            # 捕获其他异常
-            logger.error(f"Error in chat: {e}")
+                    await self.memory_manager.save_conversation(user_text, str(answer))
+                except Exception:
+                    logger.exception('Could not save semantic memory')
+            self.state_manager.finish_run(run_id, 'completed', output=str(answer))
+            return answer
+        except Exception as exc:
+            self.state_manager.finish_run(run_id, 'failed', error=str(exc))
+            logger.exception('Agent run failed: %s', run_id)
             raise
 
     async def chat_without_memory(self, user_text: str) -> str:
-        """
-        不使用记忆的对话方法（原始方法）
-
-        Args:
-            user_text: 用户输入
-
-        Returns:
-            str: Agent 的回复
-        """
-        self.history.append(HumanMessage(content=user_text))
-
+        old = self.enable_memory
+        self.enable_memory = False
         try:
-            response = await self.agent.ainvoke({
-                "messages": self.history
-            })
+            return await self.chat(user_text)
+        finally:
+            self.enable_memory = old
 
-            self.history = response["messages"]
-            return self.history[-1].content
+    def list_sessions(self):
+        return self.state_manager.list_sessions(self.user_id)
 
-        except ToolError as e:
-            logger.error(f"Tool error during chat: {e.message}")
-            self.error_handler.handle_tool_error(
-                e, "Agent", "execution", self.session_id, self.user_id
-            )
-            return f"工具执行出错: {e.message}"
+    def list_runs(self, session_id=None):
+        return self.state_manager.list_runs(session_id or self.session_id)
+
+    def list_events(self, run_id):
+        return self.state_manager.list_events(run_id)
+
+    async def get_conversation_state(self, session_id=None):
+        if self.agent is None:
+            raise RuntimeError('Agent is not started')
+        return await self.agent.aget_state({
+            'configurable': {'thread_id': session_id or self.session_id}
+        })
 
     async def save_knowledge(self, title: str, content: str, tags: list = None) -> str:
         """
@@ -351,4 +349,9 @@ class EduClawAgent:
 
     async def stop(self):
         """停止 Agent"""
-        await self.mcp_client.disconnect()
+        try:
+            await self.mcp_client.disconnect()
+        finally:
+            if self._checkpoint_stack is not None:
+                await self._checkpoint_stack.aclose()
+                self._checkpoint_stack = None
