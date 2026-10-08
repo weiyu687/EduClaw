@@ -7,6 +7,8 @@ Date: 2026-09-28
 
 from typing import Callable, Optional, Any, Dict
 from logging import getLogger
+import uuid
+from core.mcp.client import MCPToolResultError
 import asyncio
 
 from langchain_core.tools import BaseTool, StructuredTool
@@ -189,7 +191,11 @@ class SafeToolAdapter:
         Returns:
             工具执行结果
         """
-        max_attempts = 3 if self.enable_recovery else 1
+        # Retry policy is deliberately conservative. Tools with side effects
+        # (including Python execution) must never be replayed automatically.
+        safe_read_only = {'get_weather', 'extract_pdf', 'extract_word',
+                          'extract_pptx', 'extract_xlsx', 'extract_py', 'get_all_files'}
+        max_attempts = 3 if self.enable_recovery and tool_name in safe_read_only else 1
         last_error = None
 
         for attempt in range(max_attempts):
@@ -197,6 +203,10 @@ class SafeToolAdapter:
                 # 调用 MCP 工具
                 result = await mcp_client.use_tool(tool_name, kwargs)
 
+                if result is None:
+                    raise RuntimeError(f'MCP tool {tool_name} returned None')
+                if getattr(result, 'isError', False):
+                    raise MCPToolResultError(tool_name, result)
                 # 解析结果
                 if hasattr(result, 'content') and len(result.content) > 0:
                     raw_text = result.content[0].text
@@ -217,7 +227,7 @@ class SafeToolAdapter:
                 logger.warning(f"Tool '{tool_name}' execution failed (attempt {attempt + 1}): {str(e)}")
 
                 # 如果启用了恢复并且不是最后一次尝试
-                if self.enable_recovery and attempt < max_attempts - 1:
+                if attempt < max_attempts - 1 and not isinstance(e, MCPToolResultError):
                     error = ToolExecutionError(tool_name, original_error=e)
                     context = {"tool_name": tool_name, "attempt": attempt + 1}
 

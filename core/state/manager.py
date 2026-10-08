@@ -1,5 +1,6 @@
 """SQLite run/session/event metadata; LangGraph owns checkpointed messages."""
 import json
+from contextlib import contextmanager
 import sqlite3
 import threading
 import uuid
@@ -16,7 +17,7 @@ class StateManager:
         self.path = str(path)
         Path(self.path).parent.mkdir(parents=True, exist_ok=True)
         self._lock = threading.RLock()
-        with self._connect() as db:
+        with self._connection() as db:
             db.executescript('''
                 CREATE TABLE IF NOT EXISTS sessions (
                     id TEXT PRIMARY KEY, user_id TEXT, created_at TEXT NOT NULL,
@@ -43,9 +44,23 @@ class StateManager:
         db.execute('PRAGMA foreign_keys=ON')
         return db
 
+    @contextmanager
+    def _connection(self):
+        """Commit/rollback and ALWAYS close SQLite handle (Windows-safe)."""
+        db = self._connect()
+        try:
+            with db:
+                yield db
+        finally:
+            db.close()
+
+    def close(self):
+        """Compatibility API: this manager does not retain open connections."""
+        pass
+
     def ensure_session(self, session_id=None, user_id=None):
         session_id = session_id or str(uuid.uuid4())
-        with self._lock, self._connect() as db:
+        with self._lock, self._connection() as db:
             existing = db.execute('SELECT user_id FROM sessions WHERE id=?', (session_id,)).fetchone()
             if existing and user_id is not None and existing[0] not in (None, user_id):
                 raise PermissionError('Session belongs to another user')
@@ -56,7 +71,7 @@ class StateManager:
         return session_id
 
     def list_sessions(self, user_id=None):
-        with self._lock, self._connect() as db:
+        with self._lock, self._connection() as db:
             db.row_factory = sqlite3.Row
             if user_id is None:
                 rows = db.execute('SELECT * FROM sessions ORDER BY updated_at DESC').fetchall()
@@ -66,40 +81,56 @@ class StateManager:
 
     def start_run(self, session_id, text):
         run_id = str(uuid.uuid4())
-        with self._lock, self._connect() as db:
+        with self._lock, self._connection() as db:
             db.execute('INSERT INTO runs VALUES (?,?,?,?,?,?,?,?)',
                        (run_id, session_id, 'running', text, None, None, now(), now()))
         return run_id
 
     def finish_run(self, run_id, status, output=None, error=None):
-        with self._lock, self._connect() as db:
+        with self._lock, self._connection() as db:
             db.execute('UPDATE runs SET status=?, output=?, error=?, updated_at=? WHERE id=?',
                        (status, output, error, now(), run_id))
 
     def event(self, run_id, kind, payload):
-        with self._lock, self._connect() as db:
+        with self._lock, self._connection() as db:
             db.execute('INSERT INTO events(run_id,kind,payload,created_at) VALUES (?,?,?,?)',
                        (run_id, kind, json.dumps(payload, ensure_ascii=False, default=str), now()))
 
     def list_runs(self, session_id):
-        with self._lock, self._connect() as db:
+        with self._lock, self._connection() as db:
             db.row_factory = sqlite3.Row
             return [dict(row) for row in db.execute('SELECT * FROM runs WHERE session_id=? ORDER BY created_at DESC', (session_id,))]
 
     def list_events(self, run_id):
-        with self._lock, self._connect() as db:
+        with self._lock, self._connection() as db:
             db.row_factory = sqlite3.Row
             rows = db.execute('SELECT * FROM events WHERE run_id=? ORDER BY id', (run_id,)).fetchall()
             return [{**dict(r), 'payload': json.loads(r['payload'])} for r in rows]
 
     def mark_interrupted(self):
         """An abandoned process cannot be assumed safe to resume automatically."""
-        with self._lock, self._connect() as db:
+        with self._lock, self._connection() as db:
             db.execute("UPDATE runs SET status='interrupted', updated_at=? WHERE status='running'", (now(),))
+
+    def get_run(self, run_id):
+        with self._lock, self._connection() as db:
+            db.row_factory = sqlite3.Row
+            row = db.execute('SELECT * FROM runs WHERE id=?', (run_id,)).fetchone()
+            return dict(row) if row else None
+
+    def tool_call(self, run_id, call_id, tool_name, status, *, attempt=None, error=None, uncertain=False):
+        """Persist a tool attempt without storing sensitive arguments or raw output."""
+        self.event(run_id, 'tool_attempt', {
+            'call_id': call_id, 'name': tool_name, 'status': status,
+            'attempt': attempt, 'error': error, 'uncertain': uncertain,
+        })
+
+    def get_interrupted_runs(self, session_id):
+        return [r for r in self.list_runs(session_id) if r['status'] == 'interrupted']
 
     def delete_session(self, session_id):
         """Delete metadata only; LangGraph checkpoints require separate pruning."""
-        with self._lock, self._connect() as db:
+        with self._lock, self._connection() as db:
             db.execute('DELETE FROM events WHERE run_id IN (SELECT id FROM runs WHERE session_id=?)', (session_id,))
             db.execute('DELETE FROM runs WHERE session_id=?', (session_id,))
             db.execute('DELETE FROM sessions WHERE id=?', (session_id,))

@@ -15,6 +15,15 @@ from core.logging import get_logger
 logger = get_logger("CLIENT")
 
 
+class MCPToolResultError(RuntimeError):
+    """MCP transport succeeded, but the tool itself returned isError=True."""
+    def __init__(self, tool_name, result):
+        self.tool_name = tool_name
+        self.result = result
+        details = '; '.join(str(getattr(x, 'text', x)) for x in getattr(result, 'content', []))
+        super().__init__(f'MCP tool {tool_name} returned isError=True: {details[:1000]}')
+
+
 class MCPClient:
     def __init__(self, server_script: str = "core.mcp.startup_server"):
         """
@@ -78,6 +87,8 @@ class MCPClient:
             # result 包括 TextContent, ImageContent, ResourceContent
             result = await self.session.call_tool(tool_name, arguments)
 
+            if getattr(result, "isError", False):
+                raise MCPToolResultError(tool_name, result)
             logger.info(f"MCP Client: 工具 {tool_name} 调用 [bold green]成功[/bold green]")
             return result
         except Exception as e:

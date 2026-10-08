@@ -27,7 +27,7 @@ async def run_interactive_app():
         logger.info("Main: 正在运行程序 EduClaw...")
         await agent.start()
         console.print(f"[cyan]当前会话: {agent.session_id}[/cyan]")
-        console.print("命令: /new | /use <session_id> | /sessions | /runs | /events <run_id>")
+        console.print("命令: /new | /use <session_id> | /sessions | /runs | /events <run_id> | /status <run_id> | /interrupted")
 
         console.print("\n[bold green]EduClaw 已就绪，请输入您的指令 (输入 'exit' 退出):[/bold green]")
 
@@ -59,6 +59,17 @@ async def run_interactive_app():
             if command == '/runs':
                 for item in agent.list_runs():
                     console.print(f"{item['id']}  {item['status']}")
+                continue
+            if command == '/interrupted':
+                for item in agent.state_manager.get_interrupted_runs(agent.session_id):
+                    console.print(f"{item['id']}  interrupted (requires review)")
+                continue
+            if command.startswith('/status '):
+                run = agent.state_manager.get_run(command.split(maxsplit=1)[1])
+                if run is None or run['session_id'] != agent.session_id:
+                    console.print('未找到当前会话中的运行记录')
+                else:
+                    console.print(run)
                 continue
             if command.startswith('/events '):
                 for item in agent.list_events(command.split(maxsplit=1)[1]):
