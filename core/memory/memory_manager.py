@@ -124,23 +124,26 @@ class MemoryManager:
             return ""
 
     async def recall_relevant_memories(self, query: str, category: Optional[str] = None, limit: int = 3) -> List[str]:
-        """
-        召回相关记忆作为上下文（使用向量相似度搜索）
+        """仅召回当前会话记忆，禁止跨会话语义记忆泄漏。
 
-        Args:
-            query: 查询内容
-            category: 可选的类别筛选
-            limit: 返回数量
-
-        Returns:
-            List[str]: 相关记忆内容列表
+        注意：当前后端的 metadata 查询不是向量相似度排序；这是隔离优先的修复。
+        后续可扩展 ChromaStorageBackend.retrieve(where=...) 做会话内向量检索。
         """
+        if not self.session_id or limit <= 0:
+            return []
         try:
-            relevant = await self.backend.retrieve(query, category=category, limit=limit)
-            logger.debug(f"Recalled {len(relevant)} memories for query: {query[:50]}")
-            return [m.content for m in relevant]
+            memories = await self.backend.search_by_metadata("session_id", self.session_id)
+            if category is not None:
+                memories = [m for m in memories if m.category == category]
+            # 在同一会话内使用简单词项重合排序；不把其他会话数据传给模型。
+            terms = set(query.lower().split())
+            def score(m):
+                content = m.content.lower()
+                return sum(term in content for term in terms)
+            memories.sort(key=score, reverse=True)
+            return [m.content for m in memories[:limit]]
         except Exception as e:
-            logger.error(f"Error recalling memories: {e}")
+            logger.error(f"Error recalling session memories: {e}")
             return []
 
     async def get_user_memories(self, category: Optional[str] = None) -> List[MemoryEntry]:
