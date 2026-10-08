@@ -82,7 +82,7 @@ class MCPClient:
             return result
         except Exception as e:
             logger.error(f"MCP Client: 工具 {tool_name} 调用失败--{str(e)}")
-            return None
+            raise
 
     async def disconnect(self):
         """断开连接"""
