@@ -12,6 +12,7 @@ from typing import Dict, Any
 from mcp import ClientSession
 from mcp.client.stdio import stdio_client, StdioServerParameters
 from core.logging import get_logger
+from core.security.global_gateway import check_and_audit
 
 logger = get_logger("CLIENT")
 
@@ -116,6 +117,8 @@ class MCPClient:
         """调用工具"""
         if not self.session:
             raise RuntimeError("Client not connected.")
+
+        check_and_audit(tool_name, arguments)
 
         logger.info(f"MCP Client: 正在调用工具 [bold cyan]{tool_name}[/bold cyan] ...", extra={"markup": True})
 

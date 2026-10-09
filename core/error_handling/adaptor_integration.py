@@ -9,6 +9,7 @@ from typing import Callable, Optional, Any, Dict
 from logging import getLogger
 import uuid
 from core.mcp.client import MCPToolResultError
+from core.security.global_gateway import GlobalToolDenied
 import asyncio
 import json
 
@@ -294,7 +295,7 @@ class SafeToolAdapter:
                 logger.warning(f"Tool '{tool_name}' execution failed (attempt {attempt + 1}): {str(e)}")
 
                 # 如果启用了恢复并且不是最后一次尝试
-                if attempt < max_attempts - 1 and not isinstance(e, MCPToolResultError) and not _is_timeout_error(e):
+                if attempt < max_attempts - 1 and not isinstance(e, (MCPToolResultError, GlobalToolDenied)) and not _is_timeout_error(e):
                     error = ToolExecutionError(tool_name, original_error=e)
                     context = {"tool_name": tool_name, "attempt": attempt + 1}
 
