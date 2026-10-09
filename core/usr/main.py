@@ -11,6 +11,7 @@ import re
 import secrets
 from pathlib import Path
 from core.security.read_grants import grant, canonical, list_grants, revoke, session_context
+from core.security.agent_code_flow import wants_python, draft as draft_agent_code, context as agent_code_context, update as update_agent_code, explain as explain_agent_code
 from core.security.code_approval import propose as propose_code, get as get_code, claim as claim_code, reject as reject_code, approved_call
 
 from core.logging import get_logger
@@ -43,6 +44,7 @@ async def run_interactive_app():
         logger.info("Main: 正在运行程序 EduClaw...")
         await agent.start()
         console.print(f"[cyan]当前会话: {agent.session_id}[/cyan]")
+        console.print("Phase 5.4b: 自然语言明确要求 Python 执行时自动生成待审批代码；/code-approve <token> 后继续回答")
         console.print("Phase 5.4: /code-propose <Python代码> | /code-approve <token> | /code-deny <token> | /code-status <token>")
         console.print("Phase 5.3c: /permissions | /permit <token> <once|session|always> | /deny-read | /allow-read <路径> | /revoke-read <id>")
         console.print("Phase 5.3b: /skills | /agent-step-run <task_id> <序号> <skill_id或-> <tool1,tool2> | /agent-step-approve <task_id> <序号> <token> | /agent-step-result <task_id> <序号>")
@@ -81,7 +83,10 @@ async def run_interactive_app():
                 continue
             if command.startswith('/code-deny '):
                 rid = command.split(maxsplit=1)[1]
-                console.print('已拒绝' if reject_code(agent.session_id,rid) else '无法拒绝（已使用或不存在）')
+                denied = reject_code(agent.session_id,rid)
+                if denied and agent_code_context(agent.session_id, rid):
+                    update_agent_code(agent.session_id, rid, 'rejected')
+                console.print('已拒绝' if denied else '无法拒绝（已使用或不存在）')
                 continue
             if command.startswith('/code-approve '):
                 rid = command.split(maxsplit=1)[1]
@@ -92,13 +97,38 @@ async def run_interactive_app():
                     if confirmation != 'EXECUTE':
                         console.print('已取消，审批请求仍为 pending（可用 /code-deny 拒绝）')
                         continue
+                    agent_pending = agent_code_context(agent.session_id, rid)
                     tool, args, digest = claim_code(agent.session_id,rid)
+                    if agent_pending:
+                        update_agent_code(agent.session_id, rid, 'running')
                     # Approval is consumed BEFORE MCP transport, including timeouts.
                     with session_context(agent.session_id), approved_call(agent.session_id,rid,digest):
                         result = await agent.mcp_client.use_tool(tool,args)
                     console.print(f'[green]执行返回（原始 MCP 结果）:[/green] {result}')
-                except (LookupError, PermissionError, ValueError, RuntimeError) as exc:
+                    if agent_pending:
+                        if getattr(result, 'isError', False):
+                            update_agent_code(agent.session_id, rid, 'uncertain', str(result))
+                            console.print('[yellow]MCP 报告执行错误，禁止自动重试。[/yellow]')
+                        else:
+                            # The tool has already run; never run it again when explanation fails.
+                            update_agent_code(agent.session_id, rid, 'completed', str(result))
+                            try:
+                                answer = await explain_agent_code(agent.model, agent_pending['request'], args['code'], str(result))
+                                console.print(f'\n[bold white]Agent:[/bold white] {answer}\n')
+                            except Exception as exc:
+                                console.print(f'[yellow]代码已执行，但生成解释失败：{exc}。请勿重复批准执行。[/yellow]')
+                except Exception as exc:
+                    # A claimed approval is already consumed. Mark interrupted transport
+                    # uncertain rather than retrying an operation with side effects.
+                    if 'agent_pending' in locals() and agent_pending:
+                        try:
+                            if agent_code_context(agent.session_id, rid)['status'] == 'running':
+                                update_agent_code(agent.session_id, rid, 'uncertain', str(exc))
+                        except Exception:
+                            pass
                     console.print(f'[yellow]执行失败或已拒绝，禁止自动重试: {exc}[/yellow]')
+                finally:
+                    agent_pending = None
                 continue
             if command == '/permissions':
                 for item in list_grants(agent.session_id):
@@ -351,6 +381,15 @@ async def run_interactive_app():
             if command.startswith('/events '):
                 for item in agent.list_events(command.split(maxsplit=1)[1]):
                     console.print(item)
+                continue
+            # Model may draft code, but only trusted CLI can approve execution.
+            # Never let ordinary chat call run_python_code for this route.
+            if wants_python(user_input):
+                try:
+                    request = await draft_agent_code(agent.model, agent.session_id, user_input)
+                    console.print(f"[yellow]Agent 已生成待审批 Python 代码（尚未执行）：\n{request['code']}\nSHA-256: {request['sha256']}\n批准: /code-approve {request['id']}\n拒绝: /code-deny {request['id']}[/yellow]")
+                except Exception as exc:
+                    console.print(f'[yellow]自动生成代码申请失败（未执行任何代码）：{exc}[/yellow]')
                 continue
             # Preflight explicit local file paths; the model never authorizes itself.
             # The gateway remains mandatory for every actual MCP call.
