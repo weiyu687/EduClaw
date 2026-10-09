@@ -11,6 +11,7 @@ import re
 import secrets
 from pathlib import Path
 from core.security.read_grants import grant, canonical, list_grants, revoke, session_context
+from core.security.tool_dispatcher import route as suggest_route, read_preflight, user_paths, explicit_tool_policy
 from core.security.agent_code_flow import wants_python, draft as draft_agent_code, context as agent_code_context, update as update_agent_code, explain as explain_agent_code
 from core.security.code_approval import propose as propose_code, get as get_code, claim as claim_code, reject as reject_code, approved_call
 
@@ -44,6 +45,8 @@ async def run_interactive_app():
         logger.info("Main: 正在运行程序 EduClaw...")
         await agent.start()
         console.print(f"[cyan]当前会话: {agent.session_id}[/cyan]")
+        console.print("Phase 5.5: /auto on|off | /auto-status；自主建议路由（权限仍由 CLI 与 MCP 网关控制）")
+        auto_mode = True
         console.print("Phase 5.4b: 自然语言明确要求 Python 执行时自动生成待审批代码；/code-approve <token> 后继续回答")
         console.print("Phase 5.4: /code-propose <Python代码> | /code-approve <token> | /code-deny <token> | /code-status <token>")
         console.print("Phase 5.3c: /permissions | /permit <token> <once|session|always> | /deny-read | /allow-read <路径> | /revoke-read <id>")
@@ -66,6 +69,13 @@ async def run_interactive_app():
                 continue
 
             command = user_input.strip()
+            if command == '/auto-status':
+                console.print(f"自动路由: {'on' if auto_mode else 'off'}")
+                continue
+            if command in ('/auto on', '/auto off'):
+                auto_mode = command.endswith('on')
+                console.print(f"自动路由已{'启用' if auto_mode else '关闭'}")
+                continue
             if command.startswith('/code-propose '):
                 try:
                     code = user_input.strip()[len('/code-propose '):]
@@ -382,26 +392,40 @@ async def run_interactive_app():
                 for item in agent.list_events(command.split(maxsplit=1)[1]):
                     console.print(item)
                 continue
-            # Model may draft code, but only trusted CLI can approve execution.
-            # Never let ordinary chat call run_python_code for this route.
-            if wants_python(user_input):
+            # Phase 5.5.1: explicit tool requests are handled before model routing.
+            # A denied tool must never be silently converted into run_python_code.
+            explicit_policy = explicit_tool_policy(user_input)
+            if explicit_policy and explicit_policy[1] == 'deny':
+                tool_name, _, explanation = explicit_policy
+                console.print(f"[yellow]检测到指定工具：{tool_name}\n"
+                              f"安全策略：{explanation}\n"
+                              "执行状态：DENIED；未执行任何工具。[/yellow]")
+                continue
+            # Phase 5.5: model suggests a route, never an authorization.
+            # Explicit code intent retains Phase 5.4b compatibility even if auto is off.
+            selected = None
+            if auto_mode and explicit_policy is None:
+                try:
+                    selected = await suggest_route(agent.model, user_input)
+                except Exception as exc:
+                    logger.warning(f'Router failed; falling back to conservative routing: {exc}')
+            # Explicit Python intent must not fall through to unrestricted chat.
+            do_python = (explicit_policy is not None and explicit_policy[1] == 'python') or (explicit_policy is None and (wants_python(user_input) or (auto_mode and selected and selected.action == 'python')))
+            if do_python:
                 try:
                     request = await draft_agent_code(agent.model, agent.session_id, user_input)
                     console.print(f"[yellow]Agent 已生成待审批 Python 代码（尚未执行）：\n{request['code']}\nSHA-256: {request['sha256']}\n批准: /code-approve {request['id']}\n拒绝: /code-deny {request['id']}[/yellow]")
                 except Exception as exc:
                     console.print(f'[yellow]自动生成代码申请失败（未执行任何代码）：{exc}[/yellow]')
                 continue
-            # Preflight explicit local file paths; the model never authorizes itself.
-            # The gateway remains mandatory for every actual MCP call.
-            candidates = re.findall(r'[A-Za-z]:\\[^\r\n\"<>|?*]+?\.(?:pdf|docx?|pptx|xlsx?|py)(?=\s|$|[，,。；;）)])', user_input, flags=re.I)
+            # Always preflight explicit user paths, even if model proposes chat.
+            # Never approve paths inferred or invented by the model.
+            candidates = user_paths(user_input)
             requested_path = None
             for raw in candidates:
                 try:
-                    from core.security.global_gateway import _roots
-                    from core.security.read_grants import allowed
-                    resolved = Path(canonical(raw.strip()))
-                    if not any(resolved.is_relative_to(root) for root in _roots()) and not allowed(resolved, agent.session_id):
-                        requested_path = str(resolved)
+                    requested_path = read_preflight(raw, agent.session_id)
+                    if requested_path:
                         break
                 except (ValueError, OSError, PermissionError):
                     continue
@@ -414,6 +438,8 @@ async def run_interactive_app():
                               f"持久授权: /permit {token} always\n"
                               f"拒绝: /deny-read[/yellow]")
                 continue
+            # Agent chooses its read-only MCP tool using its existing LangGraph setup.
+            # All actual calls are still checked by the global gateway.
             with session_context(agent.session_id):
                 response = await agent.chat(user_input)
 
