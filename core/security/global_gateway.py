@@ -7,6 +7,8 @@ Dangerous/unknown tools are denied until a parameter-bound approval protocol exi
 import logging
 import os
 from pathlib import Path
+from core.security.read_grants import allowed as dynamic_read_allowed
+from core.security.code_approval import authorize_code
 
 log = logging.getLogger('EDUCLAW_TOOL_GATEWAY')
 
@@ -41,6 +43,10 @@ def authorize(tool_name, arguments):
         raise GlobalToolDenied('Tool arguments must be an object')
     if tool_name in NO_FILE_READ:
         return
+    if tool_name == "run_python_code":
+        if authorize_code(tool_name, arguments):
+            return
+        raise GlobalToolDenied("Python execution requires an exact, one-shot CLI approval")
     arg = FILE_TO_ARG.get(tool_name)
     if arg is None:
         raise GlobalToolDenied(f'Global policy denies tool: {tool_name}')
@@ -55,7 +61,7 @@ def authorize(tool_name, arguments):
         roots = _roots()
     except (OSError, RuntimeError) as exc:
         raise GlobalToolDenied('File path cannot be safely resolved') from exc
-    if not roots or not any(target.is_relative_to(root) for root in roots):
+    if not any(target.is_relative_to(root) for root in roots) and not dynamic_read_allowed(target, consume=True):
         raise GlobalToolDenied(f'File path is outside authorized read roots: {target}')
     if tool_name == 'get_all_files':
         if not target.is_dir():
