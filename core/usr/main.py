@@ -27,7 +27,7 @@ async def run_interactive_app():
         logger.info("Main: 正在运行程序 EduClaw...")
         await agent.start()
         console.print(f"[cyan]当前会话: {agent.session_id}[/cyan]")
-        console.print("命令: /new | /use <session_id> | /sessions | /runs | /events <run_id> | /status <run_id> | /interrupted | /resume <run_id> (review only)")
+        console.print("命令: /new | /use <session_id> | /sessions | /runs | /events <run_id> | /status <run_id> | /interrupted | /resume <run_id> | /approve-resume <token>")
 
         console.print("\n[bold green]EduClaw 已就绪，请输入您的指令 (输入 'exit' 退出):[/bold green]")
 
@@ -67,11 +67,22 @@ async def run_interactive_app():
             if command.startswith('/resume '):
                 rid = command.split(maxsplit=1)[1]
                 try:
-                    review = agent.state_manager.review_interrupted_run(rid, agent.session_id)
+                    review = await agent.review_resume(rid)
                     console.print(review)
-                    console.print('[yellow]安全限制：本版本只审查，不自动重放工具或重新提交原任务。[/yellow]')
-                except (LookupError, ValueError) as exc:
+                    if review.get('can_resume'):
+                        console.print('[yellow]仅在确认后使用 /approve-resume <approval_token> 继续；不会自动重放工具。[/yellow]')
+                    else:
+                        console.print('[yellow]恢复已阻止：当前检查点不满足安全条件。[/yellow]')
+                except (LookupError, ValueError, RuntimeError) as exc:
                     console.print(f'[yellow]{exc}[/yellow]')
+                continue
+            if command.startswith('/approve-resume '):
+                token = command.split(maxsplit=1)[1]
+                try:
+                    result = await agent.approve_resume(token)
+                    console.print(f"[bold white]恢复结果:[/bold white] {result}")
+                except (PermissionError, RuntimeError, LookupError, ValueError) as exc:
+                    console.print(f'[yellow]恢复未执行：{exc}[/yellow]')
                 continue
             if command.startswith('/status '):
                 run = agent.state_manager.get_run(command.split(maxsplit=1)[1])

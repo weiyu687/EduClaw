@@ -10,6 +10,7 @@ import uuid
 from langgraph.checkpoint.sqlite.aio import AsyncSqliteSaver
 from core.state import StateManager
 from core.state.tracking import StateTrackingHandler
+from core.state.recovery import SafeCheckpointRecovery
 import re
 from langchain.agents import create_agent
 from langchain_core.messages import HumanMessage, AIMessage
@@ -45,6 +46,7 @@ class EduClawAgent:
         self._checkpoint_path = str(Path(state_db_path).with_name("educlaw_checkpoints.sqlite3"))
         self._checkpoint_stack = None
         self._checkpointer = None
+        self.recovery_service = None
         self.state_manager.mark_interrupted()
         self.enable_error_handling = enable_error_handling
 
@@ -176,6 +178,7 @@ class EduClawAgent:
             checkpointer=self._checkpointer
         )
 
+        self.recovery_service = SafeCheckpointRecovery(self.state_manager, self.agent)
         logger.info("Agent Factory: Agent 已就绪")
 
     async def _enhance_with_memory(self, user_text: str) -> str:
@@ -258,6 +261,22 @@ class EduClawAgent:
 
     def list_events(self, run_id):
         return self.state_manager.list_events(run_id)
+
+    async def review_resume(self, run_id: str) -> dict:
+        """Inspect a stopped run; never invokes graph execution."""
+        if self.recovery_service is None or self.session_id is None:
+            raise RuntimeError('Agent is not started')
+        return (await self.recovery_service.review(run_id, self.session_id)).to_dict()
+
+    async def approve_resume(self, approval_token: str):
+        """Resume only after explicit approval and a second safety review."""
+        if self.recovery_service is None or self.session_id is None:
+            raise RuntimeError('Agent is not started')
+        result = await self.recovery_service.approve_and_resume(approval_token, self.session_id)
+        if isinstance(result, dict) and result.get('messages'):
+            self.history = result['messages']
+            return result['messages'][-1].content if hasattr(result['messages'][-1], 'content') else str(result['messages'][-1])
+        return result
 
     async def get_conversation_state(self, session_id=None):
         if self.agent is None:
