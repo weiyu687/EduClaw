@@ -13,6 +13,9 @@ from core.usr.startup_info import print_startup_info
 from core.agent import EduClawAgent
 from core.tasks import TaskManager
 from core.tasks.planning import PlanManager
+from core.tasks.execution import StepExecutor
+from core.tasks.agent_executor import AgentStepExecutor
+from core.skills import SkillRegistry
 
 logging.getLogger("httpx").setLevel(logging.WARNING)
 logger = get_logger("USER")
@@ -26,11 +29,15 @@ async def run_interactive_app():
     agent = EduClawAgent()
     task_manager = TaskManager()
     plan_manager = PlanManager(task_manager)
+    executor = StepExecutor(task_manager)
+    agent_executor = AgentStepExecutor(task_manager)
 
     try:
         logger.info("Main: 正在运行程序 EduClaw...")
         await agent.start()
         console.print(f"[cyan]当前会话: {agent.session_id}[/cyan]")
+        console.print("Phase 5.3b: /skills | /agent-step-run <task_id> <序号> <skill_id或-> <tool1,tool2> | /agent-step-approve <task_id> <序号> <token> | /agent-step-result <task_id> <序号>")
+        console.print("Phase 5.3: /step-run <task_id> <序号> | /step-approve <task_id> <序号> <token> | /step-result <task_id> <序号>")
         console.print("Phase 5.2: /plan-new <目标> | /plans | /plan <草稿id> | /plan-approve <草稿id> | /plan-reject <草稿id>")
         console.print("Phase 5: /task-new <目标> | /tasks | /task <id> | /step <id> <序号> <状态> | /task-events <id> | /task-cancel <id>")
         console.print("命令: /new | /use <session_id> | /sessions | /runs | /events <run_id> | /status <run_id> | /interrupted | /resume <run_id> | /approve-resume <token>")
@@ -48,6 +55,44 @@ async def run_interactive_app():
                 continue
 
             command = user_input.strip()
+            if command == '/skills':
+                for skill in SkillRegistry().list():
+                    console.print(f"{skill['id']}  {skill['name']}  {skill['description']}")
+                continue
+            if command.startswith('/agent-step-run '):
+                try:
+                    parts = command.split()
+                    if len(parts) != 5:
+                        raise ValueError('用法: /agent-step-run <task_id> <序号> <skill_id或-> <tool1,tool2>')
+                    tid, pos, skill_id, tools_csv = parts[1], int(parts[2]), parts[3], parts[4]
+                    request = agent_executor.request(agent.session_id, tid, pos, skill_id,
+                                                     [x.strip() for x in tools_csv.split(',') if x.strip()])
+                    console.print(f"[yellow]待审批 Skill={skill_id} Tools={request['tools']}\n"
+                                  f"执行: /agent-step-approve {tid} {pos} {request['token']}[/yellow]")
+                except (ValueError, LookupError, PermissionError) as exc:
+                    console.print(f'[yellow]工具任务申请失败: {exc}[/yellow]')
+                continue
+            if command.startswith('/agent-step-approve '):
+                try:
+                    parts = command.split()
+                    if len(parts) != 4:
+                        raise ValueError('用法: /agent-step-approve <task_id> <序号> <token>')
+                    tid, pos, token = parts[1], int(parts[2]), parts[3]
+                    agent_executor.approve(agent.session_id, tid, pos, token)
+                    result = await agent_executor.execute(agent.session_id, tid, pos, agent)
+                    console.print(f"工具步骤结果: {result['status']}\n{result['result']}")
+                except Exception as exc:
+                    console.print(f'[yellow]工具步骤失败（如执行中断请人工审查，禁止自动重试）: {exc}[/yellow]')
+                continue
+            if command.startswith('/agent-step-result '):
+                try:
+                    parts = command.split()
+                    if len(parts) != 3:
+                        raise ValueError('用法: /agent-step-result <task_id> <序号>')
+                    console.print(agent_executor.result(agent.session_id, parts[1], int(parts[2])))
+                except (ValueError, LookupError) as exc:
+                    console.print(f'[yellow]{exc}[/yellow]')
+                continue
             if command.startswith('/plan-new '):
                 try:
                     console.print('[cyan]正在生成草稿（不会执行任何工具或保存为任务）...[/cyan]')
@@ -81,6 +126,39 @@ async def run_interactive_app():
                     draft = plan_manager.reject(agent.session_id, command.split(maxsplit=1)[1])
                     console.print(f"计划草稿已拒绝: {draft['id']}")
                 except (LookupError, ValueError) as exc:
+                    console.print(f'[yellow]{exc}[/yellow]')
+                continue
+            if command.startswith('/step-run '):
+                try:
+                    parts = command.split()
+                    if len(parts) != 3: raise ValueError('用法: /step-run <task_id> <序号>')
+                    tid, pos = parts[1], int(parts[2])
+                    state = executor.request(agent.session_id, tid, pos)
+                    if state['status'] == 'awaiting_approval':
+                        console.print(f"[yellow]步骤需要审批。仅允许模型生成文本，不调用 MCP 工具。\n审批命令: /step-approve {tid} {pos} {state['token']}[/yellow]")
+                    else:
+                        result = await executor.execute(agent.session_id, tid, pos, agent.model)
+                        console.print(f"步骤结果: {result['status']}\n{result['result']}")
+                except (ValueError, LookupError, PermissionError, RuntimeError) as exc:
+                    console.print(f'[yellow]步骤执行失败: {exc}[/yellow]')
+                continue
+            if command.startswith('/step-approve '):
+                try:
+                    parts = command.split()
+                    if len(parts) != 4: raise ValueError('用法: /step-approve <task_id> <序号> <token>')
+                    tid, pos, token = parts[1], int(parts[2]), parts[3]
+                    executor.approve(agent.session_id, tid, pos, token)
+                    result = await executor.execute(agent.session_id, tid, pos, agent.model)
+                    console.print(f"步骤结果: {result['status']}\n{result['result']}")
+                except (ValueError, LookupError, PermissionError, RuntimeError) as exc:
+                    console.print(f'[yellow]审批/执行失败: {exc}[/yellow]')
+                continue
+            if command.startswith('/step-result '):
+                try:
+                    parts = command.split()
+                    if len(parts) != 3: raise ValueError('用法: /step-result <task_id> <序号>')
+                    console.print(executor.result(agent.session_id,parts[1],int(parts[2])))
+                except (ValueError, LookupError) as exc:
                     console.print(f'[yellow]{exc}[/yellow]')
                 continue
             if command.startswith('/task-new '):
