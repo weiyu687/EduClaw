@@ -5,6 +5,7 @@ Author: Gongmin Wei
 Date: 2026-04-01
 """
 import os
+import json
 from pathlib import Path
 from contextlib import AsyncExitStack
 from typing import Dict, Any
@@ -21,7 +22,42 @@ class MCPToolResultError(RuntimeError):
         self.tool_name = tool_name
         self.result = result
         details = '; '.join(str(getattr(x, 'text', x)) for x in getattr(result, 'content', []))
-        super().__init__(f'MCP tool {tool_name} returned isError=True: {details[:1000]}')
+        self.kind = 'execution_error'
+        self.uncertain = False
+        self.timeout_seconds = None
+        marker = 'EDUCLAW_ERROR_META:'
+        if marker in details:
+            try:
+                metadata, _ = json.JSONDecoder().raw_decode(details.split(marker, 1)[1])
+                if isinstance(metadata, dict):
+                    self.kind = str(metadata.get('error_type', 'execution_error'))
+                    self.uncertain = bool(metadata.get('uncertain', False))
+                    self.timeout_seconds = metadata.get('timeout_seconds')
+                    details = str(metadata.get('error_message', details))
+            except (ValueError, TypeError):
+                pass
+        super().__init__(f'MCP tool {tool_name} returned isError=True ({self.kind}): {details[:1000]}')
+
+
+class MCPStructuredExecutionError(RuntimeError):
+    """Explicit structured tool failure (not inferred from ordinary text)."""
+    def __init__(self, tool_name, kind, message):
+        self.tool_name = tool_name
+        self.kind = kind
+        self.uncertain = False
+        super().__init__(f"{tool_name}: {kind}: {message}")
+
+
+def _explicit_failure(result):
+    """Inspect explicit structured MCP fields only; never regex arbitrary stdout."""
+    payload = getattr(result, 'structuredContent', None)
+    if not isinstance(payload, dict):
+        return None
+    if payload.get('success') is False or payload.get('ok') is False or payload.get('status') in ('failed', 'error', 'timed_out'):
+        kind = str(payload.get('error_type') or payload.get('status') or 'ToolExecutionError')
+        message = str(payload.get('error_message') or payload.get('error') or 'Tool execution failed')
+        return kind, message
+    return None
 
 
 class MCPClient:
@@ -89,6 +125,9 @@ class MCPClient:
 
             if getattr(result, "isError", False):
                 raise MCPToolResultError(tool_name, result)
+            failure = _explicit_failure(result)
+            if failure:
+                raise MCPStructuredExecutionError(tool_name, *failure)
             logger.info(f"MCP Client: 工具 {tool_name} 调用 [bold green]成功[/bold green]")
             return result
         except Exception as e:

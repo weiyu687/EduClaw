@@ -5,6 +5,7 @@ Author: Gongmin Wei
 Date: 2026-03-31
 """
 import os
+import json
 import dotenv
 from typing import List
 import mcp.types as types
@@ -169,14 +170,23 @@ class MCPServer:
             target_tool = next((t for t in self.tools if t.__name__ == tool_name), None)
 
             if not target_tool:
-                return [types.TextContent(type="text", text=f"Error: Tool '{tool_name}' not found.")]
+                raise ValueError(f"Tool '{tool_name}' not found.")
 
             try:
                 result = target_tool(**arguments)
                 logger.info(f"MCP Server: 工具 {tool_name} 调用 [bold green]成功[/bold green]")
             except Exception as e:
                 logger.error(f"MCP Server: 工具 {tool_name} 调用失败--{str(e)}")
-                return [types.TextContent(type="text", text=f"Tool Execution Error: {str(e)}")]
+                category = getattr(e, 'category', 'execution_error')
+                payload = json.dumps({
+                    'error_type': category,
+                    'error_message': str(e),
+                    'uncertain': bool(getattr(e, 'uncertain', False)),
+                    'timeout_seconds': getattr(e, 'timeout_seconds', None),
+                }, ensure_ascii=False)
+                # This marker is emitted only for a server-side exception.
+                # MCP converts the raised exception into isError=True.
+                raise RuntimeError('EDUCLAW_ERROR_META:' + payload) from e
 
             return [types.TextContent(type="text", text=result)]
 

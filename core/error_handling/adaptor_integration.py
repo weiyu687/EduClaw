@@ -10,8 +10,9 @@ from logging import getLogger
 import uuid
 from core.mcp.client import MCPToolResultError
 import asyncio
+import json
 
-from langchain_core.tools import BaseTool, StructuredTool
+from langchain_core.tools import BaseTool, StructuredTool, ToolException
 from pydantic import BaseModel, create_model
 from mcp import types
 
@@ -25,6 +26,65 @@ from .validator import ParameterValidator
 from .recovery import AutoRecovery, create_default_recovery
 
 logger = getLogger("SAFE_ADAPTER")
+
+
+_TIMEOUT_EVENT_PREFIX = 'EDUCLAW_TIMEOUT_EVENT:'
+
+
+def _timeout_tool_response(exc):
+    """LangChain handled ToolException loses its Python type in ToolMessage.
+
+    Explicit machine-readable metadata is attached only to exceptions created
+    by our adapter, never inferred from arbitrary tool stdout.
+    """
+    meta = {
+        'error_type': 'timeout',
+        'uncertain': bool(getattr(exc, 'uncertain', True)),
+        'timeout_seconds': getattr(exc, 'timeout_seconds', None),
+    }
+    return _TIMEOUT_EVENT_PREFIX + json.dumps(meta, ensure_ascii=False) + '\n' + str(exc)
+
+
+def _timeout_seconds(exc):
+    current, seen = exc, set()
+    while current is not None and id(current) not in seen:
+        seen.add(id(current))
+        value = getattr(current, 'timeout_seconds', None)
+        if isinstance(value, (int, float)) and value > 0:
+            return value
+        current = getattr(current, 'original_error', None) or getattr(current, '__cause__', None)
+    return None
+
+
+class EduClawTimeoutToolException(ToolException):
+    """Timeout signaled across MCP and LangChain; no automatic replay."""
+    def __init__(self, message, *, uncertain=True, timeout_seconds=None):
+        super().__init__(message)
+        self.uncertain = uncertain
+        self.timeout_seconds = timeout_seconds
+
+
+def _is_timeout_error(exc):
+    current = exc
+    seen = set()
+    while current is not None and id(current) not in seen:
+        seen.add(id(current))
+        kind = str(getattr(current, 'kind', '')).lower()
+        if kind in ('timeout', 'timed_out') or isinstance(current, (asyncio.TimeoutError, ToolTimeoutError)):
+            return True
+        current = getattr(current, 'original_error', None) or current.__cause__
+    return False
+
+
+def _is_uncertain_error(exc):
+    current = exc
+    seen = set()
+    while current is not None and id(current) not in seen:
+        seen.add(id(current))
+        if getattr(current, 'uncertain', False):
+            return True
+        current = getattr(current, 'original_error', None) or current.__cause__
+    return False
 
 
 class SafeToolAdapter:
@@ -146,21 +206,27 @@ class SafeToolAdapter:
                 )
 
             except ToolError as e:
-                # 已处理的工具错误
-                raise e
+                # Convert to a LangChain handled tool exception so that
+                # the Agent receives a ToolMessage(status="error") instead
+                # of aborting the whole graph.
+                if _is_timeout_error(e):
+                    raise EduClawTimeoutToolException(str(e), uncertain=_is_uncertain_error(e), timeout_seconds=_timeout_seconds(e)) from e
+                raise ToolException(str(e)) from e
             except asyncio.TimeoutError as e:
                 error = ToolTimeoutError(mcp_tool.name, 300)
                 self.error_handler.handle_tool_error(
                     error, mcp_tool.name, "execution", session_id, user_id
                 )
-                raise error
+                raise EduClawTimeoutToolException(str(error), uncertain=True, timeout_seconds=300) from e
             except Exception as e:
                 # 捕获其他异常
                 error = ToolExecutionError(mcp_tool.name, original_error=e)
                 self.error_handler.handle_tool_error(
                     error, mcp_tool.name, "execution", session_id, user_id
                 )
-                raise error
+                if _is_timeout_error(e):
+                    raise EduClawTimeoutToolException(str(error), uncertain=_is_uncertain_error(e), timeout_seconds=_timeout_seconds(e)) from e
+                raise ToolException(str(error)) from e
 
         def sync_func(*args, **kwargs):
             """不支持同步调用"""
@@ -172,6 +238,7 @@ class SafeToolAdapter:
             func=sync_func,
             coroutine=async_func_with_error_handling,
             args_schema=args_schema,
+            handle_tool_error=lambda e: _timeout_tool_response(e) if isinstance(e, EduClawTimeoutToolException) else str(e),
         )
 
     async def _execute_tool_with_recovery(self, tool_name: str, kwargs: dict,
@@ -227,7 +294,7 @@ class SafeToolAdapter:
                 logger.warning(f"Tool '{tool_name}' execution failed (attempt {attempt + 1}): {str(e)}")
 
                 # 如果启用了恢复并且不是最后一次尝试
-                if attempt < max_attempts - 1 and not isinstance(e, MCPToolResultError):
+                if attempt < max_attempts - 1 and not isinstance(e, MCPToolResultError) and not _is_timeout_error(e):
                     error = ToolExecutionError(tool_name, original_error=e)
                     context = {"tool_name": tool_name, "attempt": attempt + 1}
 
@@ -236,7 +303,10 @@ class SafeToolAdapter:
                         continue
 
                 # 否则，抛出异常
-                error = ToolExecutionError(tool_name, original_error=e)
+                error = (ToolTimeoutError(tool_name, _timeout_seconds(e) or "未知") if _is_timeout_error(e)
+                         else ToolExecutionError(tool_name, original_error=e))
+                if _is_timeout_error(e):
+                    error.__cause__ = e
                 self.error_handler.handle_tool_error(
                     error, tool_name, "execution", session_id, user_id
                 )

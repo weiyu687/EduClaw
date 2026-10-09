@@ -8,7 +8,7 @@ Date: 2026-09-28
 from enum import Enum
 from typing import Callable, Optional, Any, Dict
 from datetime import datetime
-from dataclasses import dataclass, asdict
+from dataclasses import dataclass
 from logging import getLogger
 import traceback
 import json
@@ -44,8 +44,17 @@ class ErrorContext:
 
     def to_dict(self) -> dict:
         """转换为字典"""
-        data = asdict(self)
-        data['timestamp'] = self.timestamp.isoformat()
+        # Do not deepcopy exception objects: custom exception constructors may
+        # require arguments and are not necessarily copyable.
+        data = {
+            'tool_name': self.tool_name,
+            'operation': self.operation,
+            'timestamp': self.timestamp.isoformat(),
+            'session_id': self.session_id,
+            'user_id': self.user_id,
+            'input_params': self.input_params,
+            'output': self.output,
+        }
         data['error'] = {
             'type': type(self.error).__name__,
             'message': str(self.error),

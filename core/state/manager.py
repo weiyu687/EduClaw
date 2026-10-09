@@ -128,6 +128,33 @@ class StateManager:
     def get_interrupted_runs(self, session_id):
         return [r for r in self.list_runs(session_id) if r['status'] == 'interrupted']
 
+    def review_interrupted_run(self, run_id, session_id):
+        """Read-only review: never replay an interrupted tool automatically."""
+        run = self.get_run(run_id)
+        if not run or run['session_id'] != session_id:
+            raise LookupError('Run not found in current session')
+        if run['status'] != 'interrupted':
+            raise ValueError('Only interrupted runs can be reviewed')
+        events = self.list_events(run_id)
+        open_calls = {}
+        for event in events:
+            payload = event['payload']
+            cid = payload.get('call_id')
+            if not cid:
+                continue
+            if event['kind'] == 'tool_started':
+                open_calls[cid] = payload.get('name', 'unknown')
+            elif event['kind'] in ('tool_completed', 'tool_failed', 'tool_timed_out'):
+                open_calls.pop(cid, None)
+        decision = {
+            'run_id': run_id, 'status': 'requires_review',
+            'open_tool_calls': [{'call_id': cid, 'name': name} for cid, name in open_calls.items()],
+            'can_auto_resume': False,
+            'reason': 'Cannot prove whether an in-flight tool caused side effects; no automatic replay.',
+        }
+        self.event(run_id, 'recovery_reviewed', decision)
+        return decision
+
     def delete_session(self, session_id):
         """Delete metadata only; LangGraph checkpoints require separate pruning."""
         with self._lock, self._connection() as db:
