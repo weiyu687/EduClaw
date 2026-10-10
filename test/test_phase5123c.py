@@ -36,6 +36,7 @@ def test_two_tasks_require_explicit_number(services):
     context, flow = services
     first = begin(context, flow, '第一个目标')
     second = begin(context, flow, '第二个目标')
+    assert [n for n, _ in context.tasks('s')] == [1, 2]
     response = context.handle('s', '/继续')
     assert response.command is None and '多个' in response.message
     assert '第一个目标' in response.message and '第二个目标' in response.message

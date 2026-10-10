@@ -74,16 +74,31 @@ class TaskContext:
 
     def tasks(self, session):
         snapshots = self.flow.list_tasks(session) if self.flow else []
+        versions = self.replans.versions(session)
+        previous = {r['successor']: r['original'] for r in versions}
+        superseded = {r['original'] for r in versions}
+        def root(task):
+            seen = set()
+            while task in previous:
+                if task in seen:
+                    raise ValueError('任务版本链损坏，停止自动选择')
+                seen.add(task)
+                task = previous[task]
+            return task
+        snapshots = [s for s in snapshots if s.values['task_id'] not in superseded]
         with closing(sqlite3.connect(self.focus.path)) as db, db:
             for snap in snapshots:
-                db.execute('INSERT OR IGNORE INTO task_choices(session,task) VALUES (?,?)',
-                           (session, snap.values['task_id']))
+                task_root = root(snap.values['task_id'])
+                db.execute('INSERT INTO task_choices(session,task) SELECT ?,? WHERE NOT EXISTS '
+                           '(SELECT 1 FROM task_choices WHERE session=? AND task=?)',
+                           (session, task_root, session, task_root))
             numbers = dict(db.execute('SELECT task,number FROM task_choices WHERE session=?', (session,)))
-        return sorted([(numbers[s.values['task_id']], s) for s in snapshots], key=lambda x: x[0])
+        return sorted([(numbers[root(s.values['task_id'])], s) for s in snapshots], key=lambda x: x[0])
 
     def created(self, session, task):
         self.selected.pop(session, None)
         self.focus.set(session, task)
+        self.tasks(session)
 
     def _choose(self, session, rows, selector=''):
         if selector:
@@ -134,7 +149,7 @@ class TaskContext:
             task = snap.values['task_id']
             number = next(n for n, s in rows if s.values['task_id'] == task)
             draft = self.replans.pending_for(session, task)
-            blocked = self.replans.blocking_for(session, task)
+            blocked = self.replans.blocking_for(session, task) or self.ledger.frozen(session, task)
             idx, steps = snap.values['index'], snap.values['steps']
             claim = self.ledger.status(session, task, idx) if idx < len(steps) else None
             if cmd in ('/任务', '/当前', '/状态'):

@@ -26,7 +26,7 @@ def _undefined_legacy(tree):
             and isinstance(node.ctx, ast.Load) and node.id in LEGACY}
 
 
-def prepare_plan(goal, steps):
+def prepare_plan(goal, steps, *, legacy_recipe=True):
     """Enforce explicit result references and syntactic validity before checkpoint creation.
 
     Narrow deterministic recipe is used only for PDF page-count/text-length tasks.
@@ -45,7 +45,7 @@ def prepare_plan(goal, steps):
                 raise ValueError('Empty Python code')
             # A narrow, auditable recipe replaces unreliable LLM-generated code
             # only for the precise PDF page-count and page-text-length operation.
-            recipe = (i == 1 and len(steps) == 2 and
+            recipe = (legacy_recipe and i == 1 and len(steps) == 2 and
                       steps[0].get('tool') == 'extract_pdf' and
                       _PDF_LENGTH.search(goal) and _LENGTH.search(goal) and
                       _DEPENDENT.search(goal))

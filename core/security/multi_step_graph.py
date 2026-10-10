@@ -127,9 +127,11 @@ class MultiStepFlow:
         return [self.snapshot(session, task) for task in sorted(set(found.values()))]
     @staticmethod
     def config(session,task):return {'configurable':{'thread_id':f'educlaw-multi:{session}:{task}'}}
-    def begin(self,session,goal,steps):
+    def begin(self,session,goal,steps, *, task_id=None):
         steps=validate_steps(steps,goal)
-        task=secrets.token_urlsafe(16)
+        task=task_id or secrets.token_urlsafe(16)
+        if self.graph.get_state(self.config(session, task)).values:
+            raise PermissionError('Task identity already exists')
         result=self.graph.invoke({'session_id':session,'task_id':task,'goal':goal,'steps':steps,
                                   'index':0,'results':[],'status':'running'},self.config(session,task))
         if not result.get('__interrupt__'):raise RuntimeError('Graph did not pause')
@@ -159,6 +161,8 @@ class ExecutionLedger:
         with self._connect() as db:
             db.execute('CREATE TABLE IF NOT EXISTS multi_claims(session TEXT,task TEXT,idx INTEGER, '
                        'status TEXT NOT NULL, PRIMARY KEY(session,task,idx))')
+            db.execute('CREATE TABLE IF NOT EXISTS task_freezes(session TEXT,task TEXT,owner TEXT NOT NULL, '
+                       'PRIMARY KEY(session,task))')
     @contextmanager
     def _connect(self):
         conn=sqlite3.connect(str(self.path),timeout=10)
@@ -167,11 +171,28 @@ class ExecutionLedger:
                 yield conn
         finally:
             conn.close()
-    def claim(self,session,task,idx):
+    def claim(self,session,task,idx, *, freeze_owner=None):
         with self._connect() as db:
+            db.execute('BEGIN IMMEDIATE')
+            frozen = db.execute('SELECT owner FROM task_freezes WHERE session=? AND task=?', (session, task)).fetchone()
+            if frozen and frozen[0] != freeze_owner:
+                raise PermissionError('Task frozen by replan or interrupted commit; do not execute')
             cursor=db.execute('INSERT OR IGNORE INTO multi_claims VALUES (?,?,?,?)',
                               (session,task,idx,'claimed'))
             if cursor.rowcount!=1:raise PermissionError('Step already claimed; do not execute again')
+    def freeze(self, session, task, idx, owner):
+        with self._connect() as db:
+            db.execute('BEGIN IMMEDIATE')
+            if db.execute('SELECT 1 FROM multi_claims WHERE session=? AND task=? AND idx>=?', (session, task, idx)).fetchone():
+                raise PermissionError('Step already claimed; replan forbidden')
+            db.execute('INSERT INTO task_freezes VALUES (?,?,?)', (session, task, owner))
+    def frozen(self, session, task):
+        with self._connect() as db:
+            row = db.execute('SELECT owner FROM task_freezes WHERE session=? AND task=?', (session, task)).fetchone()
+        return row[0] if row else None
+    def thaw(self, session, task, owner):
+        with self._connect() as db:
+            db.execute('DELETE FROM task_freezes WHERE session=? AND task=? AND owner=?', (session, task, owner))
     def status(self,session,task,idx):
         with self._connect() as db:
             row=db.execute('SELECT status FROM multi_claims WHERE session=? AND task=? AND idx=?',

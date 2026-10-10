@@ -33,7 +33,8 @@ from core.security.dag_dependencies import DagStore, dependencies
 from core.security.data_contract import prepare_plan, validate_resolved_code
 from core.security.cli_focus import TaskFocus
 from core.security.task_context import TaskContext, COMMANDS as CONTEXT_COMMANDS
-from core.security.manual_replan import ReplanStore, completed_prefix, validate_replacement
+from core.security.manual_replan import ReplanStore
+from core.security.replan_service import ReplanService
 from core.security.goal_loop import GoalStore, verify as verify_goal, semantic_review
 from core.security.goal_reflection import can_revise, reflection_prompt, accept_revision
 
@@ -110,6 +111,7 @@ async def run_interactive_app():
             logger.debug("LangGraph multi-step flow enabled")
         except ImportError:
             console.print('[yellow]多步骤执行不可用：请安装 langgraph-checkpoint-sqlite[/yellow]')
+        replan_service = ReplanService(multi_flow, multi_ledger, result_store, dag_store, goal_store, replan_store)
         task_context = TaskContext(focus_store, multi_flow, replan_store, multi_ledger, result_store)
         catalog = TaskCatalog(agent.state_manager.path, autonomous_store.path)
         auto_mode = True
@@ -304,7 +306,7 @@ async def run_interactive_app():
                     idx, step = pending['index'], pending['step']
                     if multi_ledger.status(agent.session_id, task, idx):
                         raise PermissionError('步骤已被认领，可能已经执行；禁止重复执行')
-                    if replan_store.blocking_for(agent.session_id, task):
+                    if replan_store.blocking_for(agent.session_id, task) or multi_ledger.frozen(agent.session_id, task):
                         raise PermissionError('该任务存在待审批重规划，原计划执行已冻结')
                     dag_store.check(agent.session_id, task, idx, result_store)
                     console.print(f"多步骤审批：第 {idx+1} 步\n工具: {step['tool']}\n参数: {step['arguments']}", markup=False)
@@ -1020,103 +1022,54 @@ async def run_interactive_app():
                 except Exception as exc:
                     console.print(f'[yellow]多步骤任务创建失败，未执行工具: {exc}[/yellow]')
                 continue
-            # Phase 5.12.3: human-approved replacement. No MCP tool calls in drafting.
-            if command.startswith('/multi-replan ') and not command.startswith(('/multi-replan-status ', '/multi-replan-approve ', '/multi-replan-deny ')):
+            # Shared application service: drafting/committing never invokes tools.
+            if command.startswith('/multi-replan '):
                 try:
-                    original = command.split(maxsplit=1)[1].strip()
-                    snap = multi_flow.snapshot(agent.session_id, original)
-                    prefix = completed_prefix(agent.session_id, original, snap, result_store, multi_ledger)
-                    if replan_store.blocking_for(agent.session_id, original):
-                        raise PermissionError('已有待审批的重规划')
-                    goal = snap.values['goal']
-                    old = snap.values['steps']
-                    from core.security.multi_step_graph import validate_steps
-                    import json as _json
-                    frozen = _json.dumps(old[:prefix], ensure_ascii=False)
-                    # Draft an entire plan so all original step numbers remain stable.
-                    instruction = (goal + '\n重规划约束：已完成的前 ' + str(prefix) + ' 步必须逐字保留，不得重做。'
-                                   '请返回完整步骤列表（包含已完成前缀）。原始已完成步骤JSON：' + frozen
-                                   + '\n重新设计剩余步骤；不得新增未在原始目标出现的文件路径。')
-                    candidate = prepare_plan(goal, await draft_plan(agent.model, instruction))
-                    validate_replacement(old, candidate, prefix)
-                    # Explicitly validate the checkpoint's strict schema BEFORE persistence.
-                    strict = [{'tool': x['tool'], 'arguments': x['arguments']} for x in candidate]
-                    validate_steps(strict, goal)
-                    dependencies(candidate)
-                    rid = replan_store.create(agent.session_id, original, goal, prefix, candidate)
-                    console.print(f'[yellow]重规划草案 {rid}；原任务 {original} 暂停执行。已完成前缀 {prefix} 步不会重新调用 MCP。[/yellow]')
-                    for i, step in enumerate(candidate, 1):
-                        console.print(f'  {i}. {step["tool"]} {step["arguments"]}' + (' [已完成、不可修改]' if i <= prefix else ' [待审批]'))
-                    console.print(f'确认: /multi-replan-approve {rid} | 拒绝: /multi-replan-deny {rid}')
+                    parts = command.split(maxsplit=2)
+                    original = parts[1]
+                    change = parts[2] if len(parts) == 3 else (await asyncio.to_thread(input, '希望修改什么（留空取消）: ')).strip()
+                    rid, diff = await replan_service.draft(agent.session_id, original, change, agent.model)
+                    console.print(diff, markup=False)
+                    console.print('草案已保存，原任务冻结。/确认 审阅并提交；/取消 放弃草案。')
                 except Exception as exc:
-                    console.print(f'[yellow]重规划草案创建失败（未调用工具）: {exc}[/yellow]')
+                    console.print(f'重规划草案创建失败（未调用工具）：{exc}', markup=False)
                 continue
             if command.startswith('/multi-replan-status '):
                 try:
-                    rid=command.split(maxsplit=1)[1]
-                    console.print(replan_store.get(agent.session_id,rid))
+                    rid = command.split(maxsplit=1)[1]
+                    console.print(replan_store.get(agent.session_id, rid))
                 except Exception as exc:
-                    console.print(f'[yellow]查询失败: {exc}[/yellow]')
+                    console.print(f'查询失败：{exc}', markup=False)
                 continue
             if command.startswith('/multi-replan-deny '):
                 try:
-                    rid=command.split(maxsplit=1)[1]
-                    replan_store.transition(agent.session_id,rid,'denied')
-                    console.print('[yellow]已拒绝重规划；原任务未执行或修改。[/yellow]')
+                    rid = command.split(maxsplit=1)[1]
+                    replan_service.deny(agent.session_id, rid)
+                    console.print('已取消重规划；原任务仍等待原步骤审批。')
                 except Exception as exc:
-                    console.print(f'[yellow]拒绝失败: {exc}[/yellow]')
+                    console.print(f'取消失败：{exc}', markup=False)
                 continue
             if command.startswith('/multi-replan-approve '):
                 try:
-                    rid=command.split(maxsplit=1)[1]
-                    proposal=replan_store.get(agent.session_id,rid)
-                    if proposal['status']!='pending': raise PermissionError('重规划草案已消耗')
-                    original=proposal['original']
-                    snap=multi_flow.snapshot(agent.session_id,original)
-                    prefix=completed_prefix(agent.session_id,original,snap,result_store,multi_ledger)
-                    if prefix != proposal['prefix']: raise PermissionError('原任务检查点已变化')
-                    steps=proposal['steps']
-                    validate_replacement(snap.values['steps'],steps,prefix)
-                    from core.security.multi_step_graph import validate_steps
-                    strict=[{'tool':x['tool'],'arguments':x['arguments']} for x in steps]
-                    validate_steps(strict,proposal['goal'])
-                    dependencies(steps)
-                    console.print('[bold yellow]重规划会终止原任务并创建新任务。已完成步骤只复制已验证结果，不调用工具。[/bold yellow]')
-                    for i,x in enumerate(steps,1):
-                        console.print(f'  {i}. {x["tool"]} {x["arguments"]}')
-                    confirmation=(await asyncio.to_thread(input,'输入 REPLAN 确认: ')).strip()
-                    if confirmation!='REPLAN':
-                        console.print('未批准，草案保留')
+                    rid = command.split(maxsplit=1)[1]
+                    proposal, diff = replan_service.review(agent.session_id, rid)
+                    console.print(diff, markup=False)
+                    confirmation = (await asyncio.to_thread(input, '输入 REPLAN 确认以上变更: ')).strip()
+                    if confirmation != 'REPLAN':
+                        console.print('未批准，草案保留。')
                         continue
-                    # Consume the approval before modifying any checkpoint.
-                    # Crash midway => blocked, never silently retry the commit.
-                    replan_store.transition(agent.session_id,rid,'committing')
-                    # Stop old task at its pending interrupt; NO tool call.
-                    if multi_reads.cancel(agent.session_id,original):
+                    successor, prefix = replan_service.commit(agent.session_id, rid,
+                        approved_digest=proposal['digest'], actor='local-cli:' + agent.session_id)
+                    original = proposal['original']
+                    if multi_reads.cancel(agent.session_id, original):
                         from core.security import permission_requests as _pr
                         _pr.cancel(agent.session_id)
-                    multi_ledger.claim(agent.session_id,original,prefix)
-                    multi_ledger.finish(agent.session_id,original,prefix,'denied')
-                    multi_flow.resume(agent.session_id,original,{'status':'denied','output':'Superseded by human-approved replan'})
-                    successor,_=multi_flow.begin(agent.session_id,proposal['goal'],strict)
-                    dag_store.create(agent.session_id,successor,steps)
-                    task_context.created(agent.session_id,successor)
-                    goal_store.create(agent.session_id,successor,proposal['goal'])
-                    # Advance new checkpoint ONLY with immutable completed snapshots.
-                    for idx in range(prefix):
-                        row=result_store.get(agent.session_id,original,idx)
-                        if row['status']!='completed' or row['truncated']:
-                            raise PermissionError('Unsafe prefix snapshot')
-                        multi_ledger.claim(agent.session_id,successor,idx)
-                        result_store.put(agent.session_id,successor,idx,row['tool'],'completed',row['payload'])
-                        multi_ledger.finish(agent.session_id,successor,idx,'completed')
-                        multi_flow.resume(agent.session_id,successor,{'status':'completed','output':row['payload'][:20000]})
-                    # This transition is intentionally one-way: committing -> approved.
-                    replan_store.finish_commit(agent.session_id,rid,successor)
-                    console.print(f'[green]人工重规划完成：旧任务 {original} 已终止；新任务 {successor}。已继承 {prefix} 步不可变结果。[/green]')
+                    volatile_grant = None
+                    task_context.created(agent.session_id, successor)
+                    console.print(f'重规划完成：任务编号不变，已继承 {prefix} 步不可变结果；新步骤仍须授权。')
                     await multi_show_pending(successor)
                 except Exception as exc:
-                    console.print(f'[yellow]重规划提交失败：{exc}。若已进入 committing，禁止重试；使用 /multi-replan-status 检查并人工处理。[/yellow]')
+                    console.print(f'重规划提交失败：{exc}。提交中断后禁止重试，请用 /debug 查看并人工核查。', markup=False)
                 continue
             if command.startswith('/multi-dag '):
                 try:
