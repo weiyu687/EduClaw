@@ -19,9 +19,12 @@ ALIASES = {
     '允许': '/允许', '允许读取': '/允许', '拒绝': '/拒绝',
     '拒绝当前任务': '/拒绝', '确认重规划': '/确认',
     '取消重规划': '/取消', '重规划': '/重规划',
+    '暂停任务': '/暂停', '暂停': '/暂停', '恢复任务': '/恢复', '恢复': '/恢复',
+    '取消任务': '/取消任务', '查看失败': '/失败', '查看诊断': '/诊断',
 }
 COMMANDS = frozenset(('/任务', '/当前', '/状态', '/结果', '/继续', '/允许',
-                      '/拒绝', '/重规划', '/确认', '/取消', '/debug'))
+                      '/拒绝', '/重规划', '/确认', '/取消', '/debug',
+                      '/暂停', '/恢复', '/取消任务', '/诊断', '/失败'))
 
 
 def readable_result(payload):
@@ -138,12 +141,16 @@ class TaskContext:
             return None
         cmd, arg = intent
         try:
+            if cmd == '/失败':
+                events = [e for e in self.ledger.events(session) if e['kind'] in ('failure', 'goal_unmet')]
+                return ContextResponse('\n'.join(f"{e['detail'].get('category', e['kind'])}：{e['detail'].get('message', '')}；不会自动重放"
+                                                 for e in events[-20:]) or '当前会话暂无已记录失败。')
             rows = self.tasks(session)
             if not rows and not text.strip().startswith('/'):
                 return None  # Preserve the legacy autonomous natural-language router.
             if cmd == '/任务' and not arg:
                 return ContextResponse(self.render_list(rows) + '\n使用 /状态 查看进度；/任务 <编号> 切换。')
-            if other_tasks and cmd in ('/继续', '/允许', '/拒绝', '/重规划', '/确认', '/取消') and not arg and session not in self.selected:
+            if other_tasks and cmd in ('/继续', '/允许', '/拒绝', '/重规划', '/确认', '/取消', '/暂停', '/恢复', '/取消任务') and not arg and session not in self.selected:
                 raise ValueError('另有自主任务等待处理；请用 /任务 <编号> 明确选择多步骤任务，或使用旧命令指定自主任务。')
             snap = self._choose(session, rows, arg if cmd != '/重规划' else '')
             task = snap.values['task_id']
@@ -151,21 +158,27 @@ class TaskContext:
             draft = self.replans.pending_for(session, task)
             blocked = self.replans.blocking_for(session, task) or self.ledger.frozen(session, task)
             idx, steps = snap.values['index'], snap.values['steps']
+            mode = self.ledger.control(session, task)
             claim = self.ledger.status(session, task, idx) if idx < len(steps) else None
+            if cmd in ('/暂停', '/恢复', '/取消任务', '/诊断'):
+                return ContextResponse(command={'/暂停':'/multi-pause ', '/恢复':'/multi-recover ',
+                    '/取消任务':'/multi-cancel ', '/诊断':'/multi-diagnose '}[cmd] + task)
             if cmd in ('/任务', '/当前', '/状态'):
                 lines = [f"任务 {number}：{snap.values['goal']}",
-                         f"状态：{snap.values['status']}；进度：{idx}/{len(steps)}"]
+                         f"状态：{snap.values['status']}；控制：{mode}；进度：{idx}/{len(steps)}"]
                 for i, step in enumerate(steps):
                     status = snap.values.get('results', [])[i]['status'] if i < len(snap.values.get('results', [])) else '待执行'
                     lines.append(f"  {i+1}. {step['tool']} | {status}")
-                next_action = ('执行记录需人工核查；不会自动重放。' if claim else
+                next_action = ('任务已暂停，/恢复 查看将执行与不会重放的步骤。' if mode == 'paused' else
+                               '任务已取消或正在取消，/诊断 核查结果；不会重放。' if mode in ('cancel_requested', 'cancelled') else
+                               '执行记录需人工核查；/恢复 仅可补齐已有成功证据，不会自动重放。' if claim else
                                '/确认 或 /取消 重规划' if draft else
                                '重规划提交未完成，需人工核查；不会自动重放。' if blocked else
                                '/允许 查看并授权读取；/拒绝 结束任务' if idx < len(steps) and steps[idx]['tool'] in READ_ARGS else
                                '/继续 预览代码并确认；/拒绝 结束任务' if snap.values['status'] == 'running' else '/结果 查看已保存证据')
                 return ContextResponse('\n'.join(lines) + '\n下一步：' + next_action)
             if cmd == '/debug':
-                return ContextResponse(f'task={task}\ncheckpoint={snap.values!r}\nreplan={blocked}\nclaim={claim}')
+                return ContextResponse(f'task={task}\ncheckpoint={snap.values!r}\nreplan={blocked}\nclaim={claim}\ncontrol={mode}\nevents={self.ledger.events(session, task)!r}')
             if cmd == '/结果':
                 entries = [{**r, **self.results.get(session, task, r['idx'])} for r in self.results.list(session, task)]
                 return ContextResponse('\n'.join(f"第 {r['idx']+1} 步 | {r['status']}\n{readable_result(r['payload'])}" for r in entries) or '暂无已保存的结果。')
@@ -175,6 +188,8 @@ class TaskContext:
                 return ContextResponse(command=('/multi-replan-approve ' if cmd == '/确认' else '/multi-replan-deny ') + draft)
             if blocked:
                 raise ValueError('当前任务被重规划冻结；待审批请使用 /确认 或 /取消，提交中断需人工核查。')
+            if mode != 'active':
+                raise ValueError('任务已暂停或取消；请使用 /恢复 或 /诊断，普通继续不能绕过控制状态。')
             if claim:
                 raise ValueError('步骤已认领或结果不确定，禁止重复执行；请查看 /状态。')
             if cmd == '/重规划':

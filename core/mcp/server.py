@@ -15,6 +15,7 @@ from mcp.server.stdio import stdio_server
 
 from core.logging import get_logger
 from core.tools import all_tools
+from core.security.tool_cancellation import run_sync
 
 dotenv.load_dotenv()
 logger = get_logger("SERVER")
@@ -173,7 +174,7 @@ class MCPServer:
                 raise ValueError(f"Tool '{tool_name}' not found.")
 
             try:
-                result = target_tool(**arguments)
+                result = await run_sync(target_tool, arguments)
                 logger.info(f"MCP Server: 工具 {tool_name} 调用 [bold green]成功[/bold green]")
             except Exception as e:
                 logger.error(f"MCP Server: 工具 {tool_name} 调用失败--{str(e)}")

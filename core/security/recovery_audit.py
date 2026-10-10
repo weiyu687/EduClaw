@@ -71,6 +71,17 @@ class RecoveryAudit:
                 FROM approval_handoffs WHERE session_id=? ORDER BY updated_at DESC LIMIT 100''', (session,)).fetchall()
         return [dict(zip(('kind','task_id','step_index','tool','path','state','created_at','updated_at'), r)) for r in rows]
 
+    def confirm_completed(self, session, kind, task, index, expected_hash):
+        """Used only after human-confirmed recovery of immutable successful evidence."""
+        self._validate(session, kind, task, index)
+        with self._db() as db:
+            cur = db.execute('UPDATE approval_handoffs SET state="completed",updated_at=? '
+                             'WHERE session_id=? AND kind=? AND task_id=? AND step_index=? AND args_hash=? '
+                             'AND state IN ("claimed","uncertain","completed")',
+                             (self.clock(),session,kind,task,index,expected_hash))
+            if cur.rowcount != 1:
+                raise PermissionError('恢复审计状态或操作身份不一致')
+
     def entries_full(self, session):
         if not isinstance(session, str) or not session:
             raise ValueError('会话不能为空')

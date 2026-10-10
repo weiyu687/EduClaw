@@ -35,6 +35,7 @@ from core.security.cli_focus import TaskFocus
 from core.security.task_context import TaskContext, COMMANDS as CONTEXT_COMMANDS
 from core.security.manual_replan import ReplanStore
 from core.security.replan_service import ReplanService
+from core.security.task_lifecycle import TaskLifecycle, controlled_call
 from core.security.goal_loop import GoalStore, verify as verify_goal, semantic_review
 from core.security.goal_reflection import can_revise, reflection_prompt, accept_revision
 
@@ -49,7 +50,7 @@ from core.skills import SkillRegistry
 
 KNOWN_COMMANDS = frozenset(['/help', '/?', '/task-continue', '/task-replan', '/task-status', '/approve', '/deny', '/task-list', '/multi', '/multi-status', '/multi-approve', '/multi-deny', '/flow-code', '/flow-status', '/flow-approve', '/flow-deny', '/auto', '/auto-status', '/code-propose', '/code-approve', '/code-deny', '/code-status', '/permissions', '/permit', '/deny-read', '/allow-read', '/revoke-read', '/skills', '/agent-step-run', '/agent-step-approve', '/agent-step-result', '/step-run', '/step-approve', '/step-result', '/plan-new', '/plans', '/plan', '/plan-approve', '/plan-reject', '/task-new', '/tasks', '/task', '/step', '/task-events', '/task-cancel', '/new', '/use', '/sessions', '/runs', '/events', '/status', '/interrupted', '/resume', '/approve-resume', '/rename-session', '/rename-task', '/task-catalog', '/delete-session', '/delete-task', '/delete-confirm', '/delete-cancel', '/permission-set', '/tool-inbox', '/tool-review', '/tool-sync', '/tool-info', '/permission-info', '/permission-reset', '/permission-requests', '/permission-request', '/permission-confirm', '/permission-cancel', '/agent-pending', '/agent-cancel', '/recovery-status', '/recovery-check', '/multi-result', '/multi-results', '/goal-status', '/goal-spec', '/multi-dag', '/multi-replan', '/multi-replan-status', '/multi-replan-approve', '/multi-replan-deny', '/任务', '/当前', '/结果', '/允许', '/继续', '/拒绝'])
 
-KNOWN_COMMANDS = KNOWN_COMMANDS | CONTEXT_COMMANDS
+KNOWN_COMMANDS = KNOWN_COMMANDS | CONTEXT_COMMANDS | {'/multi-pause', '/multi-recover', '/multi-cancel', '/multi-diagnose'}
 
 logging.getLogger("httpx").setLevel(logging.WARNING)
 logger = get_logger("USER")
@@ -111,6 +112,7 @@ async def run_interactive_app():
             logger.debug("LangGraph multi-step flow enabled")
         except ImportError:
             console.print('[yellow]多步骤执行不可用：请安装 langgraph-checkpoint-sqlite[/yellow]')
+        lifecycle = TaskLifecycle(multi_flow, multi_ledger, result_store, recovery_audit)
         replan_service = ReplanService(multi_flow, multi_ledger, result_store, dag_store, goal_store, replan_store)
         task_context = TaskContext(focus_store, multi_flow, replan_store, multi_ledger, result_store)
         catalog = TaskCatalog(agent.state_manager.path, autonomous_store.path)
@@ -262,6 +264,9 @@ async def run_interactive_app():
         except Exception as exc:
             console.print(f'[dim]工具元数据同步暂不可用：{exc}。不影响现有会话；未知工具仍默认拒绝。[/dim]')
         async def multi_show_pending(flow_id):
+            if multi_ledger.control(agent.session_id, flow_id) != 'active':
+                console.print('任务已暂停或取消，未申请新授权；/恢复 或 /诊断 查看下一步。')
+                return
             pending = multi_flow.pending(agent.session_id, flow_id)
             idx, step = pending['index'], pending['step']
             if step['tool'] not in READ_ARGS:
@@ -301,7 +306,12 @@ async def run_interactive_app():
                 console.print(f'[yellow]文件读取申请失败（未执行）：{exc}[/yellow]')
 
         async def multi_approve(task, confirmed_read=None):
+                from contextlib import ExitStack
+                operation_stack = ExitStack()
+                idx = -1
                 try:
+                    if multi_ledger.control(agent.session_id, task) != 'active':
+                        raise PermissionError('任务已暂停或取消，禁止执行')
                     pending = multi_flow.pending(agent.session_id, task)
                     idx, step = pending['index'], pending['step']
                     if multi_ledger.status(agent.session_id, task, idx):
@@ -336,12 +346,16 @@ async def run_interactive_app():
                         resolved_code = resolve_code(step['arguments']['code'], session=agent.session_id,
                             task=task, current_index=idx, result_store=result_store)
                         validate_resolved_code(resolved_code)
+                    # OS ownership prevents recovery racing a still-live result writer.
+                    operation_stack.enter_context(multi_ledger.operation_lock(agent.session_id, task, idx))
                     # Durable claim BEFORE any tool call. Crash => uncertain, never replay.
                     if step['tool'] in READ_ARGS:
                         require_waiting(recovery_audit, agent.session_id, 'multi', task, idx,
                                         multi_flow, multi_ledger, autonomous_store)
                         recovery_audit.transition(agent.session_id, 'multi', task, idx, 'waiting', 'claimed')
-                    multi_ledger.claim(agent.session_id, task, idx)
+                    approved_args = {'code': resolved_code} if step['tool'] == 'run_python_code' else step['arguments']
+                    multi_ledger.claim(agent.session_id, task, idx,
+                        arguments_digest=fingerprint(step['tool'], approved_args))
                     outcome = {'status':'uncertain','output':'Execution claimed; outcome unknown'}
                     try:
                         tool, args = step['tool'], step['arguments']
@@ -350,18 +364,24 @@ async def run_interactive_app():
                             _, exact_args, digest = claim_code(agent.session_id, req['id'])
                             if exact_args != {'code': resolved_code}: raise PermissionError('Code arguments changed')
                             with session_context(agent.session_id), approved_call(agent.session_id, req['id'], digest):
-                                response = await agent.mcp_client.use_tool(tool, exact_args)
+                                response = await controlled_call(lambda: agent.mcp_client.use_tool(tool, exact_args),
+                                    multi_ledger, agent.session_id, task,
+                                    progress=lambda seconds: console.print(f'当前步骤仍在执行，已等待 {seconds} 秒；另一入口可 /取消任务。'))
                         elif tool in READ_ARGS:
                             if confirmed_read is None:
                                 raise PermissionError('缺少已确认的读取授权')
                             with session_context(agent.session_id):
-                                response = await agent.mcp_client.use_tool(tool, args)
+                                response = await controlled_call(lambda: agent.mcp_client.use_tool(tool, args),
+                                    multi_ledger, agent.session_id, task,
+                                    progress=lambda seconds: console.print(f'当前步骤仍在执行，已等待 {seconds} 秒。'))
                         else:
                             raise PermissionError('Unsupported tool')
                         outcome = {'status':'uncertain' if getattr(response,'isError',False) else 'completed',
                                    'output':normalize_response(response)[:20000]}
                         full_output = normalize_response(response)
                     except Exception as exc:
+                        failure = lifecycle.failure(agent.session_id, task, idx, exc)
+                        console.print(f'失败类别：{failure.category}；不会自动重放。', markup=False)
                         outcome = {'status':'uncertain','output':str(exc)}
                         full_output = str(exc)
                     # Persist an immutable result snapshot before marking the step finished.
@@ -370,6 +390,7 @@ async def run_interactive_app():
                         stored = result_store.put(agent.session_id, task, idx, step['tool'],
                                                   outcome['status'], full_output)
                     except Exception as exc:
+                        lifecycle.failure(agent.session_id, task, idx, exc, 'persistence')
                         console.print(f'[yellow]结果持久化失败；步骤已认领，禁止重试: {exc}[/yellow]')
                         return
                     multi_ledger.finish(agent.session_id, task, idx, outcome['status'])
@@ -379,6 +400,7 @@ async def run_interactive_app():
                     console.print(f"[cyan]步骤结果: {outcome['status']} | SHA256: {stored['digest'][:12]} | {compact_preview(full_output)}\n查看完整结果: /multi-result {task} {idx+1}[/cyan]")
                     try:
                         next_step = multi_flow.resume(agent.session_id, task, outcome)
+                        multi_ledger.acknowledge_cancel(agent.session_id, task, idx, outcome['status'])
                         if next_step.get('finished'):
                             state = next_step['state']
                             console.print(f"[green]任务结束：{state['status']}；已处理 {len(state['results'])} 步[/green]")
@@ -447,6 +469,8 @@ async def run_interactive_app():
                                             except Exception as reflection_exc:
                                                 console.print(f'[yellow]文本修订不可用，保留原始答案与核验：{reflection_exc}[/yellow]')
                                         goal_store.record(agent.session_id, task, answer, assessment)
+                                        if assessment['status'] != 'passed':
+                                            multi_ledger.event(agent.session_id, task, idx, 'goal_unmet', {'category':'goal_unmet', 'message':'目标验收未通过；已执行工具不会重放'})
                                         console.print(f"[cyan]目标验收：{assessment['status']}；/goal-status {task}[/cyan]")
                                         if assessment['status'] != 'passed':
                                             console.print('[yellow]存在尚未核验的语义验收项。不会自动重放工具；请查看 /goal-status 并人工确认。[/yellow]')
@@ -459,7 +483,10 @@ async def run_interactive_app():
                     except Exception as exc:
                         console.print(f'[yellow]执行已认领，但恢复检查点失败；禁止重试: {exc}[/yellow]')
                 except Exception as exc:
+                    lifecycle.failure(agent.session_id, task, idx, exc, 'schema' if isinstance(exc, (ValueError, SyntaxError)) else 'execution')
                     console.print(f'[yellow]多步骤审批失败（未执行新工具）: {exc}[/yellow]')
+                finally:
+                    operation_stack.close()
 
         while True:
             user_input = await asyncio.to_thread(input, "You: ")
@@ -1020,7 +1047,39 @@ async def run_interactive_app():
                         console.print(f"  {n}. {step['tool']} {step['arguments']}")
                     await multi_show_pending(task)
                 except Exception as exc:
+                    lifecycle.failure(agent.session_id, '__planning__', -1, exc, 'planning')
                     console.print(f'[yellow]多步骤任务创建失败，未执行工具: {exc}[/yellow]')
+                continue
+            if command.split(maxsplit=1)[0] in ('/multi-pause', '/multi-cancel', '/multi-recover', '/multi-diagnose'):
+                try:
+                    action, task = command.split(maxsplit=1)
+                    if action == '/multi-pause':
+                        lifecycle.pause(agent.session_id, task)
+                        console.print('任务已暂停；在途调用会结束，后续步骤不会执行。/恢复 查看恢复预览。')
+                    elif action == '/multi-cancel':
+                        mode = lifecycle.cancel(agent.session_id, task)
+                        if multi_reads.cancel(agent.session_id, task):
+                            from core.security import permission_requests as _pr
+                            _pr.cancel(agent.session_id)
+                        volatile_grant = None
+                        console.print(f'取消状态：{mode}；未执行步骤不会启动，在途外部结果需核查。')
+                    else:
+                        preview = lifecycle.preview(agent.session_id, task)
+                        console.print(preview['message'], markup=False)
+                        if action == '/multi-recover' and preview['action'] in ('repair', 'unpause'):
+                            word = 'RECOVER' if preview['action'] == 'repair' else 'RESUME'
+                            confirmation = (await asyncio.to_thread(input, f'输入 {word} 确认上述操作: ')).strip()
+                            if confirmation != word:
+                                console.print('未恢复，状态保留。')
+                                continue
+                            if preview['action'] == 'repair':
+                                lifecycle.repair(agent.session_id, task, preview['digest'])
+                                console.print('已用成功证据补齐检查点，没有再次调用工具。')
+                            else:
+                                lifecycle.resume(agent.session_id, task)
+                                console.print('暂停已解除；/状态 查看下一步，仍需独立审批。')
+                except Exception as exc:
+                    console.print(f'任务控制未完成：{exc}；不会自动重放。', markup=False)
                 continue
             # Shared application service: drafting/committing never invokes tools.
             if command.startswith('/multi-replan '):
@@ -1147,6 +1206,10 @@ async def run_interactive_app():
                     multi_ledger.claim(agent.session_id, task, pending['index'])
                     multi_ledger.finish(agent.session_id, task, pending['index'], 'denied')
                     result = multi_flow.resume(agent.session_id, task, {'status':'denied'})
+                    lifecycle.failure(agent.session_id, task, pending['index'], PermissionError('用户拒绝当前步骤'))
+                    audit = recovery_audit.entry(agent.session_id, 'multi', task, pending['index'])
+                    if audit and audit['state'] == 'waiting':
+                        recovery_audit.transition(agent.session_id, 'multi', task, pending['index'], 'waiting', 'cancelled')
                     if multi_reads.cancel(agent.session_id, task):
                         from core.security import permission_requests as _pr
                         _pr.cancel(agent.session_id)

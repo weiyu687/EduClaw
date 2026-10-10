@@ -62,6 +62,8 @@ class ReplanService:
         if proposal['status'] != 'pending':
             raise PermissionError('重规划草案已消耗；不会重复提交')
         original = proposal['original']
+        if self.ledger.control(session, original) != 'active':
+            raise PermissionError('任务已暂停或取消，不能提交重规划')
         snap = self.flow.snapshot(session, original)
         old = self._old_steps(session, original, snap)
         prefix = completed_prefix(session, original, snap, self.results, self.ledger)
@@ -112,6 +114,8 @@ class ReplanService:
             copied = self.results.put(session, successor, idx, row['tool'], 'completed', row['payload'])
             if copied['digest'] != row['digest']:
                 raise PermissionError('继承结果 SHA256 不一致')
+            self.ledger.event(session, successor, idx, 'result_inherited',
+                              {'source_task':original, 'digest':row['digest'], 'tool_replayed':False})
             self.ledger.finish(session, successor, idx, 'completed')
             self.flow.resume(session, successor, {'status': 'completed', 'output': row['payload'][:20000]})
         self.store.finish_commit(session, rid, successor, approved_by=actor)

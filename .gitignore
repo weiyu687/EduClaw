@@ -18,4 +18,5 @@ __pycache__/
 *.py[cod]
 .pytest_cache/
 data/*.sqlite3*
+data/*.locks/
 .venv/

@@ -6,6 +6,9 @@ Date: 2026-04-01
 """
 import os
 import sys
+import asyncio
+import anyio
+import mcp.types as mcp_types
 import json
 from pathlib import Path
 from contextlib import AsyncExitStack
@@ -16,6 +19,29 @@ from core.logging import get_logger
 from core.security.global_gateway import check_and_audit
 
 logger = get_logger("CLIENT")
+
+
+class CancellableClientSession(ClientSession):
+    """Bridge task cancellation to the standard MCP cancellation notification.
+
+    The installed SDK drops its response waiter without notifying the server.
+    Its request counter is read immediately before super.send_request increments
+    it (there is no intervening await). Keep this small compatibility boundary
+    covered by the real cancellation acceptance test when upgrading the SDK.
+    """
+    async def send_request(self, request, result_type, **kwargs):
+        request_id = self._request_id
+        try:
+            return await super().send_request(request, result_type, **kwargs)
+        except asyncio.CancelledError:
+            if isinstance(request.root, mcp_types.CallToolRequest):
+                # Best effort only: external side effects are still unknown.
+                with anyio.CancelScope(shield=True):
+                    with anyio.move_on_after(1):
+                        await self.send_notification(mcp_types.ClientNotification(
+                            mcp_types.CancelledNotification(params=mcp_types.CancelledNotificationParams(
+                                requestId=request_id, reason='User cancellation or local execution deadline'))))
+            raise
 
 
 class MCPToolResultError(RuntimeError):
@@ -96,7 +122,7 @@ class MCPClient:
 
         # 创建并初始化会话
         self.session = await self._exit_stack.enter_async_context(
-            ClientSession(read_stream, write_stream)
+            CancellableClientSession(read_stream, write_stream)
         )
 
         await self.session.initialize()

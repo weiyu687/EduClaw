@@ -13,4 +13,7 @@ def run_python_file(py_file_path: str) -> str:
     """
     executor = DockerExecutor()
 
-    return executor.run_python_file(py_file_path)
+    try:
+        return executor.run_python_file(py_file_path)
+    finally:
+        executor.client.close()

@@ -16,7 +16,7 @@ ROOT = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(ROOT))
 
 
-def run_cli(work, commands, label):
+def run_cli(work, commands, label, *, entry=None, expected_exit=0):
     env = os.environ.copy()
     env.update(PYTHONUTF8='1', PYTHONIOENCODING='utf-8', PYTHONPATH=str(ROOT),
                EDUCLAW_PERMISSION_DB=str(work / 'educlaw_permissions.sqlite3'),
@@ -24,13 +24,14 @@ def run_cli(work, commands, label):
                EDUCLAW_TOOL_REGISTRY_DB=str(work / 'educlaw_preferences.sqlite3'),
                EDUCLAW_DISABLE_MEMORY='1', EDUCLAW_READ_ROOTS='')
     started = time.monotonic()
-    completed = subprocess.run([sys.executable, '-m', 'core.usr.main'], cwd=ROOT,
+    launch = [sys.executable, str(entry)] if entry else [sys.executable, '-m', 'core.usr.main']
+    completed = subprocess.run(launch, cwd=ROOT,
                                input='\n'.join(commands) + '\n', capture_output=True,
                                text=True, encoding='utf-8', env=env, timeout=240)
     log = ROOT / 'logs' / ('windows_e2e_' + label + '.log')
     log.parent.mkdir(exist_ok=True)
     log.write_text(completed.stdout + '\n' + completed.stderr, encoding='utf-8')
-    assert completed.returncode == 0, f'CLI process failed; see {log}'
+    assert completed.returncode == expected_exit, f'CLI process failed ({completed.returncode}); see {log}'
     assert '程序发生错误' not in completed.stderr, f'CLI startup/loop failed; see {log}'
     return completed.stdout, round(time.monotonic() - started, 2)
 

@@ -7,6 +7,8 @@ import json
 import re
 import secrets
 import sqlite3
+import hashlib
+import time
 from contextlib import contextmanager
 from pathlib import Path
 from typing import TypedDict
@@ -163,6 +165,17 @@ class ExecutionLedger:
                        'status TEXT NOT NULL, PRIMARY KEY(session,task,idx))')
             db.execute('CREATE TABLE IF NOT EXISTS task_freezes(session TEXT,task TEXT,owner TEXT NOT NULL, '
                        'PRIMARY KEY(session,task))')
+            db.execute('CREATE TABLE IF NOT EXISTS task_controls(session TEXT,task TEXT,mode TEXT NOT NULL, '
+                       'PRIMARY KEY(session,task))')
+            db.execute('''CREATE TABLE IF NOT EXISTS execution_events (
+                seq INTEGER PRIMARY KEY AUTOINCREMENT, session TEXT NOT NULL, task TEXT NOT NULL,
+                idx INTEGER NOT NULL, kind TEXT NOT NULL, detail TEXT NOT NULL, created REAL NOT NULL)''')
+            db.execute('''CREATE TABLE IF NOT EXISTS execution_attempts (
+                session TEXT, task TEXT, idx INTEGER, operation_key TEXT NOT NULL UNIQUE,
+                arguments_digest TEXT NOT NULL, PRIMARY KEY(session,task,idx))''')
+            db.execute('''CREATE TABLE IF NOT EXISTS checkpoint_repairs (
+                session TEXT, task TEXT, idx INTEGER, digest TEXT NOT NULL, state TEXT NOT NULL,
+                PRIMARY KEY(session,task,idx))''')
     @contextmanager
     def _connect(self):
         conn=sqlite3.connect(str(self.path),timeout=10)
@@ -171,18 +184,27 @@ class ExecutionLedger:
                 yield conn
         finally:
             conn.close()
-    def claim(self,session,task,idx, *, freeze_owner=None):
+    def claim(self,session,task,idx, *, freeze_owner=None, arguments_digest=''):
         with self._connect() as db:
             db.execute('BEGIN IMMEDIATE')
             frozen = db.execute('SELECT owner FROM task_freezes WHERE session=? AND task=?', (session, task)).fetchone()
             if frozen and frozen[0] != freeze_owner:
                 raise PermissionError('Task frozen by replan or interrupted commit; do not execute')
+            mode = db.execute('SELECT mode FROM task_controls WHERE session=? AND task=?', (session, task)).fetchone()
+            if mode and mode[0] != 'active':
+                raise PermissionError('Task paused or cancelled; do not execute')
             cursor=db.execute('INSERT OR IGNORE INTO multi_claims VALUES (?,?,?,?)',
                               (session,task,idx,'claimed'))
             if cursor.rowcount!=1:raise PermissionError('Step already claimed; do not execute again')
+            key = hashlib.sha256(json.dumps([session,task,idx], separators=(',', ':')).encode()).hexdigest()
+            db.execute('INSERT INTO execution_attempts VALUES (?,?,?,?,?)', (session,task,idx,key,arguments_digest))
+            self._event(db, session, task, idx, 'claimed', {'operation_key': key, 'arguments_digest': arguments_digest})
     def freeze(self, session, task, idx, owner):
         with self._connect() as db:
             db.execute('BEGIN IMMEDIATE')
+            mode = db.execute('SELECT mode FROM task_controls WHERE session=? AND task=?', (session,task)).fetchone()
+            if mode and mode[0] != 'active':
+                raise PermissionError('Paused or cancelled task cannot enter replan')
             if db.execute('SELECT 1 FROM multi_claims WHERE session=? AND task=? AND idx>=?', (session, task, idx)).fetchone():
                 raise PermissionError('Step already claimed; replan forbidden')
             db.execute('INSERT INTO task_freezes VALUES (?,?,?)', (session, task, owner))
@@ -201,5 +223,93 @@ class ExecutionLedger:
     def finish(self,session,task,idx,status):
         if status not in ('completed','uncertain','denied'):raise ValueError('Invalid status')
         with self._connect() as db:
-            db.execute('UPDATE multi_claims SET status=? WHERE session=? AND task=? AND idx=?',
-                       (status,session,task,idx))
+            cur = db.execute('UPDATE multi_claims SET status=? WHERE session=? AND task=? AND idx=? AND status="claimed"',
+                             (status,session,task,idx))
+            if cur.rowcount != 1:
+                previous = db.execute('SELECT status FROM multi_claims WHERE session=? AND task=? AND idx=?', (session,task,idx)).fetchone()
+                if previous and previous[0] == status:
+                    return
+                raise PermissionError('Execution outcome is missing or already final; cannot overwrite')
+            self._event(db, session, task, idx, 'finished', {'status': status})
+
+    @staticmethod
+    def _event(db, session, task, idx, kind, detail):
+        db.execute('INSERT INTO execution_events(session,task,idx,kind,detail,created) VALUES (?,?,?,?,?,?)',
+                   (session,task,idx,kind,json.dumps(detail, ensure_ascii=False),time.time()))
+
+    def event(self, session, task, idx, kind, detail):
+        with self._connect() as db:
+            self._event(db, session, task, idx, kind, detail)
+
+    def events(self, session, task=None, after=0):
+        with self._connect() as db:
+            rows = db.execute('SELECT seq,task,idx,kind,detail,created FROM execution_events '
+                              'WHERE session=? AND seq>? AND (? IS NULL OR task=?) ORDER BY seq LIMIT 200',
+                              (session,after,task,task)).fetchall()
+        return [dict(seq=r[0],task=r[1],index=r[2],kind=r[3],detail=json.loads(r[4]),created=r[5]) for r in rows]
+
+    def control(self, session, task):
+        with self._connect() as db:
+            row = db.execute('SELECT mode FROM task_controls WHERE session=? AND task=?', (session, task)).fetchone()
+        return row[0] if row else 'active'
+
+    def attempt(self, session, task, idx):
+        with self._connect() as db:
+            row = db.execute('SELECT operation_key,arguments_digest FROM execution_attempts WHERE session=? AND task=? AND idx=?', (session,task,idx)).fetchone()
+        return dict(operation_key=row[0], arguments_digest=row[1]) if row else None
+
+    def operation_lock(self, session, task, idx):
+        from core.security.operation_lease import operation_lease
+        return operation_lease(self.path, session, task, idx)
+
+    def acknowledge_cancel(self, session, task, idx, outcome):
+        with self._connect() as db:
+            changed = db.execute('UPDATE task_controls SET mode="cancelled" WHERE session=? AND task=? AND mode="cancel_requested"', (session,task)).rowcount
+            if changed:
+                self._event(db, session, task, idx, 'cancel_settled', {'outcome':outcome, 'rollback_promised':False})
+
+    def set_control(self, session, task, idx, action):
+        if action not in ('pause', 'resume', 'cancel'):
+            raise ValueError('Invalid task control')
+        with self._connect() as db:
+            db.execute('BEGIN IMMEDIATE')
+            if db.execute('SELECT 1 FROM task_freezes WHERE session=? AND task=?', (session, task)).fetchone():
+                raise PermissionError('任务被重规划或恢复操作冻结，请先核查')
+            row = db.execute('SELECT mode FROM task_controls WHERE session=? AND task=?', (session, task)).fetchone()
+            mode = row[0] if row else 'active'
+            if mode in ('cancel_requested', 'cancelled'):
+                if action == 'cancel':
+                    return mode
+                raise PermissionError('已取消任务不能重新激活')
+            claimed = db.execute('SELECT status FROM multi_claims WHERE session=? AND task=? AND idx=?', (session,task,idx)).fetchone()
+            if action == 'resume' and claimed:
+                raise PermissionError('当前步骤已有执行记录，先核查；恢复不会重放')
+            target = 'paused' if action == 'pause' else 'active' if action == 'resume' else 'cancel_requested' if claimed else 'cancelled'
+            if mode == target:
+                return mode
+            db.execute('INSERT INTO task_controls VALUES (?,?,?) ON CONFLICT(session,task) DO UPDATE SET mode=excluded.mode', (session,task,target))
+            self._event(db, session, task, idx, 'control', {'before':mode, 'after':target})
+        return target
+
+    def begin_repair(self, session, task, idx, digest):
+        owner = 'repair:' + digest
+        with self._connect() as db:
+            db.execute('BEGIN IMMEDIATE')
+            row = db.execute('SELECT status FROM multi_claims WHERE session=? AND task=? AND idx=?', (session,task,idx)).fetchone()
+            if not row or row[0] not in ('claimed', 'completed'):
+                raise PermissionError('只有已保存成功结果的认领可修复')
+            control = db.execute('SELECT mode FROM task_controls WHERE session=? AND task=?', (session,task)).fetchone()
+            if control and control[0] in ('cancel_requested','cancelled'):
+                raise PermissionError('已取消任务不能恢复')
+            db.execute('INSERT INTO task_freezes VALUES (?,?,?)', (session,task,owner))
+            db.execute('INSERT INTO checkpoint_repairs VALUES (?,?,?,?,?)', (session,task,idx,digest,'committing'))
+            self._event(db, session, task, idx, 'repair_started', {'digest':digest})
+        return owner
+
+    def finish_repair(self, session, task, idx, digest):
+        with self._connect() as db:
+            cur = db.execute('UPDATE checkpoint_repairs SET state="completed" WHERE session=? AND task=? AND idx=? AND digest=? AND state="committing"', (session,task,idx,digest))
+            if cur.rowcount != 1:
+                raise PermissionError('恢复操作已处理或不匹配')
+            db.execute('DELETE FROM task_freezes WHERE session=? AND task=? AND owner=?', (session,task,'repair:' + digest))
+            self._event(db, session, task, idx, 'repair_completed', {'digest':digest, 'tool_replayed':False})
