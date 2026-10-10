@@ -18,6 +18,7 @@ from core.security.interrupt_flow import InterruptFlow
 from core.security.multi_step_graph import MultiStepFlow, ExecutionLedger, draft_plan, READ_ARGS
 from core.security.autonomous_agent import AutonomousStore, classify as classify_autonomous, next_action as autonomous_next, inspect_response, MAX_STEPS
 from core.security.read_grants import db_path
+from core.security.cli_ux import route_shortcut, help_response
 
 from core.logging import get_logger
 from core.usr.startup_info import print_startup_info
@@ -27,6 +28,8 @@ from core.tasks.planning import PlanManager
 from core.tasks.execution import StepExecutor
 from core.tasks.agent_executor import AgentStepExecutor
 from core.skills import SkillRegistry
+
+KNOWN_COMMANDS = frozenset(['/help', '/?', '/task-continue', '/task-replan', '/task-status', '/approve', '/deny', '/task-list', '/multi', '/multi-status', '/multi-approve', '/multi-deny', '/flow-code', '/flow-status', '/flow-approve', '/flow-deny', '/auto', '/auto-status', '/code-propose', '/code-approve', '/code-deny', '/code-status', '/permissions', '/permit', '/deny-read', '/allow-read', '/revoke-read', '/skills', '/agent-step-run', '/agent-step-approve', '/agent-step-result', '/step-run', '/step-approve', '/step-result', '/plan-new', '/plans', '/plan', '/plan-approve', '/plan-reject', '/task-new', '/tasks', '/task', '/step', '/task-events', '/task-cancel', '/new', '/use', '/sessions', '/runs', '/events', '/status', '/interrupted', '/resume', '/approve-resume'])
 
 logging.getLogger("httpx").setLevel(logging.WARNING)
 logger = get_logger("USER")
@@ -56,29 +59,18 @@ async def run_interactive_app():
         # No tool execution occurs inside the graph.
         try:
             interrupt_flow = InterruptFlow(db_path().with_name('educlaw_interrupts.sqlite3'))
-            console.print('[green]Phase 5.6: LangGraph Interrupt 审批流已启用[/green]')
+            logger.debug("LangGraph Interrupt approval flow enabled")
         except ImportError:
-            console.print('[yellow]Phase 5.6 未启用：请安装 langgraph-checkpoint-sqlite[/yellow]')
+            console.print('[yellow]审批流不可用：请安装 langgraph-checkpoint-sqlite[/yellow]')
         try:
             multi_flow = MultiStepFlow(db_path().with_name('educlaw_multi_checkpoints.sqlite3'))
             multi_ledger = ExecutionLedger(db_path().with_name('educlaw_multi_claims.sqlite3'))
-            console.print('[green]Phase 5.6c 多步骤执行图已启用[/green]')
+            logger.debug("LangGraph multi-step flow enabled")
         except ImportError:
-            console.print('[yellow]Phase 5.6c 不可用：请安装 langgraph-checkpoint-sqlite[/yellow]')
-        console.print(f"[cyan]当前会话: {agent.session_id}[/cyan]")
-        console.print('Phase 5.6c: /multi <任务> | /multi-status <task> | /multi-approve <task> | /multi-deny <task>')
-        console.print("Phase 5.6: /flow-code <Python代码> | /flow-status <token> | /flow-approve <token> | /flow-deny <token>")
-        console.print("Phase 5.5: /auto on|off | /auto-status；自主建议路由（权限仍由 CLI 与 MCP 网关控制）")
+            console.print('[yellow]多步骤执行不可用：请安装 langgraph-checkpoint-sqlite[/yellow]')
         auto_mode = True
-        console.print("Phase 5.4b: 自然语言明确要求 Python 执行时自动生成待审批代码；/code-approve <token> 后继续回答")
-        console.print("Phase 5.4: /code-propose <Python代码> | /code-approve <token> | /code-deny <token> | /code-status <token>")
-        console.print("Phase 5.3c: /permissions | /permit <token> <once|session|always> | /deny-read | /allow-read <路径> | /revoke-read <id>")
-        console.print("Phase 5.3b: /skills | /agent-step-run <task_id> <序号> <skill_id或-> <tool1,tool2> | /agent-step-approve <task_id> <序号> <token> | /agent-step-result <task_id> <序号>")
-        console.print("Phase 5.3: /step-run <task_id> <序号> | /step-approve <task_id> <序号> <token> | /step-result <task_id> <序号>")
-        console.print("Phase 5.2: /plan-new <目标> | /plans | /plan <草稿id> | /plan-approve <草稿id> | /plan-reject <草稿id>")
-        console.print("Phase 5: /task-new <目标> | /tasks | /task <id> | /step <id> <序号> <状态> | /task-events <id> | /task-cancel <id>")
-        console.print("自主任务：自然语言输入 | /approve <任务ID> | /deny <任务ID> | /task-status <任务ID> | /task-list | /task-continue <任务ID> | /task-replan <任务ID>")
-        console.print("命令: /new | /use <session_id> | /sessions | /runs | /events <run_id> | /status <run_id> | /interrupted | /resume <run_id> | /approve-resume <token>")
+        console.print(f"[cyan]当前会话: {agent.session_id}[/cyan]")
+        console.print('[green]自然语言任务已就绪。输入 /help 查看命令；输入 exit 退出。[/green]')
 
         console.print("\n[bold green]EduClaw 已就绪，请输入您的指令 (输入 'exit' 退出):[/bold green]")
 
@@ -183,6 +175,19 @@ async def run_interactive_app():
                 continue
 
             command = user_input.strip()
+            help_text = help_response(command)
+            if help_text is not None:
+                console.print(help_text)
+                continue
+            # Standalone natural-language controls are resolved only from
+            # durable tasks in the current session. Never infer an approval ID.
+            shortcut, shortcut_error = route_shortcut(command, autonomous_store.recoverable(agent.session_id))
+            if shortcut_error:
+                console.print(f'[yellow]{shortcut_error}[/yellow]')
+                continue
+            if shortcut:
+                command = shortcut
+                console.print(f'[dim]已匹配当前会话任务: {command}[/dim]')
             # Recovery commands must never fall through to natural-language planning.
             if command == '/task-continue':
                 recoverable = [item for item in autonomous_store.recoverable(agent.session_id)
@@ -205,6 +210,10 @@ async def run_interactive_app():
                     '/task-continue', '/task-replan', '/task-status', '/approve', '/deny') \
                     and len(command.split()) != 2:
                 console.print('[yellow]命令格式错误：请提供一个任务ID。[/yellow]')
+                continue
+            # Unrecognized slash commands must never become new Agent goals.
+            if command.startswith('/') and command.split()[0] not in KNOWN_COMMANDS:
+                console.print('[yellow]未知命令，请输入 /help 查看支持的命令。[/yellow]')
                 continue
             if command == '/task-list':
                 tasks=autonomous_store.recoverable(agent.session_id)
