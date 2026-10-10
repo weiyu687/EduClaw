@@ -19,6 +19,10 @@ from core.security.multi_step_graph import MultiStepFlow, ExecutionLedger, draft
 from core.security.autonomous_agent import AutonomousStore, classify as classify_autonomous, next_action as autonomous_next, inspect_response, MAX_STEPS
 from core.security.read_grants import db_path
 from core.security.cli_ux import route_shortcut, help_response
+from core.security.task_catalog import TaskCatalog, resolve_selection, short_title
+from core.security.nl_system_router import deterministic_route, model_route, render_sessions, render_tasks
+from core.security.nl_action_router import classify as classify_local_action, prepare_action
+from core.security.intent_gate import inspect as inspect_intent, should_draft_python
 
 from core.logging import get_logger
 from core.usr.startup_info import print_startup_info
@@ -29,11 +33,22 @@ from core.tasks.execution import StepExecutor
 from core.tasks.agent_executor import AgentStepExecutor
 from core.skills import SkillRegistry
 
-KNOWN_COMMANDS = frozenset(['/help', '/?', '/task-continue', '/task-replan', '/task-status', '/approve', '/deny', '/task-list', '/multi', '/multi-status', '/multi-approve', '/multi-deny', '/flow-code', '/flow-status', '/flow-approve', '/flow-deny', '/auto', '/auto-status', '/code-propose', '/code-approve', '/code-deny', '/code-status', '/permissions', '/permit', '/deny-read', '/allow-read', '/revoke-read', '/skills', '/agent-step-run', '/agent-step-approve', '/agent-step-result', '/step-run', '/step-approve', '/step-result', '/plan-new', '/plans', '/plan', '/plan-approve', '/plan-reject', '/task-new', '/tasks', '/task', '/step', '/task-events', '/task-cancel', '/new', '/use', '/sessions', '/runs', '/events', '/status', '/interrupted', '/resume', '/approve-resume'])
+KNOWN_COMMANDS = frozenset(['/help', '/?', '/task-continue', '/task-replan', '/task-status', '/approve', '/deny', '/task-list', '/multi', '/multi-status', '/multi-approve', '/multi-deny', '/flow-code', '/flow-status', '/flow-approve', '/flow-deny', '/auto', '/auto-status', '/code-propose', '/code-approve', '/code-deny', '/code-status', '/permissions', '/permit', '/deny-read', '/allow-read', '/revoke-read', '/skills', '/agent-step-run', '/agent-step-approve', '/agent-step-result', '/step-run', '/step-approve', '/step-result', '/plan-new', '/plans', '/plan', '/plan-approve', '/plan-reject', '/task-new', '/tasks', '/task', '/step', '/task-events', '/task-cancel', '/new', '/use', '/sessions', '/runs', '/events', '/status', '/interrupted', '/resume', '/approve-resume', '/rename-session', '/rename-task', '/task-catalog', '/delete-session', '/delete-task', '/delete-confirm', '/delete-cancel', '/permission-set'])
 
 logging.getLogger("httpx").setLevel(logging.WARNING)
 logger = get_logger("USER")
 console = Console()
+
+
+def render_sessions_from_rows(rows, limit=10):
+    if not rows:
+        return '暂无会话。'
+    lines = [f'共有 {len(rows)} 个会话，显示最近 {min(limit, len(rows))} 个：']
+    for i, item in enumerate(rows[:limit], 1):
+        lines.append(f"{i}. {item['title'] or '未命名会话'} | {item['updated_at']} | {item['id'][:8]}…")
+    if len(rows) > limit:
+        lines.append('查看完整列表：/sessions')
+    return '\n'.join(lines)
 
 
 async def run_interactive_app():
@@ -68,6 +83,7 @@ async def run_interactive_app():
             logger.debug("LangGraph multi-step flow enabled")
         except ImportError:
             console.print('[yellow]多步骤执行不可用：请安装 langgraph-checkpoint-sqlite[/yellow]')
+        catalog = TaskCatalog(agent.state_manager.path, autonomous_store.path)
         auto_mode = True
         console.print(f"[cyan]当前会话: {agent.session_id}[/cyan]")
         console.print('[green]自然语言任务已就绪。输入 /help 查看命令；输入 exit 退出。[/green]')
@@ -164,6 +180,10 @@ async def run_interactive_app():
             else:
                 console.print('[yellow]步骤失败或结果不确定，任务停止；禁止自动重试。[/yellow]')
 
+        # Numbered references stay pinned to the last list shown to the user.
+        from core.security.safe_delete import SafeDelete
+        safe_delete = SafeDelete(agent.state_manager.path, autonomous_store.path)
+        session_snapshot = None
         while True:
             user_input = await asyncio.to_thread(input, "You: ")
 
@@ -175,6 +195,112 @@ async def run_interactive_app():
                 continue
 
             command = user_input.strip()
+            # Phase 5.10c.1: trusted natural-language permission actions.
+            # Parse before generic LLM routing; never let LLM issue grants.
+            from core.security.permission_center import parse_natural_language, set_mode, render as render_permission_center
+            if not command.startswith('/'):
+                permission_action = parse_natural_language(command)
+                if permission_action:
+                    kind, value = permission_action
+                    if kind == 'show':
+                        console.print(render_permission_center(agent.session_id))
+                    elif kind == 'weather':
+                        set_mode('get_weather', value)
+                        console.print('[green]天气工具权限已更新[/green]' if value == 'auto' else '[yellow]天气工具已禁用[/yellow]')
+                    elif kind == 'revoke':
+                        console.print('[green]已撤销读取授权[/green]' if revoke(value, agent.session_id) else '[yellow]未找到可撤销的授权[/yellow]')
+                    elif kind == 'read':
+                        try:
+                            path = canonical(value)
+                            confirm = (await asyncio.to_thread(input, f'确认授权当前会话只读访问 {path}？输入 YES 确认: ')).strip()
+                            if confirm == 'YES':
+                                grant(path, 'session', agent.session_id)
+                                console.print('[green]只读权限已授予当前会话[/green]')
+                            else:
+                                console.print('已取消授权')
+                        except (OSError, ValueError) as exc:
+                            console.print(f'[yellow]未授权：{exc}[/yellow]')
+                    continue
+            if command.startswith('/permission-set '):
+                parts = command.split()
+                if len(parts) != 3:
+                    console.print('[yellow]用法: /permission-set <工具名> <auto|always_ask|deny>[/yellow]')
+                else:
+                    try:
+                        set_mode(parts[1], parts[2])
+                        console.print('[green]权限偏好已保存[/green]')
+                    except ValueError as exc:
+                        console.print(f'[yellow]{exc}[/yellow]')
+                continue
+            # Phase 5.10a.1c: unified semantic router. All non-slash messages
+            # are eligible; no vocabulary gate can silently bypass local actions.
+            # Read-only deterministic routing remains a latency optimization.
+            if not command.startswith('/'):
+                from core.security.nl_action_router import route_local_intent, is_destructive_request, is_local_management_request
+                intent = await route_local_intent(agent.model, command)
+                if intent and intent['action'] == 'delete_preview':
+                    # Narrow natural-language shorthand; all other deletion requests
+                    # are denied with instructions. Never execute without confirmation.
+                    import re
+                    simple_delete = re.fullmatch(r'(?:请|帮我|我想|我要|请帮我)?\s*(?:删除|删掉|移除)\s*(?:第)?\s*([1-9]\d{0,3})\s*(?:个)?\s*(会话|任务)[。！!]?|(?:请|帮我|我想|我要|请帮我)?\s*(?:删除|删掉|移除)\s*(会话|任务)\s*(?:第)?\s*([1-9]\d{0,3})[。！!]?',command)
+                    if simple_delete:
+                        number=simple_delete.group(1) or simple_delete.group(4)
+                        kind=simple_delete.group(2) or simple_delete.group(3)
+                        command=('/delete-session ' if kind=='会话' else '/delete-task ')+number
+                        console.print('[dim]已识别删除预览请求；尚未删除任何数据。[/dim]')
+                    else:
+                        console.print('[yellow]删除需要明确指定单个目标。请先 /sessions 或 /task-catalog，再使用 /delete-session <编号或ID> 或 /delete-task <编号或ID> 查看影响并确认。批量删除暂不开放。[/yellow]')
+                        continue
+                if intent and intent['action'] in ('switch_session', 'rename_session', 'approve_task', 'deny_task'):
+                    try:
+                        command = prepare_action(intent, catalog, agent.session_id, agent.user_id,
+                                                 autonomous_store.recoverable(agent.session_id),
+                                                 session_rows=session_snapshot)
+                        console.print(f'[dim]已识别本地操作：{intent["action"]}[/dim]')
+                    except (ValueError, LookupError) as exc:
+                        console.print(f'[yellow]未执行操作：{exc}[/yellow]')
+                        continue
+                elif intent and intent['action'] in ('sessions','tasks','pending_tasks','permissions','help'):
+                    command = {'sessions':'/sessions','tasks':'/task-catalog',
+                               'pending_tasks':'/task-list','permissions':'/permissions',
+                               'help':'/help'}[intent['action']]
+                elif is_local_management_request(command):
+                    console.print('[yellow]未能可靠解析本地管理操作，未执行。请换种说法或使用 /help 查看命令。[/yellow]')
+                    continue
+                elif is_destructive_request(command):
+                    # Never pass an explicit local destructive request to the
+                    # general chat agent, which lacks local capability context.
+                    console.print('[yellow]删除请求需要单个明确目标和二次确认。请使用 /delete-session 或 /delete-task 查看预览。[/yellow]')
+                    continue
+            # Phase 5.10a.1: read-only local system operations take priority over
+            # generic Agent chat. Never let the LLM fabricate slash commands.
+            local_action = deterministic_route(command)
+            if local_action is None and not command.startswith('/'):
+                # Semantic fallback is limited to likely *queries*, avoiding extra
+                # model calls for ordinary task requests and all state mutations.
+                query_hints = ('查看', '列出', '展示', '显示', '有哪些', '多少', '查询', '告诉我', '能看到', '帮助')
+                domain_hints = ('会话', '对话', '聊天记录', '任务', '权限', '白名单', '黑名单', '命令')
+                mutations = ('删除', '清空', '撤销', '授权', '允许', '禁用', '批准', '拒绝', '执行', '运行', '切换', '修改', '改名', '重命名', '继续', '恢复')
+                if (any(x in command for x in query_hints)
+                        and any(x in command for x in domain_hints)
+                        and not any(x in command for x in mutations)):
+                    local_action = await model_route(agent.model, command)
+            if local_action:
+                if local_action == 'sessions':
+                    session_snapshot = catalog.sessions(agent.user_id)
+                    console.print(render_sessions_from_rows(session_snapshot))
+                elif local_action in ('tasks', 'pending_tasks'):
+                    console.print(render_tasks(catalog, agent.session_id, local_action == 'pending_tasks'))
+                elif local_action == 'permissions':
+                    grants = list_grants(agent.session_id)
+                    if grants:
+                        for item in grants:
+                            console.print(f"{item['id']}  {item['scope']}  {item['path']}  remaining={item['remaining']}")
+                    else:
+                        console.print('当前会话没有可显示的读取授权记录。此处不代表系统级工具黑白名单。')
+                elif local_action == 'help':
+                    console.print(help_response('/help'))
+                continue
             help_text = help_response(command)
             if help_text is not None:
                 console.print(help_text)
@@ -214,6 +340,65 @@ async def run_interactive_app():
             # Unrecognized slash commands must never become new Agent goals.
             if command.startswith('/') and command.split()[0] not in KNOWN_COMMANDS:
                 console.print('[yellow]未知命令，请输入 /help 查看支持的命令。[/yellow]')
+                continue
+            # Phase 5.10a.2: never delete from model output directly.
+            if command == '/delete-cancel':
+                safe_delete.cancel()
+                console.print('已取消删除预览；未修改任何数据。')
+                continue
+            if command.startswith('/delete-confirm'):
+                try:
+                    parts=command.split()
+                    if len(parts)!=2: raise ValueError('用法：/delete-confirm <一次性令牌>')
+                    result=safe_delete.confirm(parts[1])
+                    session_snapshot=None
+                    if result['kind']=='session' and result['id']==agent.session_id:
+                        import uuid
+                        agent.set_session_context(str(uuid.uuid4()))
+                        console.print('当前会话已软删除，已切换至新会话。')
+                    else:
+                        console.print('软删除成功；目标已从正常列表隐藏，原始记录未物理清除。')
+                except (ValueError,LookupError,PermissionError) as exc:
+                    console.print(f'[yellow]删除未执行：{exc}[/yellow]')
+                continue
+            if command.startswith('/delete-session') or command.startswith('/delete-task'):
+                try:
+                    parts=command.split(maxsplit=1)
+                    if len(parts)!=2: raise ValueError('请提供单个编号、完整ID或唯一名称')
+                    if parts[0]=='/delete-session':
+                        if parts[1].isdecimal() and session_snapshot is None:
+                            raise ValueError('请先查看会话列表，再按编号选择')
+                        sid=resolve_selection(session_snapshot if session_snapshot is not None else catalog.sessions(agent.user_id),parts[1])
+                        console.print(safe_delete.preview_session(sid,agent.user_id,agent.session_id))
+                    else:
+                        tid=resolve_selection(catalog.tasks(agent.session_id),parts[1])
+                        console.print(safe_delete.preview_task(agent.session_id,tid,agent.user_id))
+                except (ValueError,LookupError,PermissionError) as exc:
+                    console.print(f'[yellow]无法生成删除预览：{exc}[/yellow]')
+                continue
+            if command == '/task-catalog':
+                items = catalog.tasks(agent.session_id)
+                if not items: console.print('[dim]当前会话暂无自主任务[/dim]')
+                for n, item in enumerate(items, 1):
+                    console.print(f"{n}. {item['display_title']} | {item['status']} | {item['step']} 步")
+                continue
+            if command.startswith('/rename-session '):
+                try:
+                    title = catalog.set_session_title(agent.session_id, command.split(maxsplit=1)[1], agent.user_id)
+                    console.print(f'[green]当前会话已命名：{title}[/green]')
+                except Exception as exc: console.print(f'[yellow]命名失败: {exc}[/yellow]')
+                continue
+            if command.startswith('/rename-task '):
+                try:
+                    parts = command.split(maxsplit=2)
+                    if len(parts) != 3: raise ValueError('用法：/rename-task <编号或ID> <名称>')
+                    task_id = resolve_selection(catalog.tasks(agent.session_id), parts[1])
+                    title = catalog.set_task_title(agent.session_id, task_id, parts[2])
+                    console.print(f'[green]任务已命名：{title}[/green]')
+                except Exception as exc: console.print(f'[yellow]命名失败: {exc}[/yellow]')
+                continue
+            if command in ('/rename-session','/rename-task'):
+                console.print('[yellow]用法：/rename-session <名称> 或 /rename-task <编号或ID> <名称>[/yellow]')
                 continue
             if command == '/task-list':
                 tasks=autonomous_store.recoverable(agent.session_id)
@@ -529,8 +714,7 @@ async def run_interactive_app():
                     agent_pending = None
                 continue
             if command == '/permissions':
-                for item in list_grants(agent.session_id):
-                    console.print(f"{item['id']}  {item['scope']}  {item['path']}  remaining={item['remaining']}")
+                console.print(render_permission_center(agent.session_id))
                 continue
             if command.startswith('/revoke-read '):
                 try:
@@ -748,16 +932,31 @@ async def run_interactive_app():
             if command == '/new':
                 import uuid
                 agent.set_session_context(str(uuid.uuid4()))
-                console.print(f"新会话: {agent.session_id}")
+                console.print(f'已创建新会话：未命名会话（{agent.session_id[:8]}…）')
                 continue
             if command == '/sessions':
-                for item in agent.list_sessions():
-                    console.print(f"{item['id']}  {item['updated_at']}")
+                session_snapshot = catalog.sessions(agent.user_id)
+                for n, item in enumerate(session_snapshot, 1):
+                    console.print(f"{n}. {item['title'] or '未命名会话'} | {item['updated_at']} | {item['id'][:8]}…")
                 continue
             if command.startswith('/use '):
-                sid = command.split(maxsplit=1)[1]
+                selection = command.split(maxsplit=1)[1]
+                # A displayed number always means the number in the last shown list.
+                if selection.isdecimal() and session_snapshot is None:
+                    console.print('[yellow]请先查看会话列表，再使用编号切换。[/yellow]')
+                    continue
+                try:
+                    sid = resolve_selection(session_snapshot if session_snapshot is not None else catalog.sessions(agent.user_id), selection)
+                except (LookupError, ValueError) as exc:
+                    console.print(f'[yellow]无法切换会话：{exc}[/yellow]')
+                    continue
+                if not any(r['id']==sid for r in catalog.sessions(agent.user_id)):
+                    console.print('[yellow]会话已删除或无权限；请刷新会话列表。[/yellow]')
+                    continue
                 agent.set_session_context(sid)
-                console.print(f"已切换到: {agent.session_id}")
+                selected_session = next((item for item in catalog.sessions(agent.user_id) if item['id'] == sid), None)
+                display_name = (selected_session or {}).get('title') or '未命名会话'
+                console.print(f'已切换到：{display_name}（{agent.session_id[:8]}…）')
                 continue
             if command == '/runs':
                 for item in agent.list_runs():
@@ -807,12 +1006,19 @@ async def run_interactive_app():
                               f"安全策略：{explanation}\n"
                               "执行状态：DENIED；未执行任何工具。[/yellow]")
                 continue
+            # Phase 5.10a.1e: answer-only requests must not be turned into
+            # autonomous tool plans merely because a classifier guesses "task".
+            intent_decision = inspect_intent(user_input)
             # Phase 5.7: ordinary natural language is the primary task interface.
             # Existing developer commands and explicit forbidden-tool policy stay authoritative.
             if auto_mode and multi_flow is not None:
                 try:
-                    if await classify_autonomous(agent.model,user_input):
+                    if not (intent_decision.explanation_requested and not intent_decision.execution_requested) and await classify_autonomous(agent.model,user_input):
                         task_id=autonomous_store.create(agent.session_id,user_input)
+                        catalog.set_task_title(agent.session_id, task_id, short_title(user_input))
+                        current_session = next((x for x in catalog.sessions(agent.user_id) if x['id'] == agent.session_id), None)
+                        if current_session and not current_session['title']:
+                            catalog.set_session_title(agent.session_id, short_title(user_input), agent.user_id)
                         console.print(f'[cyan]Agent 正在规划任务 {task_id}[/cyan]')
                         await autonomous_plan(task_id)
                         continue
@@ -828,7 +1034,11 @@ async def run_interactive_app():
                 except Exception as exc:
                     logger.warning(f'Router failed; falling back to conservative routing: {exc}')
             # Explicit Python intent must not fall through to unrestricted chat.
-            do_python = (explicit_policy is not None and explicit_policy[1] == 'python') or (explicit_policy is None and (wants_python(user_input) or (auto_mode and selected and selected.action == 'python')))
+            do_python = should_draft_python(
+                user_input,
+                suggested_python=bool(auto_mode and selected and selected.action == 'python'),
+                explicit_python_policy=bool(explicit_policy is not None and explicit_policy[1] == 'python'),
+            )
             if do_python:
                 try:
                     request = await draft_agent_code(agent.model, agent.session_id, user_input)
@@ -877,6 +1087,12 @@ async def run_interactive_app():
                               f"当前会话: /permit {token} session\n"
                               f"持久授权: /permit {token} always\n"
                               f"拒绝: /deny-read[/yellow]")
+                continue
+            # Phase 5.10a.1f: explanation-only turns use a model with NO tools.
+            # The MCP gateway remains the independent final authorization layer.
+            if intent_decision.explanation_requested and not intent_decision.execution_requested:
+                response = await agent.answer_only(user_input)
+                console.print(f"\n[bold white]Agent:[/bold white] {response}\n")
                 continue
             # Agent chooses its read-only MCP tool using its existing LangGraph setup.
             # All actual calls are still checked by the global gateway.

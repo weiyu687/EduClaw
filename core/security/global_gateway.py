@@ -9,15 +9,12 @@ import os
 from pathlib import Path
 from core.security.read_grants import allowed as dynamic_read_allowed
 from core.security.code_approval import authorize_code
+from core.security.policy_engine import evaluate, Risk, FILE_ARGUMENTS, PUBLIC_READ
 
 log = logging.getLogger('EDUCLAW_TOOL_GATEWAY')
 
-FILE_TO_ARG = {
-    'extract_pdf': 'pdf_path', 'extract_word': 'word_path',
-    'extract_pptx': 'pptx_path', 'extract_xlsx': 'xlsx_path',
-    'extract_py': 'py_path', 'get_all_files': 'folder_path',
-}
-NO_FILE_READ = frozenset({'get_weather'})
+FILE_TO_ARG = FILE_ARGUMENTS
+NO_FILE_READ = PUBLIC_READ
 
 
 class GlobalToolDenied(PermissionError):
@@ -39,8 +36,12 @@ def _roots():
 
 def authorize(tool_name, arguments):
     """Fail closed before any MCP transport call. No model-supplied grants."""
-    if not isinstance(arguments, dict):
-        raise GlobalToolDenied('Tool arguments must be an object')
+    decision = evaluate(tool_name, arguments)
+    from core.security.permission_center import get_mode, CAPABILITIES
+    if tool_name in CAPABILITIES and get_mode(tool_name) == "deny":
+        raise GlobalToolDenied(f"工具已禁用或未经审核: {tool_name}")
+    if not decision.allowed:
+        raise GlobalToolDenied(decision.reason)
     if tool_name in NO_FILE_READ:
         return
     if tool_name == "run_python_code":

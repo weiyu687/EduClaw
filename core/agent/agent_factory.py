@@ -245,6 +245,37 @@ class EduClawAgent:
             logger.exception('Agent run failed: %s', run_id)
             raise
 
+    async def answer_only(self, user_text: str) -> str:
+        """No-tool explanation route. No agent graph or MCP tool can run here.
+
+        Explicitly scoped to informational requests by the CLI; the user text
+        is never interpreted as permission to execute code.
+        """
+        from langchain_core.messages import SystemMessage
+        if self.session_id is None:
+            self.set_session_context(str(uuid.uuid4()))
+        run_id = self.state_manager.start_run(self.session_id, user_text)
+        try:
+            instructions = (
+                "你是 EduClaw 的知识问答助手。当前轮次只能提供文字解释、示例代码和预期输出，"
+                "不能调用任何工具或执行代码。不得声称实际运行了代码。"
+                "不要建议绕过审批调用 run_python_file 或 run_python_code。"
+                "需要执行时，请提示用户明确提出执行请求，届时由 CLI 审批。"
+                "会话管理属于 EduClaw CLI 的功能，不要声称系统不支持。"
+            )
+            # No tools are bound to this model. Keep this turn separate from
+            # the checkpointed tool-enabled graph to avoid implicit tool calls.
+            reply = await self.model.ainvoke([
+                SystemMessage(content=instructions),
+                HumanMessage(content=user_text),
+            ])
+            answer = str(reply.content)
+            self.state_manager.finish_run(run_id, 'completed', output=answer)
+            return answer
+        except Exception as exc:
+            self.state_manager.finish_run(run_id, 'failed', error=str(exc))
+            raise
+
     async def chat_without_memory(self, user_text: str) -> str:
         old = self.enable_memory
         self.enable_memory = False

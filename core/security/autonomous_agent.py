@@ -96,6 +96,7 @@ class AutonomousStore:
             columns={r[1] for r in db.execute('PRAGMA table_info(autonomous_tasks)')}
             if 'last_error' not in columns: db.execute("ALTER TABLE autonomous_tasks ADD COLUMN last_error TEXT NOT NULL DEFAULT ''")
             if 'planning_failures' not in columns: db.execute("ALTER TABLE autonomous_tasks ADD COLUMN planning_failures INTEGER NOT NULL DEFAULT 0")
+            if 'deleted_at' not in columns: db.execute('ALTER TABLE autonomous_tasks ADD COLUMN deleted_at TEXT')
     @contextmanager
     def connect(self):
         db=sqlite3.connect(str(self.path),timeout=10)
@@ -110,7 +111,7 @@ class AutonomousStore:
         return task
     def get(self,session,task):
         with self.connect() as db:
-            row=db.execute('SELECT goal,status,step,pending,results,answer,last_error,planning_failures FROM autonomous_tasks WHERE session=? AND id=?',(session,task)).fetchone()
+            row=db.execute('SELECT goal,status,step,pending,results,answer,last_error,planning_failures FROM autonomous_tasks WHERE session=? AND id=? AND deleted_at IS NULL',(session,task)).fetchone()
         if not row: raise LookupError('Task not found in current session')
         return {'id':task,'goal':row[0],'status':row[1],'step':row[2],
                 'pending':json.loads(row[3]) if row[3] else None,'results':json.loads(row[4]),'answer':row[5],
@@ -120,14 +121,14 @@ class AutonomousStore:
         if state['status'] != 'planning': raise PermissionError('Task is not planning')
         with self.connect() as db:
             if decision['action']=='finish':
-                db.execute("UPDATE autonomous_tasks SET status='completed',answer=?,last_error='' WHERE session=? AND id=? AND status='planning'",
+                db.execute("UPDATE autonomous_tasks SET status='completed',answer=?,last_error='' WHERE session=? AND id=? AND deleted_at IS NULL AND status='planning'",
                            (decision['answer'],session,task))
             else:
-                db.execute("UPDATE autonomous_tasks SET status='pending',pending=?,last_error='' WHERE session=? AND id=? AND status='planning'",
+                db.execute("UPDATE autonomous_tasks SET status='pending',pending=?,last_error='' WHERE session=? AND id=? AND deleted_at IS NULL AND status='planning'",
                            (json.dumps(decision['step'],ensure_ascii=False),session,task))
     def claim(self,session,task):
         with self.connect() as db:
-            cur=db.execute("UPDATE autonomous_tasks SET status='claimed' WHERE session=? AND id=? AND status='pending'",(session,task))
+            cur=db.execute("UPDATE autonomous_tasks SET status='claimed' WHERE session=? AND id=? AND deleted_at IS NULL AND status='pending'",(session,task))
             if cur.rowcount != 1: raise PermissionError('Step not pending; never replay a claimed operation')
         return self.get(session,task)
     def record(self,session,task,outcome):
@@ -138,12 +139,12 @@ class AutonomousStore:
                 'status':outcome['status'],'output':str(outcome.get('output',''))[:12000]}
         status='planning' if outcome['status']=='completed' else outcome['status']
         with self.connect() as db:
-            db.execute('UPDATE autonomous_tasks SET status=?,step=?,pending=NULL,results=? WHERE session=? AND id=? AND status=?',
+            db.execute('UPDATE autonomous_tasks SET status=?,step=?,pending=NULL,results=? WHERE session=? AND id=? AND deleted_at IS NULL AND status=?',
                        (status,state['step']+1,json.dumps(state['results']+[result],ensure_ascii=False),session,task,'claimed'))
         return self.get(session,task)
     def deny(self,session,task):
         with self.connect() as db:
-            cur=db.execute("UPDATE autonomous_tasks SET status='denied',pending=NULL WHERE session=? AND id=? AND status='pending'",(session,task))
+            cur=db.execute("UPDATE autonomous_tasks SET status='denied',pending=NULL WHERE session=? AND id=? AND deleted_at IS NULL AND status='pending'",(session,task))
             if cur.rowcount!=1:raise PermissionError('Cannot deny nonpending step')
     def uncertain(self,session,task):
         # On process restart, a claimed step MUST NOT be executed again.
@@ -156,25 +157,25 @@ class AutonomousStore:
         count=state['planning_failures']+1
         status='needs_attention' if count>=max_failures else 'planning'
         with self.connect() as db:
-            cur=db.execute("UPDATE autonomous_tasks SET status=?,last_error=?,planning_failures=? WHERE session=? AND id=? AND status='planning'",(status,str(error)[:1500],count,session,task))
+            cur=db.execute("UPDATE autonomous_tasks SET status=?,last_error=?,planning_failures=? WHERE session=? AND id=? AND deleted_at IS NULL AND status='planning'",(status,str(error)[:1500],count,session,task))
             if cur.rowcount!=1:raise RuntimeError('Concurrent planning update')
         return self.get(session,task)
 
     def recoverable(self,session):
         """List durable tasks for this session, including ambiguous claimed operations."""
         with self.connect() as db:
-            rows=db.execute("SELECT id,status,step,last_error FROM autonomous_tasks WHERE session=? AND status IN ('planning','pending','claimed','needs_attention','uncertain','failed') ORDER BY rowid DESC",(session,)).fetchall()
+            rows=db.execute("SELECT id,status,step,last_error FROM autonomous_tasks WHERE session=? AND deleted_at IS NULL AND status IN ('planning','pending','claimed','needs_attention','uncertain','failed') ORDER BY rowid DESC",(session,)).fetchall()
         return [{'id':r[0],'status':r[1],'step':r[2],'last_error':r[3]} for r in rows]
 
     def reopen_planning(self,session,task):
         with self.connect() as db:
-            cur=db.execute("UPDATE autonomous_tasks SET status='planning',planning_failures=0,last_error='' WHERE session=? AND id=? AND status='needs_attention'",(session,task))
+            cur=db.execute("UPDATE autonomous_tasks SET status='planning',planning_failures=0,last_error='' WHERE session=? AND id=? AND deleted_at IS NULL AND status='needs_attention'",(session,task))
             if cur.rowcount!=1:raise PermissionError('Only a planning error may be retried; never replay a claimed tool')
         return self.get(session,task)
 
     def mark_uncertain(self,session,task,reason):
         with self.connect() as db:
-            cur=db.execute("UPDATE autonomous_tasks SET status='uncertain',last_error=? WHERE session=? AND id=? AND status='claimed'",(str(reason)[:1500],session,task))
+            cur=db.execute("UPDATE autonomous_tasks SET status='uncertain',last_error=? WHERE session=? AND id=? AND deleted_at IS NULL AND status='claimed'",(str(reason)[:1500],session,task))
             if cur.rowcount!=1:raise PermissionError('Only claimed execution can become uncertain')
 
 

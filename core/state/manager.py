@@ -67,7 +67,7 @@ class StateManager:
             if existing:
                 db.execute('UPDATE sessions SET updated_at=? WHERE id=?', (now(), session_id))
             else:
-                db.execute('INSERT INTO sessions VALUES (?,?,?,?)', (session_id, user_id, now(), now()))
+                db.execute('INSERT INTO sessions (id, user_id, created_at, updated_at) VALUES (?,?,?,?)', (session_id, user_id, now(), now()))
         return session_id
 
     def list_sessions(self, user_id=None):

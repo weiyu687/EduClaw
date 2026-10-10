@@ -33,7 +33,7 @@ ADVANCED_HELP = '''兼容及开发者命令（高级）
 def natural_control(text):
     """Recognize only short, standalone user commands; never parse task descriptions."""
     s = re.sub(r'[。！!？?\s]+$', '', text.strip())
-    if s in ('继续刚才的任务', '继续上一个任务', '继续之前的任务', '继续任务', '恢复刚才的任务', '恢复上一个任务'):
+    if s in ('继续刚才的任务', '继续上一个任务', '继续之前的任务', '继续任务', '恢复刚才的任务', '恢复上一个任务', '你可以继续刚才的任务吗', '可以继续刚才的任务吗', '能继续刚才的任务吗', '请继续刚才的任务', '帮我继续刚才的任务', '继续刚才那个任务'):
         return 'continue'
     if s in ('批准', '同意', '批准当前任务', '同意执行', '批准这一步'):
         return 'approve'
