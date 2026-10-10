@@ -5,6 +5,7 @@ Author: Gongmin Wei
 Date: 2026-04-01
 """
 import os
+import sys
 import json
 from pathlib import Path
 from contextlib import AsyncExitStack
@@ -73,7 +74,7 @@ class MCPClient:
         env_info["PYTHONPATH"] = project_dir_root
 
         self.server_params = StdioServerParameters(
-            command="python",
+            command=sys.executable,
             args=["-m", server_script],
             env=env_info
         )

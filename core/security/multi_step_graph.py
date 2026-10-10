@@ -113,6 +113,18 @@ class MultiStepFlow:
         self.conn=sqlite3.connect(str(path),check_same_thread=False)
         self.graph=build_graph(SqliteSaver(self.conn))
     def close(self): self.conn.close()
+    def list_tasks(self, session):
+        """Enumerate durable tasks, verifying ownership from checkpoint values."""
+        prefix = f'educlaw-multi:{session}:'
+        found = {}
+        for checkpoint in self.graph.checkpointer.list(None):
+            thread = checkpoint.config['configurable']['thread_id']
+            if not thread.startswith(prefix) or thread in found:
+                continue
+            values = checkpoint.checkpoint.get('channel_values', {})
+            if values.get('session_id') == session and values.get('task_id'):
+                found[thread] = values['task_id']
+        return [self.snapshot(session, task) for task in sorted(set(found.values()))]
     @staticmethod
     def config(session,task):return {'configurable':{'thread_id':f'educlaw-multi:{session}:{task}'}}
     def begin(self,session,goal,steps):

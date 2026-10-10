@@ -2,7 +2,7 @@ import asyncio
 import tempfile
 import unittest
 from pathlib import Path
-from unittest.mock import AsyncMock
+from unittest.mock import AsyncMock, patch
 from core.state.manager import StateManager
 
 
@@ -30,6 +30,13 @@ class StateTests(unittest.TestCase):
 
 
 class MCPResultTests(unittest.IsolatedAsyncioTestCase):
+    def setUp(self):
+        # These are transport result tests. Gateway denial is covered separately
+        # by test_global_tool_gateway; an unregistered demo tool must stay denied.
+        gateway = patch('core.mcp.client.check_and_audit')
+        self.gateway = gateway.start()
+        self.addCleanup(gateway.stop)
+
     async def test_is_error_is_raised(self):
         from core.mcp.client import MCPClient, MCPToolResultError
         client = MCPClient()
