@@ -11,9 +11,13 @@ import re
 import secrets
 from pathlib import Path
 from core.security.read_grants import grant, canonical, list_grants, revoke, session_context
-from core.security.tool_dispatcher import route as suggest_route, read_preflight, user_paths, explicit_tool_policy
+from core.security.tool_dispatcher import route as suggest_route, read_preflight, user_paths, explicit_tool_policy, READ_TOOLS
 from core.security.agent_code_flow import wants_python, draft as draft_agent_code, context as agent_code_context, update as update_agent_code, explain as explain_agent_code
-from core.security.code_approval import propose as propose_code, get as get_code, claim as claim_code, reject as reject_code, approved_call
+from core.security.code_approval import propose as propose_code, get as get_code, claim as claim_code, reject as reject_code, approved_call, fingerprint
+from core.security.interrupt_flow import InterruptFlow
+from core.security.multi_step_graph import MultiStepFlow, ExecutionLedger, draft_plan, READ_ARGS
+from core.security.autonomous_agent import AutonomousStore, classify as classify_autonomous, next_action as autonomous_next, MAX_STEPS
+from core.security.read_grants import db_path
 
 from core.logging import get_logger
 from core.usr.startup_info import print_startup_info
@@ -40,11 +44,30 @@ async def run_interactive_app():
     agent_executor = AgentStepExecutor(task_manager)
 
     pending_read = None
+    interrupt_flow = None
+    multi_flow = None
+    multi_ledger = None
+    autonomous_store = AutonomousStore(db_path().with_name("educlaw_autonomous.sqlite3"))
 
     try:
         logger.info("Main: 正在运行程序 EduClaw...")
         await agent.start()
+        # Independent durable LangGraph checkpoint for approval decisions.
+        # No tool execution occurs inside the graph.
+        try:
+            interrupt_flow = InterruptFlow(db_path().with_name('educlaw_interrupts.sqlite3'))
+            console.print('[green]Phase 5.6: LangGraph Interrupt 审批流已启用[/green]')
+        except ImportError:
+            console.print('[yellow]Phase 5.6 未启用：请安装 langgraph-checkpoint-sqlite[/yellow]')
+        try:
+            multi_flow = MultiStepFlow(db_path().with_name('educlaw_multi_checkpoints.sqlite3'))
+            multi_ledger = ExecutionLedger(db_path().with_name('educlaw_multi_claims.sqlite3'))
+            console.print('[green]Phase 5.6c 多步骤执行图已启用[/green]')
+        except ImportError:
+            console.print('[yellow]Phase 5.6c 不可用：请安装 langgraph-checkpoint-sqlite[/yellow]')
         console.print(f"[cyan]当前会话: {agent.session_id}[/cyan]")
+        console.print('Phase 5.6c: /multi <任务> | /multi-status <task> | /multi-approve <task> | /multi-deny <task>')
+        console.print("Phase 5.6: /flow-code <Python代码> | /flow-status <token> | /flow-approve <token> | /flow-deny <token>")
         console.print("Phase 5.5: /auto on|off | /auto-status；自主建议路由（权限仍由 CLI 与 MCP 网关控制）")
         auto_mode = True
         console.print("Phase 5.4b: 自然语言明确要求 Python 执行时自动生成待审批代码；/code-approve <token> 后继续回答")
@@ -54,9 +77,83 @@ async def run_interactive_app():
         console.print("Phase 5.3: /step-run <task_id> <序号> | /step-approve <task_id> <序号> <token> | /step-result <task_id> <序号>")
         console.print("Phase 5.2: /plan-new <目标> | /plans | /plan <草稿id> | /plan-approve <草稿id> | /plan-reject <草稿id>")
         console.print("Phase 5: /task-new <目标> | /tasks | /task <id> | /step <id> <序号> <状态> | /task-events <id> | /task-cancel <id>")
+        console.print("Phase 5.7: 自然语言自动规划；/approve <任务ID> | /deny <任务ID> | /task-status <任务ID>")
         console.print("命令: /new | /use <session_id> | /sessions | /runs | /events <run_id> | /status <run_id> | /interrupted | /resume <run_id> | /approve-resume <token>")
 
         console.print("\n[bold green]EduClaw 已就绪，请输入您的指令 (输入 'exit' 退出):[/bold green]")
+
+        async def autonomous_plan(task_id):
+            state = autonomous_store.get(agent.session_id, task_id)
+            if state['status'] != 'planning':
+                return
+            if state['step'] >= MAX_STEPS:
+                autonomous_store.decision(agent.session_id, task_id,
+                    {'action':'finish','answer':'已达到安全步骤上限，请查看已完成结果并发起新任务。'})
+                console.print('[yellow]已达到步骤上限，任务停止。[/yellow]')
+                return
+            decision = await autonomous_next(agent.model, state['goal'], state['results'], user_paths(state['goal']))
+            if decision['action'] == 'finish':
+                autonomous_store.decision(agent.session_id, task_id, decision)
+                console.print(f"\n[bold white]Agent:[/bold white] {decision['answer']}\n")
+                return
+            # Every step gets a real LangGraph interrupt, even after prior tool results.
+            if multi_flow is None:
+                raise RuntimeError('LangGraph checkpoint unavailable; refusing to execute')
+            flow_id, _ = multi_flow.begin(agent.session_id, state['goal'], [decision['step']])
+            autonomous_store.decision(agent.session_id, task_id,
+                {'action':'tool','step':{**decision['step'],'_flow_id':flow_id}})
+            console.print(f"[yellow]任务 {task_id} 第 {state['step']+1} 步等待审批："
+                          f"{decision['step']['tool']} {decision['step']['arguments']}\n"
+                          f"批准: /approve {task_id} | 拒绝: /deny {task_id}[/yellow]")
+
+        async def autonomous_approve(task_id):
+            state=autonomous_store.get(agent.session_id,task_id)
+            if state['status'] != 'pending' or not state['pending']:
+                raise PermissionError('任务没有待审批步骤')
+            step=state['pending']
+            flow_id=step['_flow_id']
+            checkpoint=multi_flow.pending(agent.session_id,flow_id)
+            if checkpoint['step'] != {'tool':step['tool'],'arguments':step['arguments']}:
+                raise PermissionError('Checkpoint/approval parameters mismatch')
+            console.print(f"[bold yellow]第 {state['step']+1} 步审批\n工具: {step['tool']}\n参数: {step['arguments']}[/bold yellow]")
+            confirm=(await asyncio.to_thread(input,'输入 EXECUTE 确认本次操作: ')).strip()
+            if confirm != 'EXECUTE':
+                console.print('未执行，仍等待审批')
+                return
+            # Durable claim first. A crash leaves claimed state; never auto-replay.
+            autonomous_store.claim(agent.session_id,task_id)
+            outcome={'status':'uncertain','output':'Execution claimed; outcome unknown'}
+            try:
+                tool,args=step['tool'],step['arguments']
+                if tool=='run_python_code':
+                    req=propose_code(agent.session_id,args['code'])
+                    _,exact,digest=claim_code(agent.session_id,req['id'])
+                    if exact!=args: raise PermissionError('Code changed')
+                    with session_context(agent.session_id),approved_call(agent.session_id,req['id'],digest):
+                        response=await agent.mcp_client.use_tool(tool,exact)
+                elif tool in READ_ARGS:
+                    grant(args[READ_ARGS[tool]],'once',agent.session_id)
+                    with session_context(agent.session_id):
+                        response=await agent.mcp_client.use_tool(tool,args)
+                else:raise PermissionError('Unsupported tool')
+                outcome={'status':'uncertain' if getattr(response,'isError',False) else 'completed',
+                         'output':str(response)[:12000]}
+            except Exception as exc:
+                outcome={'status':'uncertain','output':str(exc)}
+            autonomous_store.record(agent.session_id,task_id,outcome)
+            console.print(f"[cyan]步骤执行状态: {outcome['status']}\n{outcome['output']}[/cyan]")
+            try:
+                multi_flow.resume(agent.session_id,flow_id,outcome)
+            except Exception as exc:
+                console.print(f'[yellow]检查点恢复异常，禁止重新执行此步骤: {exc}[/yellow]')
+                return
+            if outcome['status']=='completed':
+                try:
+                    await autonomous_plan(task_id)
+                except Exception as exc:
+                    console.print(f'[yellow]后续规划失败；工具不会重试。任务 {task_id} 可查询: {exc}[/yellow]')
+            else:
+                console.print('[yellow]执行结果不确定，任务停止；禁止自动重试。[/yellow]')
 
         while True:
             user_input = await asyncio.to_thread(input, "You: ")
@@ -69,12 +166,208 @@ async def run_interactive_app():
                 continue
 
             command = user_input.strip()
+            if command.startswith('/task-status '):
+                try:
+                    state=autonomous_store.get(agent.session_id,command.split(maxsplit=1)[1])
+                    console.print({k:v for k,v in state.items() if k != 'goal'})
+                except Exception as exc: console.print(f'[yellow]查询失败: {exc}[/yellow]')
+                continue
+            if command.startswith('/approve '):
+                try: await autonomous_approve(command.split(maxsplit=1)[1])
+                except Exception as exc: console.print(f'[yellow]审批失败，未重试工具: {exc}[/yellow]')
+                continue
+            if command.startswith('/deny '):
+                try:
+                    task_id=command.split(maxsplit=1)[1]
+                    state=autonomous_store.get(agent.session_id,task_id)
+                    flow_id=state['pending']['_flow_id']
+                    multi_flow.resume(agent.session_id,flow_id,{'status':'denied','output':'User denied'})
+                    autonomous_store.deny(agent.session_id,task_id)
+                    console.print('[yellow]已拒绝，任务停止[/yellow]')
+                except Exception as exc: console.print(f'[yellow]拒绝失败: {exc}[/yellow]')
+                continue
+            # Phase 5.6c: multi-step graph. Only the CLI executes side effects.
+            if command.startswith('/multi '):
+                if multi_flow is None:
+                    console.print('[yellow]多步骤图不可用，请安装 checkpoint-sqlite[/yellow]')
+                    continue
+                try:
+                    goal = command[len('/multi '):].strip()
+                    policy = explicit_tool_policy(goal)
+                    if policy and policy[1] == 'deny':
+                        raise PermissionError(f'禁止的指定工具: {policy[0]}')
+                    steps = await draft_plan(agent.model, goal)
+                    task, pending = multi_flow.begin(agent.session_id, goal, steps)
+                    console.print(f'[cyan]多步骤任务 {task}：共 {len(steps)} 步[/cyan]')
+                    for n, step in enumerate(steps, 1):
+                        console.print(f"  {n}. {step['tool']} {step['arguments']}")
+                    console.print(f"[yellow]等待第 1 步审批: /multi-approve {task} 或 /multi-deny {task}[/yellow]")
+                except Exception as exc:
+                    console.print(f'[yellow]多步骤任务创建失败，未执行工具: {exc}[/yellow]')
+                continue
+            if command.startswith('/multi-status '):
+                try:
+                    task = command.split(maxsplit=1)[1]
+                    snap = multi_flow.snapshot(agent.session_id, task)
+                    console.print(f"status={snap.values['status']} index={snap.values['index']}/{len(snap.values['steps'])} results={snap.values['results']}")
+                    if 'gate' in snap.next:
+                        console.print(f"待审批: {snap.values['steps'][snap.values['index']]}")
+                    if multi_ledger and snap.values['index'] < len(snap.values['steps']):
+                        claimed = multi_ledger.status(agent.session_id, task, snap.values['index'])
+                        if claimed: console.print(f'[yellow]当前步骤执行记录: {claimed}，不可再次执行[/yellow]')
+                except Exception as exc:
+                    console.print(f'[yellow]查询失败: {exc}[/yellow]')
+                continue
+            if command.startswith('/multi-deny '):
+                try:
+                    task = command.split(maxsplit=1)[1]
+                    pending = multi_flow.pending(agent.session_id, task)
+                    if multi_ledger.status(agent.session_id, task, pending['index']):
+                        raise PermissionError('步骤已经提交执行，不能改为拒绝')
+                    multi_ledger.claim(agent.session_id, task, pending['index'])
+                    multi_ledger.finish(agent.session_id, task, pending['index'], 'denied')
+                    result = multi_flow.resume(agent.session_id, task, {'status':'denied'})
+                    console.print(f"[yellow]已拒绝，任务结束: {result['state']['status']}[/yellow]")
+                except Exception as exc:
+                    console.print(f'[yellow]拒绝失败: {exc}[/yellow]')
+                continue
+            if command.startswith('/multi-approve '):
+                try:
+                    task = command.split(maxsplit=1)[1]
+                    pending = multi_flow.pending(agent.session_id, task)
+                    idx, step = pending['index'], pending['step']
+                    if multi_ledger.status(agent.session_id, task, idx):
+                        raise PermissionError('步骤已被认领，可能已经执行；禁止重复执行')
+                    console.print(f"[bold yellow]多步骤审批：任务 {task} 第 {idx+1} 步\n工具: {step['tool']}\n参数: {step['arguments']}[/bold yellow]")
+                    confirmation = (await asyncio.to_thread(input, '输入 EXECUTE 确认当前步骤: ')).strip()
+                    if confirmation != 'EXECUTE':
+                        console.print('未执行，仍等待审批')
+                        continue
+                    # Durable claim BEFORE any tool call. Crash => uncertain, never replay.
+                    multi_ledger.claim(agent.session_id, task, idx)
+                    outcome = {'status':'uncertain','output':'Execution claimed; outcome unknown'}
+                    try:
+                        tool, args = step['tool'], step['arguments']
+                        if tool == 'run_python_code':
+                            req = propose_code(agent.session_id, args['code'])
+                            _, exact_args, digest = claim_code(agent.session_id, req['id'])
+                            if exact_args != args: raise PermissionError('Code arguments changed')
+                            with session_context(agent.session_id), approved_call(agent.session_id, req['id'], digest):
+                                response = await agent.mcp_client.use_tool(tool, exact_args)
+                        elif tool in READ_ARGS:
+                            grant(args[READ_ARGS[tool]], 'once', agent.session_id)
+                            with session_context(agent.session_id):
+                                response = await agent.mcp_client.use_tool(tool, args)
+                        else:
+                            raise PermissionError('Unsupported tool')
+                        outcome = {'status':'uncertain' if getattr(response,'isError',False) else 'completed',
+                                   'output':str(response)[:20000]}
+                    except Exception as exc:
+                        outcome = {'status':'uncertain','output':str(exc)}
+                    multi_ledger.finish(agent.session_id, task, idx, outcome['status'])
+                    console.print(f"[cyan]步骤结果: {outcome['status']}\n{outcome['output']}[/cyan]")
+                    try:
+                        next_step = multi_flow.resume(agent.session_id, task, outcome)
+                        if next_step.get('finished'):
+                            state = next_step['state']
+                            console.print(f"[green]任务结束：{state['status']}；已处理 {len(state['results'])} 步[/green]")
+                            if state['status'] == 'completed':
+                                try:
+                                    from langchain_core.messages import SystemMessage, HumanMessage
+                                    from core.security.agent_code_flow import _content
+                                    report = await agent.model.ainvoke([
+                                        SystemMessage(content='根据给定任务和工具结果总结。只可依据结果，不调用工具，不得虚构。'),
+                                        HumanMessage(content=str({'goal':state['goal'],'results':state['results']})[:22000])])
+                                    console.print(f"\n[bold white]Agent:[/bold white] {_content(report)}")
+                                except Exception as exc:
+                                    console.print(f'[yellow]结果总结失败（不会重新执行工具）: {exc}[/yellow]')
+                        else:
+                            console.print(f"[yellow]第 {next_step['index']+1} 步等待审批: {next_step['step']}\n/multi-approve {task} 或 /multi-deny {task}[/yellow]")
+                    except Exception as exc:
+                        console.print(f'[yellow]执行已认领，但恢复检查点失败；禁止重试: {exc}[/yellow]')
+                except Exception as exc:
+                    console.print(f'[yellow]多步骤审批失败（未执行新工具）: {exc}[/yellow]')
+                continue
             if command == '/auto-status':
                 console.print(f"自动路由: {'on' if auto_mode else 'off'}")
                 continue
             if command in ('/auto on', '/auto off'):
                 auto_mode = command.endswith('on')
                 console.print(f"自动路由已{'启用' if auto_mode else '关闭'}")
+                continue
+            if command.startswith('/flow-code '):
+                if interrupt_flow is None:
+                    console.print('[yellow]请先安装 langgraph-checkpoint-sqlite 并重启。[/yellow]')
+                    continue
+                try:
+                    req = propose_code(agent.session_id, command[len('/flow-code '):])
+                    full = get_code(agent.session_id, req['id'])
+                    interrupt_flow.begin(agent.session_id, full)
+                    console.print(f"[yellow]LangGraph 已中断等待审批\n工具: run_python_code\n代码:\n{req['code']}\nSHA-256: {req['sha256']}\n批准: /flow-approve {req['id']}\n拒绝: /flow-deny {req['id']}[/yellow]")
+                except Exception as exc:
+                    console.print(f'[yellow]流程创建失败（未执行代码）: {exc}[/yellow]')
+                continue
+            if command.startswith('/flow-status '):
+                try:
+                    rid = command.split(maxsplit=1)[1]
+                    req = get_code(agent.session_id, rid)
+                    status = 'pending' if interrupt_flow and req['status'] == 'pending' and interrupt_flow.pending(agent.session_id, rid) else req['status']
+                    console.print(f"workflow={status}, approval={req['status']}, digest={req['sha256']}")
+                except Exception as exc:
+                    console.print(f'[yellow]查询失败: {exc}[/yellow]')
+                continue
+            if command.startswith('/flow-deny '):
+                try:
+                    rid = command.split(maxsplit=1)[1]
+                    interrupt_flow.pending(agent.session_id, rid)
+                    if not reject_code(agent.session_id, rid):
+                        raise PermissionError('审批已消耗或不存在')
+                    interrupt_flow.finish(agent.session_id, rid, {'status':'denied'})
+                    if agent_code_context(agent.session_id, rid):
+                        update_agent_code(agent.session_id, rid, 'rejected')
+                    console.print('[yellow]已拒绝，LangGraph 从断点恢复并结束。[/yellow]')
+                except Exception as exc:
+                    console.print(f'[yellow]拒绝失败: {exc}[/yellow]')
+                continue
+            if command.startswith('/flow-approve '):
+                try:
+                    rid = command.split(maxsplit=1)[1]
+                    state = interrupt_flow.pending(agent.session_id, rid)
+                    req = get_code(agent.session_id, rid)
+                    if req['status'] != 'pending' or req['sha256'] != state['digest'] or req['arguments'] != state['arguments']:
+                        raise PermissionError('审批状态或参数不匹配')
+                    console.print(f"[bold yellow]LangGraph 暂停点：run_python_code\n代码:\n{req['arguments']['code']}\nSHA-256: {req['sha256']}[/bold yellow]")
+                    confirmation = (await asyncio.to_thread(input, '输入 EXECUTE 确认本次执行: ')).strip()
+                    if confirmation != 'EXECUTE':
+                        console.print('取消执行；仍等待审批')
+                        continue
+                    tool, args, digest = claim_code(agent.session_id, rid)
+                    # Consumed BEFORE transport. Failure is uncertain, never retry.
+                    try:
+                        with session_context(agent.session_id), approved_call(agent.session_id, rid, digest):
+                            result = await agent.mcp_client.use_tool(tool, args)
+                        if getattr(result, 'isError', False):
+                            outcome = {'status':'uncertain','output':str(result)}
+                        else:
+                            outcome = {'status':'completed','output':str(result)}
+                    except Exception as exc:
+                        outcome = {'status':'uncertain','output':str(exc)}
+                    try:
+                        interrupt_flow.finish(agent.session_id, rid, outcome)
+                    except Exception as exc:
+                        console.print(f'[yellow]执行已消耗审批，但恢复 checkpoint 失败: {exc}[/yellow]')
+                    console.print(f"执行状态: {outcome['status']}\n{outcome['output']}")
+                    context = agent_code_context(agent.session_id, rid)
+                    if context:
+                        update_agent_code(agent.session_id, rid, outcome['status'], outcome['output'])
+                        if outcome['status'] == 'completed':
+                            try:
+                                explanation = await explain_agent_code(agent.model, context['request'], args['code'], outcome['output'])
+                                console.print(f"\n[bold white]Agent:[/bold white] {explanation}\n")
+                            except Exception as exc:
+                                console.print(f'[yellow]结果解释失败（代码不会重新执行）: {exc}[/yellow]')
+                except Exception as exc:
+                    console.print(f'[yellow]审批失败（未执行）: {exc}[/yellow]')
                 continue
             if command.startswith('/code-propose '):
                 try:
@@ -93,6 +386,14 @@ async def run_interactive_app():
                 continue
             if command.startswith('/code-deny '):
                 rid = command.split(maxsplit=1)[1]
+                if interrupt_flow is not None:
+                    try:
+                        interrupt_flow.pending(agent.session_id, rid)
+                    except (LookupError, PermissionError):
+                        pass
+                    else:
+                        console.print('[yellow]该审批属于 LangGraph 工作流，请使用 /flow-deny[/yellow]')
+                        continue
                 denied = reject_code(agent.session_id,rid)
                 if denied and agent_code_context(agent.session_id, rid):
                     update_agent_code(agent.session_id, rid, 'rejected')
@@ -101,6 +402,15 @@ async def run_interactive_app():
             if command.startswith('/code-approve '):
                 rid = command.split(maxsplit=1)[1]
                 try:
+                    if interrupt_flow is not None:
+                        try:
+                            interrupt_flow.pending(agent.session_id, rid)
+                        except LookupError:
+                            pass
+                        except PermissionError:
+                            pass
+                        else:
+                            raise PermissionError('该审批属于 LangGraph 工作流，请使用 /flow-approve')
                     request = get_code(agent.session_id,rid)
                     console.print(f"[bold yellow]请核对即将执行的代码（Docker 沙箱，无网络）：\n{request['arguments']['code']}\nSHA-256: {request['sha256']}[/bold yellow]")
                     confirmation = (await asyncio.to_thread(input, '输入 EXECUTE 确认本次执行: ')).strip()
@@ -152,6 +462,11 @@ async def run_interactive_app():
                     console.print('[yellow]用法: /revoke-read <授权ID>[/yellow]')
                 continue
             if command == '/deny-read':
+                if pending_read and interrupt_flow and pending_read.get('workflow'):
+                    try:
+                        interrupt_flow.finish(agent.session_id, pending_read['token'], {'status': 'denied'})
+                    except Exception as exc:
+                        console.print(f'[yellow]读取拒绝已记录，但检查点恢复失败: {exc}[/yellow]')
                 pending_read = None
                 console.print('已取消待处理的读取授权请求')
                 continue
@@ -176,12 +491,25 @@ async def run_interactive_app():
                 request = pending_read
                 pending_read = None
                 try:
+                    if request.get('workflow'):
+                        state = interrupt_flow.pending(agent.session_id, request['token'])
+                        if (state['tool'] != request['tool'] or
+                                state['arguments'] != request['arguments'] or
+                                state['digest'] != fingerprint(request['tool'], request['arguments'])):
+                            raise PermissionError('读取审批参数与检查点不匹配')
                     grant(request['path'], parts[2], agent.session_id)
                     console.print(f"[green]已授权 {parts[2]}：{request['path']}；正在继续原请求[/green]")
                     with session_context(agent.session_id):
                         response = await agent.chat(request['message'])
                     console.print(f"\n[bold white]Agent:[/bold white] {response}\n")
-                except (ValueError, OSError) as exc:
+                    if request.get('workflow'):
+                        interrupt_flow.finish(agent.session_id, request['token'], {'status':'completed', 'output':'Read permission granted and agent request returned'})
+                except Exception as exc:
+                    if request.get('workflow'):
+                        try:
+                            interrupt_flow.finish(agent.session_id, request['token'], {'status':'uncertain', 'output':str(exc)})
+                        except Exception:
+                            pass
                     console.print(f'[yellow]授权或执行失败: {exc}[/yellow]')
                 continue
             if command == '/skills':
@@ -401,6 +729,18 @@ async def run_interactive_app():
                               f"安全策略：{explanation}\n"
                               "执行状态：DENIED；未执行任何工具。[/yellow]")
                 continue
+            # Phase 5.7: ordinary natural language is the primary task interface.
+            # Existing developer commands and explicit forbidden-tool policy stay authoritative.
+            if auto_mode and multi_flow is not None:
+                try:
+                    if await classify_autonomous(agent.model,user_input):
+                        task_id=autonomous_store.create(agent.session_id,user_input)
+                        console.print(f'[cyan]Agent 正在规划任务 {task_id}[/cyan]')
+                        await autonomous_plan(task_id)
+                        continue
+                except Exception as exc:
+                    console.print(f'[yellow]自动任务规划失败（未执行新工具）: {exc}[/yellow]')
+                    continue
             # Phase 5.5: model suggests a route, never an authorization.
             # Explicit code intent retains Phase 5.4b compatibility even if auto is off.
             selected = None
@@ -414,7 +754,12 @@ async def run_interactive_app():
             if do_python:
                 try:
                     request = await draft_agent_code(agent.model, agent.session_id, user_input)
-                    console.print(f"[yellow]Agent 已生成待审批 Python 代码（尚未执行）：\n{request['code']}\nSHA-256: {request['sha256']}\n批准: /code-approve {request['id']}\n拒绝: /code-deny {request['id']}[/yellow]")
+                    if interrupt_flow is not None:
+                        interrupt_flow.begin(agent.session_id, get_code(agent.session_id, request['id']))
+                        approve_cmd, deny_cmd = '/flow-approve', '/flow-deny'
+                    else:
+                        approve_cmd, deny_cmd = '/code-approve', '/code-deny'
+                    console.print(f"[yellow]Agent 已生成待审批 Python 代码（尚未执行）：\n{request['code']}\nSHA-256: {request['sha256']}\n批准: {approve_cmd} {request['id']}\n拒绝: {deny_cmd} {request['id']}[/yellow]")
                 except Exception as exc:
                     console.print(f'[yellow]自动生成代码申请失败（未执行任何代码）：{exc}[/yellow]')
                 continue
@@ -422,16 +767,33 @@ async def run_interactive_app():
             # Never approve paths inferred or invented by the model.
             candidates = user_paths(user_input)
             requested_path = None
+            path_error = None
             for raw in candidates:
                 try:
                     requested_path = read_preflight(raw, agent.session_id)
                     if requested_path:
                         break
-                except (ValueError, OSError, PermissionError):
-                    continue
+                except (ValueError, OSError, PermissionError) as exc:
+                    path_error = f'{raw}: {exc}'
+                    break
+            if path_error:
+                console.print(f'[yellow]文件预检查失败（未执行工具）：{path_error}[/yellow]')
+                continue
             if requested_path:
                 token = secrets.token_urlsafe(16)
-                pending_read = {'token':token, 'path':requested_path, 'message':user_input, 'session':agent.session_id}
+                ext = requested_path.rsplit('.', 1)[-1].lower()
+                tool = READ_TOOLS.get(ext)
+                args = None
+                if interrupt_flow is not None and tool:
+                    try:
+                        state = interrupt_flow.begin_read(agent.session_id, token, tool, requested_path)
+                        args = state['arguments']
+                    except Exception as exc:
+                        console.print(f'[yellow]读取审批工作流创建失败（未授权）: {exc}[/yellow]')
+                        continue
+                pending_read = {'token':token, 'path':requested_path, 'message':user_input,
+                                'session':agent.session_id, 'workflow':bool(args),
+                                'tool':tool, 'arguments':args}
                 console.print(f"[yellow]需要读取授权：{requested_path}\n"
                               f"仅本次: /permit {token} once\n"
                               f"当前会话: /permit {token} session\n"
@@ -448,6 +810,10 @@ async def run_interactive_app():
     except Exception as e:
         logger.error(f"Main: 程序发生错误--{e}", exc_info=True)
     finally:
+        if multi_flow is not None:
+            multi_flow.close()
+        if interrupt_flow is not None:
+            interrupt_flow.close()
         await agent.stop()
         logger.info("Main: 程序已安全退出")
 
