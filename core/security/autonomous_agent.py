@@ -7,6 +7,7 @@ import json
 import re
 import secrets
 import sqlite3
+import hashlib
 from pathlib import Path
 from contextlib import contextmanager
 from core.security.multi_step_graph import validate_steps
@@ -90,7 +91,11 @@ class AutonomousStore:
             db.execute('''CREATE TABLE IF NOT EXISTS autonomous_tasks (
                 id TEXT PRIMARY KEY, session TEXT NOT NULL, goal TEXT NOT NULL,
                 status TEXT NOT NULL, step INTEGER NOT NULL, pending TEXT,
-                results TEXT NOT NULL, answer TEXT NOT NULL DEFAULT '')''')
+                results TEXT NOT NULL, answer TEXT NOT NULL DEFAULT '',
+                last_error TEXT NOT NULL DEFAULT '', planning_failures INTEGER NOT NULL DEFAULT 0)''')
+            columns={r[1] for r in db.execute('PRAGMA table_info(autonomous_tasks)')}
+            if 'last_error' not in columns: db.execute("ALTER TABLE autonomous_tasks ADD COLUMN last_error TEXT NOT NULL DEFAULT ''")
+            if 'planning_failures' not in columns: db.execute("ALTER TABLE autonomous_tasks ADD COLUMN planning_failures INTEGER NOT NULL DEFAULT 0")
     @contextmanager
     def connect(self):
         db=sqlite3.connect(str(self.path),timeout=10)
@@ -105,19 +110,20 @@ class AutonomousStore:
         return task
     def get(self,session,task):
         with self.connect() as db:
-            row=db.execute('SELECT goal,status,step,pending,results,answer FROM autonomous_tasks WHERE session=? AND id=?',(session,task)).fetchone()
+            row=db.execute('SELECT goal,status,step,pending,results,answer,last_error,planning_failures FROM autonomous_tasks WHERE session=? AND id=?',(session,task)).fetchone()
         if not row: raise LookupError('Task not found in current session')
         return {'id':task,'goal':row[0],'status':row[1],'step':row[2],
-                'pending':json.loads(row[3]) if row[3] else None,'results':json.loads(row[4]),'answer':row[5]}
+                'pending':json.loads(row[3]) if row[3] else None,'results':json.loads(row[4]),'answer':row[5],
+                'last_error':row[6], 'planning_failures':row[7]}
     def decision(self,session,task,decision):
         state=self.get(session,task)
         if state['status'] != 'planning': raise PermissionError('Task is not planning')
         with self.connect() as db:
             if decision['action']=='finish':
-                db.execute("UPDATE autonomous_tasks SET status='completed',answer=? WHERE session=? AND id=? AND status='planning'",
+                db.execute("UPDATE autonomous_tasks SET status='completed',answer=?,last_error='' WHERE session=? AND id=? AND status='planning'",
                            (decision['answer'],session,task))
             else:
-                db.execute("UPDATE autonomous_tasks SET status='pending',pending=? WHERE session=? AND id=? AND status='planning'",
+                db.execute("UPDATE autonomous_tasks SET status='pending',pending=?,last_error='' WHERE session=? AND id=? AND status='planning'",
                            (json.dumps(decision['step'],ensure_ascii=False),session,task))
     def claim(self,session,task):
         with self.connect() as db:
@@ -142,3 +148,65 @@ class AutonomousStore:
     def uncertain(self,session,task):
         # On process restart, a claimed step MUST NOT be executed again.
         return self.get(session,task)
+
+    def planning_error(self,session,task,error,max_failures=3):
+        """Persist planning failures; no external tool has been executed here."""
+        state=self.get(session,task)
+        if state['status'] != 'planning': raise PermissionError('Not in planning state')
+        count=state['planning_failures']+1
+        status='needs_attention' if count>=max_failures else 'planning'
+        with self.connect() as db:
+            cur=db.execute("UPDATE autonomous_tasks SET status=?,last_error=?,planning_failures=? WHERE session=? AND id=? AND status='planning'",(status,str(error)[:1500],count,session,task))
+            if cur.rowcount!=1:raise RuntimeError('Concurrent planning update')
+        return self.get(session,task)
+
+    def recoverable(self,session):
+        """List durable tasks for this session, including ambiguous claimed operations."""
+        with self.connect() as db:
+            rows=db.execute("SELECT id,status,step,last_error FROM autonomous_tasks WHERE session=? AND status IN ('planning','pending','claimed','needs_attention','uncertain','failed') ORDER BY rowid DESC",(session,)).fetchall()
+        return [{'id':r[0],'status':r[1],'step':r[2],'last_error':r[3]} for r in rows]
+
+    def reopen_planning(self,session,task):
+        with self.connect() as db:
+            cur=db.execute("UPDATE autonomous_tasks SET status='planning',planning_failures=0,last_error='' WHERE session=? AND id=? AND status='needs_attention'",(session,task))
+            if cur.rowcount!=1:raise PermissionError('Only a planning error may be retried; never replay a claimed tool')
+        return self.get(session,task)
+
+    def mark_uncertain(self,session,task,reason):
+        with self.connect() as db:
+            cur=db.execute("UPDATE autonomous_tasks SET status='uncertain',last_error=? WHERE session=? AND id=? AND status='claimed'",(str(reason)[:1500],session,task))
+            if cur.rowcount!=1:raise PermissionError('Only claimed execution can become uncertain')
+
+
+def inspect_response(tool, response):
+    """Deterministic structural verification, not a semantic correctness guarantee."""
+    if getattr(response,'isError',False):
+        return {'status':'failed','output':_text(response)[:12000], 'summary':'工具报告执行失败'}
+    content=getattr(response,'content',None)
+    parts=[]
+    if isinstance(content,list):
+        for item in content:
+            value=item.get('text') if isinstance(item,dict) else getattr(item,'text',None)
+            if isinstance(value,str):parts.append(value)
+    if not parts:
+        structured=getattr(response,'structuredContent',None)
+        if structured is not None:parts=[json.dumps(structured,ensure_ascii=False)]
+    output='\n'.join(parts).strip()
+    if not output:
+        return {'status':'failed','output':'Empty tool output','summary':'工具未返回可用结果'}
+    if tool=='extract_pdf':
+        try:
+            payload=json.loads(output)
+            pages=payload.get('pages')
+            count=payload.get('total_pages')
+            if not isinstance(pages,list) or not isinstance(count,int) or count<1 or count!=len(pages):
+                raise ValueError('Page count mismatch')
+            tables=sum(len(p.get('tables',[])) for p in pages if isinstance(p,dict))
+            summary=f'已读取 PDF：{count} 页，提取 {tables} 个表格'
+        except (ValueError,TypeError,AttributeError):
+            return {'status':'failed','output':output[:12000], 'summary':'PDF 结构验证失败'}
+    elif tool=='run_python_code':
+        summary=f'Python 执行完成，输出 {len(output)} 个字符'
+    else:
+        summary=f'{tool} 返回有效内容（{len(output)} 字符）'
+    return {'status':'completed','output':output[:12000],'summary':summary}

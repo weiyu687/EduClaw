@@ -16,7 +16,7 @@ from core.security.agent_code_flow import wants_python, draft as draft_agent_cod
 from core.security.code_approval import propose as propose_code, get as get_code, claim as claim_code, reject as reject_code, approved_call, fingerprint
 from core.security.interrupt_flow import InterruptFlow
 from core.security.multi_step_graph import MultiStepFlow, ExecutionLedger, draft_plan, READ_ARGS
-from core.security.autonomous_agent import AutonomousStore, classify as classify_autonomous, next_action as autonomous_next, MAX_STEPS
+from core.security.autonomous_agent import AutonomousStore, classify as classify_autonomous, next_action as autonomous_next, inspect_response, MAX_STEPS
 from core.security.read_grants import db_path
 
 from core.logging import get_logger
@@ -77,7 +77,7 @@ async def run_interactive_app():
         console.print("Phase 5.3: /step-run <task_id> <序号> | /step-approve <task_id> <序号> <token> | /step-result <task_id> <序号>")
         console.print("Phase 5.2: /plan-new <目标> | /plans | /plan <草稿id> | /plan-approve <草稿id> | /plan-reject <草稿id>")
         console.print("Phase 5: /task-new <目标> | /tasks | /task <id> | /step <id> <序号> <状态> | /task-events <id> | /task-cancel <id>")
-        console.print("Phase 5.7: 自然语言自动规划；/approve <任务ID> | /deny <任务ID> | /task-status <任务ID>")
+        console.print("自主任务：自然语言输入 | /approve <任务ID> | /deny <任务ID> | /task-status <任务ID> | /task-list | /task-continue <任务ID> | /task-replan <任务ID>")
         console.print("命令: /new | /use <session_id> | /sessions | /runs | /events <run_id> | /status <run_id> | /interrupted | /resume <run_id> | /approve-resume <token>")
 
         console.print("\n[bold green]EduClaw 已就绪，请输入您的指令 (输入 'exit' 退出):[/bold green]")
@@ -91,7 +91,19 @@ async def run_interactive_app():
                     {'action':'finish','answer':'已达到安全步骤上限，请查看已完成结果并发起新任务。'})
                 console.print('[yellow]已达到步骤上限，任务停止。[/yellow]')
                 return
-            decision = await autonomous_next(agent.model, state['goal'], state['results'], user_paths(state['goal']))
+            # Retry only LLM planning/JSON errors; no MCP operation is retried.
+            decision=None
+            for attempt in range(2):
+                try:
+                    decision = await autonomous_next(agent.model, state['goal'], state['results'], user_paths(state['goal']))
+                    break
+                except Exception as exc:
+                    failure=autonomous_store.planning_error(agent.session_id,task_id,exc)
+                    if failure['status']=='needs_attention' or attempt==1:
+                        console.print(f"[yellow]规划失败（未执行工具）：{exc}；任务 {task_id}，累计失败 {failure['planning_failures']} 次。"
+                                      f"可用 /task-continue {task_id} 继续安全规划；达到上限后用 /task-replan。[/yellow]")
+                        return
+                    console.print('[dim]规划输出无效，正在安全地重新生成计划（不会重试工具）[/dim]')
             if decision['action'] == 'finish':
                 autonomous_store.decision(agent.session_id, task_id, decision)
                 console.print(f"\n[bold white]Agent:[/bold white] {decision['answer']}\n")
@@ -136,14 +148,19 @@ async def run_interactive_app():
                     with session_context(agent.session_id):
                         response=await agent.mcp_client.use_tool(tool,args)
                 else:raise PermissionError('Unsupported tool')
-                outcome={'status':'uncertain' if getattr(response,'isError',False) else 'completed',
-                         'output':str(response)[:12000]}
+                checked=inspect_response(tool,response)
+                outcome={'status':checked['status'],'output':checked['output']}
+                summary=checked['summary']
             except Exception as exc:
                 outcome={'status':'uncertain','output':str(exc)}
+                summary='工具调用结果不确定，已停止自动执行'
             autonomous_store.record(agent.session_id,task_id,outcome)
-            console.print(f"[cyan]步骤执行状态: {outcome['status']}\n{outcome['output']}[/cyan]")
+            console.print(f"[cyan]{summary}；步骤状态: {outcome['status']}[/cyan]")
+            if outcome['status']!='completed':
+                console.print(f"[yellow]诊断: {outcome['output'][:500]}[/yellow]")
             try:
-                multi_flow.resume(agent.session_id,flow_id,outcome)
+                multi_flow.resume(agent.session_id,flow_id,
+                    {**outcome,'status':'uncertain' if outcome['status']=='failed' else outcome['status']})
             except Exception as exc:
                 console.print(f'[yellow]检查点恢复异常，禁止重新执行此步骤: {exc}[/yellow]')
                 return
@@ -153,7 +170,7 @@ async def run_interactive_app():
                 except Exception as exc:
                     console.print(f'[yellow]后续规划失败；工具不会重试。任务 {task_id} 可查询: {exc}[/yellow]')
             else:
-                console.print('[yellow]执行结果不确定，任务停止；禁止自动重试。[/yellow]')
+                console.print('[yellow]步骤失败或结果不确定，任务停止；禁止自动重试。[/yellow]')
 
         while True:
             user_input = await asyncio.to_thread(input, "You: ")
@@ -166,6 +183,58 @@ async def run_interactive_app():
                 continue
 
             command = user_input.strip()
+            # Recovery commands must never fall through to natural-language planning.
+            if command == '/task-continue':
+                recoverable = [item for item in autonomous_store.recoverable(agent.session_id)
+                               if item['status'] in ('pending', 'planning')]
+                if len(recoverable) == 1:
+                    command = '/task-continue ' + recoverable[0]['id']
+                    console.print(f"[dim]继续当前会话任务: {recoverable[0]['id']}[/dim]")
+                elif not recoverable:
+                    console.print('[yellow]当前会话没有可继续的任务；请使用 /task-list 查看任务状态。[/yellow]')
+                    continue
+                else:
+                    console.print('[yellow]存在多个可继续任务，请使用 /task-continue <任务ID> 指定：[/yellow]')
+                    for item in recoverable:
+                        console.print(f"  {item['id']} | {item['status']}")
+                    continue
+            if command in ('/task-replan', '/task-status', '/approve', '/deny'):
+                console.print(f'[yellow]缺少任务ID。用法: {command} <任务ID>[/yellow]')
+                continue
+            if command.startswith('/') and command.split()[0] in (
+                    '/task-continue', '/task-replan', '/task-status', '/approve', '/deny') \
+                    and len(command.split()) != 2:
+                console.print('[yellow]命令格式错误：请提供一个任务ID。[/yellow]')
+                continue
+            if command == '/task-list':
+                tasks=autonomous_store.recoverable(agent.session_id)
+                if not tasks: console.print('[dim]当前会话没有待处理任务[/dim]')
+                for item in tasks:
+                    console.print(f"{item['id']} | {item['status']} | 已处理 {item['step']} 步 | {item['last_error'][:100]}")
+                continue
+            if command.startswith('/task-continue ') or command.startswith('/task-replan '):
+                task_id=command.split(maxsplit=1)[1]
+                try:
+                    state=autonomous_store.get(agent.session_id,task_id)
+                    if state['status']=='needs_attention' and command.startswith('/task-replan '):
+                        state=autonomous_store.reopen_planning(agent.session_id,task_id)
+                    if state['status']=='planning':
+                        await autonomous_plan(task_id)
+                    elif state['status']=='pending':
+                        step=state['pending']
+                        if multi_flow is None: raise RuntimeError('LangGraph checkpoint unavailable')
+                        checkpoint=multi_flow.pending(agent.session_id,step['_flow_id'])
+                        if checkpoint['step'] != {'tool':step['tool'],'arguments':step['arguments']}:
+                            raise PermissionError('Checkpoint/approval parameters mismatch')
+                        console.print(f"[yellow]等待审批：{step['tool']} {step['arguments']}\n"
+                                      f"批准: /approve {task_id} | 拒绝: /deny {task_id}[/yellow]")
+                    elif state['status'] in ('claimed','uncertain','failed'):
+                        console.print('[yellow]此任务存在已认领或结果不确定的操作，禁止自动重放；请人工核查执行结果。[/yellow]')
+                    else:
+                        console.print(f"[yellow]任务状态 {state['status']} 不可继续；规划错误可用 /task-replan {task_id}[/yellow]")
+                except Exception as exc:
+                    console.print(f'[yellow]恢复失败，未执行工具: {exc}[/yellow]')
+                continue
             if command.startswith('/task-status '):
                 try:
                     state=autonomous_store.get(agent.session_id,command.split(maxsplit=1)[1])
