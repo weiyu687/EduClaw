@@ -57,8 +57,8 @@ def set_mode(tool, mode):
 def render(session_id):
     from core.security.read_grants import list_grants
     lines = ['EduClaw 权限中心（修改不会绕过底层安全审批）', '工具权限：']
-    for name, info in CAPABILITIES.items():
-        lines.append(f"- {info['label']} [{name}]: {get_mode(name)}")
+    from core.security.dynamic_permissions import render_tools
+    lines.append(render_tools())
     lines.append('文件读取授权：')
     grants = list_grants(session_id)
     lines.extend(f"- #{g['id']} {g['scope']} {g['path']}" for g in grants)

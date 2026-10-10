@@ -40,6 +40,9 @@ def authorize(tool_name, arguments):
     from core.security.permission_center import get_mode, CAPABILITIES
     if tool_name in CAPABILITIES and get_mode(tool_name) == "deny":
         raise GlobalToolDenied(f"工具已禁用或未经审核: {tool_name}")
+    from core.security.dynamic_permissions import enforcement_mode
+    if enforcement_mode(tool_name) == 'deny':
+        raise GlobalToolDenied(f'用户权限或安全策略禁止工具: {tool_name}')
     if not decision.allowed:
         raise GlobalToolDenied(decision.reason)
     if tool_name in NO_FILE_READ:
