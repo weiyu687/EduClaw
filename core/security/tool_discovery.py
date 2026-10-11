@@ -17,7 +17,10 @@ async def sync_client(client, server=None):
             schema = getattr(tool, "inputSchema", None)
             if schema is None:
                 schema = getattr(tool, "input_schema", None)
-            recorded = record_discovered(source, name, description, schema)
+            output = getattr(tool, 'outputSchema', None)
+            metadata = getattr(tool, 'meta', None)
+            contract = {'outputSchema':output, 'meta':metadata} if output is not None or metadata is not None else None
+            recorded = record_discovered(source, name, description, schema, contract_metadata=contract)
             result["seen"] += 1
             if recorded["changed"]:
                 result["new_or_changed"] += 1

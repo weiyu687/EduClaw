@@ -29,7 +29,7 @@ class PermissionCenterTests(unittest.TestCase):
     def test_reenable(self):
         set_mode('get_weather', 'deny')
         set_mode('get_weather', 'auto')
-        authorize('get_weather', {})
+        authorize('get_weather', {'city':'北京'})
 
     def test_unknown_denied(self):
         with self.assertRaises(ValueError):

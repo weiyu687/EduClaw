@@ -44,7 +44,7 @@ def _normal(value, max_len=256):
     return value.strip()
 
 
-def record_discovered(server, name, description='', input_schema=None):
+def record_discovered(server, name, description='', input_schema=None, *, contract_metadata=None):
     """Record untrusted metadata; never grants or registers execution policy."""
     server, name = _normal(server), _normal(name)
     description = str(description or '')[:1000]
@@ -52,7 +52,13 @@ def record_discovered(server, name, description='', input_schema=None):
     schema_json = json.dumps(schema, ensure_ascii=False, sort_keys=True)
     if len(schema_json) > 20000:
         raise ValueError('工具参数声明过大')
-    digest = hashlib.sha256(json.dumps([server, name, description, schema_json], ensure_ascii=False).encode()).hexdigest()
+    identity = [server, name, description, schema_json]
+    if contract_metadata is not None:
+        serialized = json.dumps(contract_metadata, ensure_ascii=False, sort_keys=True)
+        if len(serialized) > 20000:
+            raise ValueError('工具结果契约声明过大')
+        identity.append(serialized)
+    digest = hashlib.sha256(json.dumps(identity, ensure_ascii=False).encode()).hexdigest()
     with _db() as db:
         old = db.execute('SELECT fingerprint,reviewed FROM tool_inventory WHERE server=? AND name=?', (server, name)).fetchone()
         reviewed = old[1] if old and old[0] == digest else 0

@@ -50,7 +50,7 @@ from core.skills import SkillRegistry
 
 KNOWN_COMMANDS = frozenset(['/help', '/?', '/task-continue', '/task-replan', '/task-status', '/approve', '/deny', '/task-list', '/multi', '/multi-status', '/multi-approve', '/multi-deny', '/flow-code', '/flow-status', '/flow-approve', '/flow-deny', '/auto', '/auto-status', '/code-propose', '/code-approve', '/code-deny', '/code-status', '/permissions', '/permit', '/deny-read', '/allow-read', '/revoke-read', '/skills', '/agent-step-run', '/agent-step-approve', '/agent-step-result', '/step-run', '/step-approve', '/step-result', '/plan-new', '/plans', '/plan', '/plan-approve', '/plan-reject', '/task-new', '/tasks', '/task', '/step', '/task-events', '/task-cancel', '/new', '/use', '/sessions', '/runs', '/events', '/status', '/interrupted', '/resume', '/approve-resume', '/rename-session', '/rename-task', '/task-catalog', '/delete-session', '/delete-task', '/delete-confirm', '/delete-cancel', '/permission-set', '/tool-inbox', '/tool-review', '/tool-sync', '/tool-info', '/permission-info', '/permission-reset', '/permission-requests', '/permission-request', '/permission-confirm', '/permission-cancel', '/agent-pending', '/agent-cancel', '/recovery-status', '/recovery-check', '/multi-result', '/multi-results', '/goal-status', '/goal-spec', '/multi-dag', '/multi-replan', '/multi-replan-status', '/multi-replan-approve', '/multi-replan-deny', '/任务', '/当前', '/结果', '/允许', '/继续', '/拒绝'])
 
-KNOWN_COMMANDS = KNOWN_COMMANDS | CONTEXT_COMMANDS | {'/multi-pause', '/multi-recover', '/multi-cancel', '/multi-diagnose'}
+KNOWN_COMMANDS = KNOWN_COMMANDS | CONTEXT_COMMANDS | {'/multi-pause', '/multi-recover', '/multi-cancel', '/multi-diagnose', '/tool-contracts'}
 
 logging.getLogger("httpx").setLevel(logging.WARNING)
 logger = get_logger("USER")
@@ -521,6 +521,13 @@ async def run_interactive_app():
             )
             from core.security.tool_discovery import sync_client
             tool_intent = parse_tool_intent(command) if not command.startswith('/') else None
+            if command in ('/tool-contracts', '检查工具契约', '查看工具契约'):
+                try:
+                    from core.tool_contracts.service import render_tools as render_contracts
+                    console.print(await render_contracts(agent.mcp_client), markup=False)
+                except Exception as exc:
+                    console.print(f'工具契约检查失败：{exc}；未执行任何工具。', markup=False)
+                continue
             if not command.startswith('/') and command in (
                 '刷新工具列表', '同步工具列表', '发现新工具', '扫描MCP工具', '扫描 MCP 工具'
             ):

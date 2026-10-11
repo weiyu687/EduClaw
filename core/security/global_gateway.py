@@ -45,6 +45,11 @@ def authorize(tool_name, arguments):
         raise GlobalToolDenied(f'用户权限或安全策略禁止工具: {tool_name}')
     if not decision.allowed:
         raise GlobalToolDenied(decision.reason)
+    from core.tool_contracts import builtin_registry
+    try:
+        builtin_registry().validate_input(tool_name, arguments)
+    except ValueError as exc:
+        raise GlobalToolDenied(str(exc)) from exc
     if tool_name in NO_FILE_READ:
         return
     if tool_name == "run_python_code":

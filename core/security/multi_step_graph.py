@@ -13,8 +13,10 @@ from contextlib import contextmanager
 from pathlib import Path
 from typing import TypedDict
 
-ALLOWED = {'extract_pdf', 'extract_word', 'extract_pptx', 'extract_xlsx', 'extract_py', 'run_python_code'}
-READ_ARGS = {'extract_pdf':'pdf_path','extract_word':'word_path','extract_pptx':'pptx_path','extract_xlsx':'xlsx_path','extract_py':'py_path'}
+from core.tool_contracts import builtin_registry
+_PLANNABLE = [x for x in builtin_registry().items() if x['plannable']]
+ALLOWED = {x['name'] for x in _PLANNABLE}
+READ_ARGS = {x['name']:x['resource_argument'] for x in _PLANNABLE if x['risk'] == 'path_read'}
 
 class MultiState(TypedDict, total=False):
     session_id: str
@@ -47,10 +49,18 @@ def validate_steps(steps, user_goal):
             raw_path = next(iter(args.values()))
             if not isinstance(raw_path, str) or not raw_path.strip():
                 raise ValueError(f'Invalid read path for {tool}')
-            # An exact literal path must appear in the original user request.
-            # Do not silently rewrite a path, including slash direction.
+            # Revalidation may see a canonical Windows long path instead of
+            # the user's short path. Accept only that exact canonical identity.
             if raw_path.casefold() not in user_goal.casefold():
-                raise PermissionError('Read path must appear verbatim in user request')
+                from core.security.tool_dispatcher import user_paths
+                canonical_literals = []
+                for supplied in user_paths(user_goal):
+                    try:
+                        canonical_literals.append(canonical(supplied).casefold())
+                    except (ValueError, OSError):
+                        continue
+                if raw_path.casefold() not in canonical_literals:
+                    raise PermissionError('Read path must appear verbatim in user request')
             args = {field: canonical(raw_path)}
         else:
             if set(args) != {'code'} or not isinstance(args['code'], str) or not 0 < len(args['code']) <= 32768:
@@ -70,14 +80,16 @@ def parse_plan(text, goal):
 
 async def draft_plan(model, goal):
     from langchain_core.messages import HumanMessage, SystemMessage
+    from core.security.tool_dispatcher import user_paths
     if not isinstance(goal, str) or not 0 < len(goal.strip()) <= 12000:
         raise ValueError('Invalid task')
     response = await model.ainvoke([
         SystemMessage(content=('你是仅起草计划的组件，不能调用工具。只返回JSON {"steps":[{"tool":"...","arguments":{...}}]}。'
-            '最多5步。只允许extract_pdf/extract_word/extract_pptx/extract_xlsx/extract_py和run_python_code。'
-            '读取文件路径必须从用户消息逐字复制，不要修改反斜杠。'
-            '各读取工具参数键必须精确使用：extract_pdf→pdf_path、extract_word→word_path、'
-            'extract_pptx→pptx_path、extract_xlsx→xlsx_path、extract_py→py_path；'
+            '最多5步。工具能力与契约如下（仅可使用这些工具）：' + json.dumps(_PLANNABLE, ensure_ascii=False) +
+            '读取文件路径必须从用户消息逐字复制，不要修改反斜杠，参数必须使用契约的准确名称。'
+            '用户明确提供的路径（JSON编码，可直接复制字符串值）：' + json.dumps(user_paths(goal), ensure_ascii=False) +
+            'Python引用前序结果使用 data = {{step:1:json:}}（1为步骤号）。占位符会替换为Python值表达式，'
+            '不要给占位符加引号，也不要json.loads占位符，不要重复读取文件。'
             '不得使用path或file_path。Python只用标准库、不得访问文件/网络/进程。'
             '如果用户明确指定不支持的工具，不得替换。不能完成则返回空steps。')),
         HumanMessage(content=goal)])

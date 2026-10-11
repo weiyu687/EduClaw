@@ -4,7 +4,8 @@ Only explicitly enumerated read-only tools are allowed in 5.3b. High-risk
 operations require a future argument-level approval workflow, not just a
 blanket approval of the step.
 """
-READ_ONLY_TOOLS = frozenset({'extract_pdf', 'extract_word', 'extract_pptx', 'extract_xlsx', 'extract_py', 'get_all_files', 'get_weather'})
+from core.security.policy_engine import FILE_ARGUMENTS, PUBLIC_READ
+READ_ONLY_TOOLS = frozenset(FILE_ARGUMENTS) | PUBLIC_READ
 DANGEROUS_TOOLS = frozenset({'run_python_code', 'run_python_file', 'process_doc'})
 
 class ToolPolicyError(PermissionError):
