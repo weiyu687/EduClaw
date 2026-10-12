@@ -66,7 +66,7 @@ def test_session_and_execution_boundaries(service):
     n=number(service)
     with pytest.raises(LookupError): service.detail('other',n)
     with pytest.raises(LookupError): service.tasks('missing')
-    with pytest.raises(PermissionError): service.preview('s',n,'execute')
+    with pytest.raises(PermissionError): service.preview('s',n,'shell')
     assert DashboardService(service.directory).tickets == {}
 
 
@@ -124,3 +124,61 @@ def test_restarted_server_rejects_old_credentials(server):
     fresh=DashboardServer(server.service.directory,server.static_directory)
     try: assert fresh.token != server.token
     finally: fresh.server_close()
+
+
+def test_code_preview_requires_execute_word_and_does_not_spawn(service,monkeypatch):
+    monkeypatch.setattr('core.gui.service.subprocess.Popen',lambda *a,**kw:pytest.fail('must not spawn'))
+    preview=service.preview('s',number(service),'execute')
+    assert preview['code']=='print(42)'
+    with pytest.raises(PermissionError): service.confirm(preview['ticket'],'CONFIRM')
+    with pytest.raises(PermissionError): service.confirm(preview['ticket'],'EXECUTE')
+
+
+def test_shared_code_executor_exact_review_and_one_shot(service,tmp_path,monkeypatch):
+    import asyncio
+    from types import SimpleNamespace
+    from core.security.global_gateway import authorize
+    monkeypatch.setenv('EDUCLAW_PERMISSION_DB',str(tmp_path/'educlaw_permissions.sqlite3'))
+    monkeypatch.setenv('EDUCLAW_PREFERENCE_DB',str(tmp_path/'educlaw_preferences.sqlite3'))
+    monkeypatch.setenv('EDUCLAW_TOOL_REGISTRY_DB',str(tmp_path/'educlaw_preferences.sqlite3'))
+    calls=[]
+    class Client:
+        async def use_tool(self,tool,args):
+            authorize(tool,args);calls.append(args)
+            return SimpleNamespace(isError=False,content=[SimpleNamespace(type='text',text='42')])
+    with service.stores('s') as (context,life):
+        task=service.choose(context,'s',number(service))['task_id']
+        steps=service.code_service(context,life)
+        preview=steps.preview('s',task)
+        with pytest.raises(PermissionError): asyncio.run(steps.execute('s',task,'wrong',Client()))
+        assert not calls and life.ledger.status('s',task,0) is None
+        result=asyncio.run(steps.execute('s',task,preview['digest'],Client()))
+        assert result['outcome']['status']=='completed'
+        with pytest.raises(PermissionError): asyncio.run(steps.execute('s',task,preview['digest'],Client()))
+        assert calls==[{'code':'print(42)'}]
+
+
+@pytest.mark.parametrize('persistence_failure',[False,True])
+def test_shared_executor_failure_never_replays(service,monkeypatch,persistence_failure):
+    import asyncio
+    calls=[]
+    class Client:
+        async def use_tool(self,tool,args):
+            calls.append(args)
+            raise ConnectionError('transport lost after dispatch')
+    with service.stores('s') as (context,life):
+        task=service.choose(context,'s',number(service))['task_id']
+        steps=service.code_service(context,life)
+        preview=steps.preview('s',task)
+        if persistence_failure:
+            def fail_save(*args,**kwargs): raise OSError('disk unavailable')
+            monkeypatch.setattr(life.results,'put',fail_save)
+            with pytest.raises(OSError):
+                asyncio.run(steps.execute('s',task,preview['digest'],Client()))
+        else:
+            result=asyncio.run(steps.execute('s',task,preview['digest'],Client()))
+            assert result['outcome']['status']=='uncertain'
+        assert life.ledger.status('s',task,0) is not None
+        with pytest.raises(PermissionError):
+            asyncio.run(steps.execute('s',task,preview['digest'],Client()))
+        assert len(calls)==1

@@ -2,9 +2,12 @@
 from contextlib import closing, contextmanager
 import hashlib
 import json
+import os
 from pathlib import Path
 import secrets
 import sqlite3
+import subprocess
+import sys
 import threading
 import time
 
@@ -16,6 +19,7 @@ from core.security.recovery_audit import RecoveryAudit
 from core.security.task_context import TaskContext, readable_result
 from core.security.task_lifecycle import TaskLifecycle
 from core.security.tool_results import ToolResultStore
+from core.security.code_step_service import CodeStepService
 
 
 class DashboardService:
@@ -23,6 +27,11 @@ class DashboardService:
         self.directory = Path(directory).resolve()
         self.directory.mkdir(parents=True, exist_ok=True)
         self.clock, self.lock, self.tickets = clock, threading.RLock(), {}
+        self.jobs = {}
+
+    def code_service(self, context, life):
+        return CodeStepService(context.flow,life.ledger,life.results,
+            DagStore(self.directory/'educlaw_dag_plans.sqlite3'),context.replans,life)
 
     def sessions(self):
         path = self.directory / 'educlaw_state.sqlite3'
@@ -91,11 +100,20 @@ class DashboardService:
             except (ValueError, PermissionError, LookupError) as exc:
                 result['recovery'] = {'action':'blocked','message':str(exc)}
             result['actions'] = []
+            job = self.jobs.get((session,number))
+            result['execution_pending'] = bool(job and job.poll() is None)
+            result['execution_error'] = bool(job and job.poll() not in (None,0))
             if state['status'] == 'running' and not life.ledger.frozen(session, task):
                 mode = result['control']
                 if mode == 'active': result['actions'].append('pause')
                 if result['recovery']['action'] == 'unpause': result['actions'].append('resume')
                 if mode in ('active','paused'): result['actions'].append('cancel')
+                if mode == 'active' and not result['execution_pending']:
+                    try:
+                        self.code_service(context,life).preview(session,task)
+                        result['actions'].append('execute')
+                    except (PermissionError,ValueError,LookupError):
+                        pass
             previous = {v['successor']:v['original'] for v in context.replans.versions(session)}
             ancestor, count = task, 1
             while ancestor in previous:
@@ -128,16 +146,24 @@ class DashboardService:
             if action not in detail['actions']:
                 raise PermissionError('当前状态不支持此操作，请刷新任务。')
             messages = {'pause':'暂停后不再启动后续步骤；在途调用可能继续完成。',
-                        'resume':'仅解除暂停。不会授予权限或启动工具，后续步骤仍需在 CLI 审批。',
-                        'cancel':'取消后不再执行后续步骤；无法保证撤销已经发生的外部操作。'}
+                        'resume':'仅解除暂停。不会授予权限或启动工具，后续步骤仍需单独审批。',
+                        'cancel':'取消后不再执行后续步骤；无法保证撤销已经发生的外部操作。',
+                        'execute':'核对下方实际执行代码后输入 EXECUTE。只执行当前步骤一次，后续步骤仍需重新审批。'}
             token = secrets.token_urlsafe(32)
             self.tickets[token] = dict(session=session,number=number,action=action,binding=binding,expires=self.clock()+120)
-            return dict(ticket=token, action=action, number=number, goal=detail['goal'], message=messages[action], expires_in=120)
+            extra = {}
+            if action == 'execute':
+                with self.stores(session) as (context,life):
+                    task=self.choose(context,session,number)['task_id']
+                    review=self.code_service(context,life).preview(session,task)
+                    self.tickets[token]['code_digest']=review['digest']
+                    extra={'code':review['code'],'step':review['index']+1}
+            return dict(ticket=token, action=action, number=number, goal=detail['goal'], message=messages[action], expires_in=120,**extra)
 
     def confirm(self, ticket, confirmation):
         with self.lock:
             item = self.tickets.pop(ticket, None) if isinstance(ticket, str) else None
-            if not item or item['expires'] <= self.clock() or confirmation != 'CONFIRM':
+            if not item or item['expires'] <= self.clock() or confirmation != ('EXECUTE' if item['action']=='execute' else 'CONFIRM'):
                 raise PermissionError('确认已消耗、过期或无效，请重新预览。')
             session, number = item['session'], item['number']
             binding, _ = self._binding(session, number)
@@ -145,5 +171,24 @@ class DashboardService:
                 raise PermissionError('任务在预览后已变化，请重新预览。')
             with self.stores(session) as (context, life):
                 task = self.choose(context, session, number)['task_id']
-                getattr(life, item['action'])(session, task)
+                if item['action']=='execute':
+                    self.jobs={k:v for k,v in self.jobs.items() if v.poll() is None}
+                    if len(self.jobs)>=4:
+                        raise PermissionError('执行队列已满，请等待现有操作结束。')
+                    root=Path(__file__).resolve().parents[2]
+                    env=os.environ.copy()
+                    env.update(PYTHONUTF8='1',PYTHONIOENCODING='utf-8',PYTHONPATH=str(root),EDUCLAW_DISABLE_MEMORY='1',EDUCLAW_READ_ROOTS='',
+                        EDUCLAW_PERMISSION_DB=str(self.directory/'educlaw_permissions.sqlite3'),
+                        EDUCLAW_PREFERENCE_DB=str(self.directory/'educlaw_preferences.sqlite3'),
+                        EDUCLAW_TOOL_REGISTRY_DB=str(self.directory/'educlaw_preferences.sqlite3'))
+                    process=subprocess.Popen([sys.executable,'-m','core.gui.worker','--data-dir',str(self.directory)],cwd=root,env=env,
+                        stdin=subprocess.PIPE,stdout=subprocess.DEVNULL,stderr=subprocess.DEVNULL,text=True,encoding='utf-8',
+                        creationflags=subprocess.CREATE_NO_WINDOW if os.name=='nt' else 0)
+                    self.jobs[(session,number)]=process
+                    try:
+                        process.stdin.write(json.dumps({'session':session,'number':number,'digest':item['code_digest']}))
+                    finally:
+                        process.stdin.close()
+                else:
+                    getattr(life, item['action'])(session, task)
             return self.detail(session, number)

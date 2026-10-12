@@ -65,11 +65,22 @@ def main():
                 page.get_by_role('button',name='恢复任务',exact=True).click()
                 page.get_by_role('button',name='确认恢复任务',exact=True).click()
                 expect(page.get_by_role('button',name='暂停任务',exact=True)).to_be_visible()
-                executed,duration=run_cli(work,['/use '+session,'/继续','EXECUTE','/结果','exit'],'gui_cli_execute')
+                page.get_by_role('button',name='审阅并执行',exact=True).click()
+                expect(page.locator('.code-review')).to_contain_text('print')
+                execute=page.get_by_role('button',name='确认执行当前步骤',exact=True)
+                expect(execute).to_be_disabled()
+                page.get_by_label('执行确认').fill('NO')
+                expect(execute).to_be_disabled()
+                page.screenshot(path=str(ROOT/'logs'/'windows_gui_approval.png'),full_page=True)
+                page.get_by_label('执行确认').fill('EXECUTE')
+                execute.click()
+                expect(page.locator('.detail-top .badge')).to_have_text('已完成',timeout=90000)
+                replay=page.request.post(server.origin+'/api/confirm',data=confirmations[-1],headers={
+                    'Authorization':'Bearer '+server.token,'Origin':server.origin})
+                assert replay.status==409
+                executed,duration=run_cli(work,['/use '+session,'/继续','/结果','exit'],'gui_cli_execute')
                 seconds+=duration
-                assert '42' in executed
-                page.get_by_role('button',name='↻ 刷新',exact=True).click()
-                expect(page.locator('.detail-top .badge')).to_have_text('已完成',timeout=15000)
+                assert '42' in executed and '不处于待审批状态' in executed
                 page.get_by_role('tab',name='结果证据').click()
                 expect(page.get_by_text('✓ 结果摘要校验通过',exact=True)).to_be_visible()
                 assert '42' in page.locator('.results').inner_text()
@@ -91,7 +102,7 @@ def main():
     print(json.dumps(dict(platform='win32',browser='Microsoft Edge',real_model_mcp_docker=True,
         keyboard_selection=True,pause_resume_cli_consistency=True,duplicate_confirmation_refused=True,
         escaped_untrusted_content=True,desktop_mobile_screenshots=True,tool_completed_once=True,
-        windows_cleanup_passed=True,cli_seconds=round(seconds,2)),indent=2))
+        gui_code_execution=True,explicit_execute_required=True,windows_cleanup_passed=True,cli_seconds=round(seconds,2)),indent=2))
 
 
 if __name__ == '__main__': main()
