@@ -26,6 +26,10 @@
 新增 CSV→Python 多步骤处理及 `/tool-contracts` 契约检查，开发接入见
 [工具 SDK](docs/TOOL_SDK.md)。CSV 读取仍需路径授权，Python 仍需逐次代码审批。
 
+TypeScript + React 本地工作台现已提供任务、步骤、结果证据和暂停/恢复/取消操作。
+按 [界面启动与测试说明](web/README.md) 构建后运行 `python -m core.gui.server`。
+工具审批和任务创建暂由 CLI 完成。
+
 ## 项目介绍
 
 **EduClaw 是一个以自然语言为交互入口、以实际任务为导向的个人 AI Agent。**

@@ -19,4 +19,7 @@ __pycache__/
 .pytest_cache/
 data/*.sqlite3*
 data/*.locks/
+web/node_modules/
+web/dist/
+web/*.tsbuildinfo
 .venv/
