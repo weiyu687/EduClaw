@@ -15,4 +15,7 @@ def run_python_code(code: str) -> str:
     """
     executor = DockerExecutor()
 
-    return executor.run_python_code(code.strip())
+    try:
+        return executor.run_python_code(code.strip())
+    finally:
+        executor.client.close()

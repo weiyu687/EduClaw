@@ -7,13 +7,13 @@ import json
 import re
 from dataclasses import dataclass
 
-READ_TOOLS = {'pdf': 'extract_pdf', 'docx': 'extract_word', 'doc': 'extract_word',
-              'pptx': 'extract_pptx', 'xlsx': 'extract_xlsx', 'xls': 'extract_xlsx',
-              'py': 'extract_py'}
-EXPLICIT_TOOL_RE = re.compile(r'(?i)(?<![a-z0-9_])(?:run_python_file|run_python_code|process_doc|extract_pdf|extract_word|extract_pptx|extract_xlsx|extract_py|get_all_files|[a-z_][a-z0-9_]*_tool)(?![a-z0-9_])')
+from core.tool_contracts import builtin_registry
+READ_TOOLS = {ext:x['name'] for x in builtin_registry().items() if x['risk'] == 'path_read'
+              for ext in x['extensions']}
+EXPLICIT_TOOL_RE = re.compile(r'(?i)(?<![a-z0-9_])(?:' + '|'.join(re.escape(x['name']) for x in builtin_registry().items()) + r'|[a-z_][a-z0-9_]*_tool)(?![a-z0-9_])')
 FILE_EXEC_RE = re.compile(r'(?i)(?:执行|运行|run|execute|启动)[^\r\n]{0,160}\.py\b')
 
-PATH_RE = re.compile(r'[A-Za-z]:\\[^\r\n"<>|?*]+?\.(?:pdf|docx?|pptx|xlsx?|py)(?=\s|$|[，,。；;）)])', re.I)
+PATH_RE = re.compile(r'[A-Za-z]:\\[^\r\n"<>|?*]+?\.(?:' + '|'.join(re.escape(x) for x in READ_TOOLS) + r')(?=\s|$|[，,。；;）)])', re.I)
 
 @dataclass(frozen=True)
 class Route:

@@ -9,3 +9,17 @@ models/
 
 # 通用
 .idea/
+
+# Local credentials, runtime state and interpreter caches
+.env
+.env.*
+!.env.example
+__pycache__/
+*.py[cod]
+.pytest_cache/
+data/*.sqlite3*
+data/*.locks/
+web/node_modules/
+web/dist/
+web/*.tsbuildinfo
+.venv/

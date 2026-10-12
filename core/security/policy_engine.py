@@ -25,16 +25,11 @@ class Decision:
     required_argument: str = ''
 
 
-FILE_ARGUMENTS = {
-    'extract_pdf': 'pdf_path',
-    'extract_word': 'word_path',
-    'extract_pptx': 'pptx_path',
-    'extract_xlsx': 'xlsx_path',
-    'extract_py': 'py_path',
-    'get_all_files': 'folder_path',
-}
-PUBLIC_READ = frozenset({'get_weather'})
-APPROVAL_EXECUTE = frozenset({'run_python_code'})
+from core.tool_contracts import builtin_registry
+_CONTRACTS = builtin_registry().items()
+FILE_ARGUMENTS = {x['name']:x['resource_argument'] for x in _CONTRACTS if x['risk'] == 'path_read'}
+PUBLIC_READ = frozenset(x['name'] for x in _CONTRACTS if x['risk'] == 'public_read')
+APPROVAL_EXECUTE = frozenset(x['name'] for x in _CONTRACTS if x['risk'] == 'code_execute')
 # Deliberately not included: run_python_file, process_doc and any unknown tool.
 
 

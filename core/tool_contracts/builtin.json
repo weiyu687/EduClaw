@@ -1,0 +1,356 @@
+[
+  {
+    "name": "get_weather",
+    "description": "返回指定城市的天气。",
+    "inputSchema": {
+      "type": "object",
+      "properties": {
+        "city": {
+          "type": "string"
+        }
+      },
+      "required": [
+        "city"
+      ]
+    },
+    "version": "1.0.0",
+    "sdk_version": 1,
+    "adapter": "get_weather",
+    "risk": "public_read",
+    "resource_argument": null,
+    "plannable": false,
+    "extensions": [],
+    "output_encoding": "text",
+    "output_schema": {
+      "type": "string"
+    },
+    "max_output_bytes": 2000000
+  },
+  {
+    "name": "extract_pdf",
+    "description": "从 PDF 文件中提取内容 (文本 + 表格)",
+    "inputSchema": {
+      "type": "object",
+      "properties": {
+        "pdf_path": {
+          "type": "string"
+        }
+      },
+      "required": [
+        "pdf_path"
+      ]
+    },
+    "version": "1.0.0",
+    "sdk_version": 1,
+    "adapter": "extract_pdf",
+    "risk": "path_read",
+    "resource_argument": "pdf_path",
+    "plannable": true,
+    "extensions": [
+      "pdf"
+    ],
+    "output_encoding": "text",
+    "output_schema": {
+      "type": "string"
+    },
+    "max_output_bytes": 2000000
+  },
+  {
+    "name": "extract_word",
+    "description": "从 Word 文件中提取内容 (文本 + 表格)，支持 doc/docx",
+    "inputSchema": {
+      "type": "object",
+      "properties": {
+        "word_path": {
+          "type": "string"
+        }
+      },
+      "required": [
+        "word_path"
+      ]
+    },
+    "version": "1.0.0",
+    "sdk_version": 1,
+    "adapter": "extract_word",
+    "risk": "path_read",
+    "resource_argument": "word_path",
+    "plannable": true,
+    "extensions": [
+      "doc",
+      "docx"
+    ],
+    "output_encoding": "text",
+    "output_schema": {
+      "type": "string"
+    },
+    "max_output_bytes": 2000000
+  },
+  {
+    "name": "extract_pptx",
+    "description": "从 PPTX 文件中提取内容 (文本 + 表格)",
+    "inputSchema": {
+      "type": "object",
+      "properties": {
+        "pptx_path": {
+          "type": "string"
+        }
+      },
+      "required": [
+        "pptx_path"
+      ]
+    },
+    "version": "1.0.0",
+    "sdk_version": 1,
+    "adapter": "extract_pptx",
+    "risk": "path_read",
+    "resource_argument": "pptx_path",
+    "plannable": true,
+    "extensions": [
+      "pptx"
+    ],
+    "output_encoding": "text",
+    "output_schema": {
+      "type": "string"
+    },
+    "max_output_bytes": 2000000
+  },
+  {
+    "name": "extract_xlsx",
+    "description": "提取 Excel (.xlsx) 文件内容。支持通过序号或名称读取单个工作表。",
+    "inputSchema": {
+      "type": "object",
+      "properties": {
+        "xlsx_path": {
+          "type": "string",
+          "description": "Excel 文件的绝对路径"
+        },
+        "sheet_index": {
+          "anyOf": [
+            {
+              "type": "integer",
+              "description": "工作表序号，0表示第一个表"
+            },
+            {
+              "type": "string",
+              "description": "工作表名称或序号字符串"
+            }
+          ],
+          "default": 0
+        }
+      },
+      "required": [
+        "xlsx_path"
+      ]
+    },
+    "version": "1.0.0",
+    "sdk_version": 1,
+    "adapter": "extract_xlsx",
+    "risk": "path_read",
+    "resource_argument": "xlsx_path",
+    "plannable": true,
+    "extensions": [
+      "xls",
+      "xlsx"
+    ],
+    "output_encoding": "text",
+    "output_schema": {
+      "type": "string"
+    },
+    "max_output_bytes": 2000000
+  },
+  {
+    "name": "run_python_code",
+    "description": "\n                    执行 Python 代码，\n                    适用于计算、逻辑校验、数据处理等场景，\n                    环境仅依赖 Python 3.10 自带标准库，\n                    暂不支持生成文件、绘图、联网等操作。\n                    ",
+    "inputSchema": {
+      "type": "object",
+      "properties": {
+        "code": {
+          "type": "string"
+        }
+      },
+      "required": [
+        "code"
+      ]
+    },
+    "version": "1.0.0",
+    "sdk_version": 1,
+    "adapter": "run_python_code",
+    "risk": "code_execute",
+    "resource_argument": null,
+    "plannable": true,
+    "extensions": [],
+    "output_encoding": "text",
+    "output_schema": {
+      "type": "string"
+    },
+    "max_output_bytes": 2000000
+  },
+  {
+    "name": "run_python_file",
+    "description": "\n                    运行 Python 本地文件，\n                    环境仅依赖 Python 3.10 自带标准库，\n                    ",
+    "inputSchema": {
+      "type": "object",
+      "properties": {
+        "py_file_path": {
+          "type": "string"
+        }
+      },
+      "required": [
+        "py_file_path"
+      ]
+    },
+    "version": "1.0.0",
+    "sdk_version": 1,
+    "adapter": "run_python_file",
+    "risk": "denied",
+    "resource_argument": null,
+    "plannable": false,
+    "extensions": [],
+    "output_encoding": "text",
+    "output_schema": {
+      "type": "string"
+    },
+    "max_output_bytes": 2000000
+  },
+  {
+    "name": "extract_py",
+    "description": "从 Python 文件中提取代码",
+    "inputSchema": {
+      "type": "object",
+      "properties": {
+        "py_path": {
+          "type": "string"
+        }
+      },
+      "required": [
+        "py_path"
+      ]
+    },
+    "version": "1.0.0",
+    "sdk_version": 1,
+    "adapter": "extract_py",
+    "risk": "path_read",
+    "resource_argument": "py_path",
+    "plannable": true,
+    "extensions": [
+      "py"
+    ],
+    "output_encoding": "text",
+    "output_schema": {
+      "type": "string"
+    },
+    "max_output_bytes": 2000000
+  },
+  {
+    "name": "get_all_files",
+    "description": "获取指定文件夹下的所有文件的绝对路径",
+    "inputSchema": {
+      "type": "object",
+      "properties": {
+        "folder_path": {
+          "type": "string"
+        }
+      },
+      "required": [
+        "folder_path"
+      ]
+    },
+    "version": "1.0.0",
+    "sdk_version": 1,
+    "adapter": "get_all_files",
+    "risk": "path_read",
+    "resource_argument": "folder_path",
+    "plannable": false,
+    "extensions": [],
+    "output_encoding": "text",
+    "output_schema": {
+      "type": "string"
+    },
+    "max_output_bytes": 2000000
+  },
+  {
+    "name": "process_doc",
+    "description": "读取文档进行切片，向量化后存入Chroma向量库,支持pdf/docx/txt",
+    "inputSchema": {
+      "type": "object",
+      "properties": {
+        "doc_path": {
+          "type": "string"
+        }
+      },
+      "required": [
+        "doc_path"
+      ]
+    },
+    "version": "1.0.0",
+    "sdk_version": 1,
+    "adapter": "process_doc",
+    "risk": "denied",
+    "resource_argument": null,
+    "plannable": false,
+    "extensions": [],
+    "output_encoding": "text",
+    "output_schema": {
+      "type": "string"
+    },
+    "max_output_bytes": 2000000
+  },
+  {
+    "name": "extract_csv",
+    "description": "读取 UTF-8 CSV，返回 columns 字符串数组、rows 对象数组和 row_count。单元格均为字符串，不执行公式；最多 10000 行、100 列、1 MiB 文件。",
+    "inputSchema": {
+      "type": "object",
+      "properties": {
+        "csv_path": {
+          "type": "string",
+          "minLength": 1
+        }
+      },
+      "required": [
+        "csv_path"
+      ],
+      "additionalProperties": false
+    },
+    "version": "1.0.0",
+    "sdk_version": 1,
+    "adapter": "extract_csv",
+    "risk": "path_read",
+    "resource_argument": "csv_path",
+    "plannable": true,
+    "extensions": [
+      "csv"
+    ],
+    "output_encoding": "json",
+    "output_schema": {
+      "type": "object",
+      "properties": {
+        "columns": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        },
+        "rows": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "additionalProperties": {
+              "type": "string"
+            }
+          }
+        },
+        "row_count": {
+          "type": "integer",
+          "minimum": 0
+        }
+      },
+      "required": [
+        "columns",
+        "rows",
+        "row_count"
+      ],
+      "additionalProperties": false
+    },
+    "max_output_bytes": 2000000
+  }
+]

@@ -38,6 +38,8 @@ def get_llm(test_connection_test: bool = True) -> ChatOpenAI:
         model=model_name,
         openai_api_key=api_key,
         openai_api_base=base_url,
+        timeout=60,
+        max_retries=0,
         # temperature=0.7
     )
 

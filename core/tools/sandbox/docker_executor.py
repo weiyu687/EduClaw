@@ -1,6 +1,7 @@
 """Docker-based Python execution with explicit error semantics."""
 import os
 import logging
+import time
 import requests
 import docker
 from docker.errors import APIError, NotFound
@@ -42,6 +43,7 @@ class DockerExecutor:
                 mem_limit="128m",
                 cpu_period=100000,
                 cpu_quota=50000,
+                labels={'educlaw.sandbox': 'true'},
             )
             return self._wait_and_get_logs(container, timeout)
         except ToolExecutionError:
@@ -77,8 +79,34 @@ class DockerExecutor:
             self._cleanup(container)
 
     def _wait_and_get_logs(self, container, timeout):
+        from core.security.tool_cancellation import current_cancel_event
+        cancel_event = current_cancel_event()
+        deadline = time.monotonic() + timeout
         try:
-            result = container.wait(timeout=timeout)
+            if cancel_event is None:
+                result = container.wait(timeout=timeout)
+            else:
+                while True:
+                    if cancel_event.is_set():
+                        raise ToolExecutionError('Cancellation requested; stopping sandbox', category='cancelled', uncertain=True)
+                    remaining = deadline - time.monotonic()
+                    if remaining <= 0:
+                        raise ToolExecutionTimeout(f'Execution exceeded {timeout}s; stopping sandbox', timeout_seconds=timeout)
+                    try:
+                        result = container.wait(timeout=min(1, remaining))
+                        break
+                    except Exception as exc:
+                        chain = exc
+                        timed_out = False
+                        while chain is not None:
+                            if isinstance(chain, (requests.exceptions.Timeout, ReadTimeoutError, TimeoutError)):
+                                timed_out = True
+                                break
+                            chain = chain.__cause__ or chain.__context__
+                        if not timed_out:
+                            raise
+        except ToolExecutionError:
+            raise
         except (requests.exceptions.Timeout, ReadTimeoutError, TimeoutError) as exc:
             raise ToolExecutionTimeout(f"Docker API wait timed out (limit: {timeout}s); process termination pending confirmation", timeout_seconds=timeout) from exc
         except Exception as exc:

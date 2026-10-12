@@ -78,7 +78,8 @@ class InterruptFlow:
     def begin_read(self, session_id, approval_id, tool, path):
         """Checkpoint a read approval. No grant is created by the graph."""
         from core.security.code_approval import fingerprint
-        if tool not in ('extract_pdf', 'extract_word', 'extract_pptx', 'extract_xlsx', 'extract_py'):
+        from core.security.multi_step_graph import READ_ARGS
+        if tool not in READ_ARGS:
             raise PermissionError('Read workflow tool is not allowlisted')
         from core.security.global_gateway import FILE_TO_ARG
         from core.security.read_grants import canonical
