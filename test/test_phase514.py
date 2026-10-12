@@ -134,7 +134,7 @@ def test_output_contract_change_invalidates_review_and_preference():
     from core.security.tool_discovery import sync_client
     from core.security.tool_onboarding import acknowledge, list_tools
     from core.security.dynamic_permissions import set_permission, enforcement_mode
-    descriptor = builtin_registry().descriptors()[-1]
+    descriptor = next(t for t in builtin_registry().descriptors() if t.name == 'extract_csv')
     class Client:
         async def get_tools(self): return [descriptor]
     asyncio.run(sync_client(Client(), 'local'))

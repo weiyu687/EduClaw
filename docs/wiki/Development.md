@@ -17,6 +17,7 @@ React + TypeScript + Vite。验收使用生产构建，同源 Python 服务提�
 ```powershell
 python -m pytest test/test_phase_gui1.py test/test_phase_gui2.py -q
 python scripts/windows_workspace_e2e.py
+python scripts/windows_long_workflows_e2e.py
 python scripts/windows_gui_e2e.py
 python scripts/windows_registry_e2e.py
 python scripts/windows_recovery_e2e.py --only-cancel

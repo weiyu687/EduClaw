@@ -46,6 +46,7 @@ python -m pytest test/test_phase_gui1.py -q
 python -m pip install playwright
 python scripts/windows_gui_e2e.py
 python scripts/windows_workspace_e2e.py
+python scripts/windows_gui3_e2e.py
 ```
 
 Windows 浏览器验收使用本机 Microsoft Edge，无需下载 Chromium。需要原项目的
@@ -70,5 +71,5 @@ Python 执行与 CLI 共用 `CodeStepService`，重新验证代码摘要并原�
 `educlaw_gui.sqlite3` 保存会话挂载和提交记录；服务重启后未完成规划显示中断，不自动重试。
 文档见 [GitHub Pages](https://weiyu687.github.io/EduClaw/) 和 [Wiki](https://github.com/weiyu687/EduClaw/wiki)。
 
-不把此原型暴露到局域网或公网。后续仍需完成文件审批服务、完整 GUI 旅程、
+不把此原型暴露到局域网或公网。后续仍需完成完整 GUI 旅程、
 可访问性审查、故障恢复界面和目标用户可用性验收。

@@ -18,3 +18,13 @@ def test_workspace_http_auth_schema_and_mounts(server):
     assert status==200 and json.loads(data)['skills']==['sandbox']
     assert call(server,'/api/submit',method='POST',body={'session':session,'text':'/shell','request_id':'a'*32},headers=auth)[0]==409
     assert call(server,'/api/submissions?session='+session,headers=auth)[0]==200
+
+def test_permissions_http_boundary(server):
+    auth={'Authorization':'Bearer '+server.token,'Content-Type':'application/json','Origin':server.origin}
+    assert call(server,'/api/permissions?session=s')[0]==403
+    assert call(server,'/api/permissions?session=s',headers=auth)[0]==200
+    change={'session':'s','kind':'tool','value':'extract_text','mode':'deny'}
+    assert call(server,'/api/permissions',method='POST',body=change,headers={k:v for k,v in auth.items() if k!='Origin'})[0]==403
+    assert call(server,'/api/permissions',method='POST',body=change,headers=auth)[0]==200
+    assert call(server,'/api/permissions',method='POST',body={**change,'mode':'auto'},headers=auth)[0]==409
+    assert call(server,'/api/permissions',method='POST',body={**change,'session':'unknown'},headers=auth)[0]==409

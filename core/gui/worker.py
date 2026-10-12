@@ -7,6 +7,7 @@ import sys
 from core.gui.service import DashboardService
 from core.security.code_step_service import CodeStepService
 from core.security.dag_dependencies import DagStore
+from core.security.read_step_service import ReadStepService
 
 
 async def execute(directory, payload):
@@ -19,6 +20,8 @@ async def execute(directory, payload):
         client = MCPClient()
         steps = CodeStepService(context.flow,life.ledger,life.results,
             DagStore(service.directory/'educlaw_dag_plans.sqlite3'),context.replans,life)
+        if payload.get('action') == 'read':
+            steps = ReadStepService(steps)
         try:
             # Validate before starting the transport; validate again under the OS lock.
             if steps.preview(session,task)['digest'] != payload['digest']:
@@ -39,7 +42,7 @@ def main():
     parser.add_argument('--data-dir',required=True)
     args=parser.parse_args()
     payload=json.loads(sys.stdin.read(8193))
-    if not isinstance(payload,dict) or set(payload)!={'session','number','digest'}:
+    if not isinstance(payload,dict) or set(payload) not in ({'session','number','digest'}, {'session','number','digest','action'}) or payload.get('action','execute') not in ('execute','read'):
         raise ValueError('Invalid execution identity')
     asyncio.run(execute(args.data_dir,payload))
 

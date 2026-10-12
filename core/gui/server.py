@@ -89,6 +89,8 @@ class Handler(BaseHTTPRequestHandler):
                 result = self.server.workspace.catalog()
             elif path.path == '/api/mounts' and set(params) == {'session'}:
                 result = self.server.workspace.mounts(params['session'])
+            elif path.path == '/api/permissions' and set(params) == {'session'}:
+                result = service.permissions(params['session'])
             elif path.path == '/api/submissions' and set(params) == {'session'}:
                 result = self.server.workspace.submissions(params['session'])
             elif path.path == '/api/tasks' and set(params) == {'session'}:
@@ -130,6 +132,8 @@ class Handler(BaseHTTPRequestHandler):
                 result = self.server.workspace.submit(body['session'],body['text'],body['request_id'])
             elif self.path == '/api/preview' and set(body) == {'session','number','action'}:
                 result = service.preview(body['session'], body['number'], body['action'])
+            elif self.path == '/api/permissions' and set(body) == {'session','kind','value','mode'}:
+                result = service.permission_change(body['session'],body['kind'],body['value'],body['mode'])
             elif self.path == '/api/confirm' and set(body) == {'ticket','confirmation'}:
                 result = service.confirm(body['ticket'], body['confirmation'])
             else:

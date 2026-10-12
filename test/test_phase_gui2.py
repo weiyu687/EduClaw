@@ -105,3 +105,20 @@ def test_explicit_unsupported_tool_is_not_substituted(workspace):
     with pytest.raises(PermissionError): w.submit(s,'使用 run_python_file 执行文件','e'*32)
     with pytest.raises(PermissionError): w.submit(s,'使用 extract_csv 读取数据','f'*32)
     assert not model.calls
+
+
+def test_each_planning_loop_owns_and_closes_its_transport(workspace,monkeypatch):
+    w,s,_=workspace
+    w.model_factory=None
+    clients=[]
+    def factory(test_connection_test,*,http_async_client):
+        assert not test_connection_test and not http_async_client.is_closed
+        clients.append(http_async_client)
+        return Model()
+    monkeypatch.setattr('core.llm.llm_factory.get_llm',factory)
+    w.save_mounts(s,[],['run_python_code'])
+    for key in ('g'*32,'h'*32):
+        w.submit(s,'计算 6*7',key)
+        assert finished(w,s,key)['status']=='ready'
+    assert len(clients)==2 and clients[0] is not clients[1]
+    assert all(client.is_closed for client in clients)

@@ -33,6 +33,10 @@ TypeScript + React 本地工作台现已提供任务、步骤、结果证据和�
 
 项目文档：[文档网站](https://weiyu687.github.io/EduClaw/) · [GitHub Wiki](https://github.com/weiyu687/EduClaw/wiki)。
 
+新增文本、JSON、JSONL 读取和 CSV 数据质量分析工具，以及项目对账、学习进度、
+数据核查和研究证据技能。多步骤任务支持最多 12 步，实际跨文件工作流见
+[长流程指南](https://weiyu687.github.io/EduClaw/Long-Workflows.html)。
+
 ## 项目介绍
 
 **EduClaw 是一个以自然语言为交互入口、以实际任务为导向的个人 AI Agent。**

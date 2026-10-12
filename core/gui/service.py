@@ -20,6 +20,9 @@ from core.security.task_context import TaskContext, readable_result
 from core.security.task_lifecycle import TaskLifecycle
 from core.security.tool_results import ToolResultStore
 from core.security.code_step_service import CodeStepService
+from core.security.read_step_service import ReadStepService
+from core.security.read_grants import permission_database, canonical, list_grants, grant, revoke
+from core.gui.permissions import tool_modes, set_tool_mode
 
 
 class DashboardService:
@@ -32,6 +35,39 @@ class DashboardService:
     def code_service(self, context, life):
         return CodeStepService(context.flow,life.ledger,life.results,
             DagStore(self.directory/'educlaw_dag_plans.sqlite3'),context.replans,life)
+
+    def permissions(self, session):
+        with self.lock, self.stores(session), permission_database(self.directory/'educlaw_permissions.sqlite3'):
+            return dict(tools=tool_modes(self.directory), files=list_grants(session))
+
+    def permission_change(self, session, kind, value, mode):
+        with self.lock, self.stores(session), permission_database(self.directory/'educlaw_permissions.sqlite3'):
+            if kind == 'tool':
+                set_tool_mode(self.directory, value, mode)
+            elif kind == 'revoke':
+                if type(value) is not int:
+                    raise ValueError('授权编号无效。')
+                revoke(value, session)
+            elif kind == 'file_preview':
+                if mode not in ('once','session'):
+                    raise ValueError('请选择单次或当前会话授权。')
+                path = canonical(value)
+                token = secrets.token_urlsafe(32)
+                self.tickets = {k:v for k,v in self.tickets.items() if v['expires'] > self.clock()}
+                if len(self.tickets) >= 100:
+                    raise PermissionError('待确认操作过多。')
+                self.tickets[token] = dict(action='file_grant',session=session,path=path,scope=mode,expires=self.clock()+120)
+                return dict(ticket=token,path=path,scope=mode,directory=Path(path).is_dir())
+            elif kind == 'file_confirm':
+                item = self.tickets.pop(value, None) if isinstance(value,str) else None
+                if not item or item['action'] != 'file_grant' or item['session'] != session or item['expires'] <= self.clock() or mode != 'CONFIRM':
+                    raise PermissionError('授权预览已失效。')
+                if canonical(item['path']) != item['path']:
+                    raise PermissionError('路径已变化，请重新确认。')
+                grant(item['path'],item['scope'],session)
+            else:
+                raise ValueError('未知权限操作。')
+            return self.permissions(session)
 
     def sessions(self):
         path = self.directory / 'educlaw_state.sqlite3'
@@ -114,6 +150,11 @@ class DashboardService:
                         result['actions'].append('execute')
                     except (PermissionError,ValueError,LookupError):
                         pass
+                    try:
+                        ReadStepService(self.code_service(context,life)).preview(session,task)
+                        result['actions'].append('read')
+                    except (PermissionError,ValueError,LookupError,OSError):
+                        pass
             previous = {v['successor']:v['original'] for v in context.replans.versions(session)}
             ancestor, count = task, 1
             while ancestor in previous:
@@ -148,22 +189,24 @@ class DashboardService:
             messages = {'pause':'暂停后不再启动后续步骤；在途调用可能继续完成。',
                         'resume':'仅解除暂停。不会授予权限或启动工具，后续步骤仍需单独审批。',
                         'cancel':'取消后不再执行后续步骤；无法保证撤销已经发生的外部操作。',
-                        'execute':'核对下方实际执行代码后输入 EXECUTE。只执行当前步骤一次，后续步骤仍需重新审批。'}
+                        'execute':'核对下方实际执行代码后输入 EXECUTE。只执行当前步骤一次，后续步骤仍需重新审批。',
+                        'read':'确认下方工具与绝对路径。仅授权当前步骤读取一次；不会授权其他文件或后续步骤。'}
             token = secrets.token_urlsafe(32)
             self.tickets[token] = dict(session=session,number=number,action=action,binding=binding,expires=self.clock()+120)
             extra = {}
-            if action == 'execute':
+            if action in ('execute','read'):
                 with self.stores(session) as (context,life):
                     task=self.choose(context,session,number)['task_id']
-                    review=self.code_service(context,life).preview(session,task)
+                    steps=self.code_service(context,life)
+                    review=(ReadStepService(steps) if action=='read' else steps).preview(session,task)
                     self.tickets[token]['code_digest']=review['digest']
-                    extra={'code':review['code'],'step':review['index']+1}
+                    extra=({'path':review['path'],'tool':review['tool']} if action=='read' else {'code':review['code']}) | {'step':review['index']+1}
             return dict(ticket=token, action=action, number=number, goal=detail['goal'], message=messages[action], expires_in=120,**extra)
 
     def confirm(self, ticket, confirmation):
         with self.lock:
             item = self.tickets.pop(ticket, None) if isinstance(ticket, str) else None
-            if not item or item['expires'] <= self.clock() or confirmation != ('EXECUTE' if item['action']=='execute' else 'CONFIRM'):
+            if not item or item['action']=='file_grant' or item['expires'] <= self.clock() or confirmation != ('EXECUTE' if item['action']=='execute' else 'CONFIRM'):
                 raise PermissionError('确认已消耗、过期或无效，请重新预览。')
             session, number = item['session'], item['number']
             binding, _ = self._binding(session, number)
@@ -171,7 +214,7 @@ class DashboardService:
                 raise PermissionError('任务在预览后已变化，请重新预览。')
             with self.stores(session) as (context, life):
                 task = self.choose(context, session, number)['task_id']
-                if item['action']=='execute':
+                if item['action'] in ('execute','read'):
                     self.jobs={k:v for k,v in self.jobs.items() if v.poll() is None}
                     if len(self.jobs)>=4:
                         raise PermissionError('执行队列已满，请等待现有操作结束。')
@@ -186,7 +229,7 @@ class DashboardService:
                         creationflags=subprocess.CREATE_NO_WINDOW if os.name=='nt' else 0)
                     self.jobs[(session,number)]=process
                     try:
-                        process.stdin.write(json.dumps({'session':session,'number':number,'digest':item['code_digest']}))
+                        process.stdin.write(json.dumps({'session':session,'number':number,'digest':item['code_digest'],'action':item['action']}))
                     finally:
                         process.stdin.close()
                 else:

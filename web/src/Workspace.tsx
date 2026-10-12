@@ -1,3 +1,5 @@
+import {createPortal} from 'react-dom';
+import {Permissions} from './Permissions';
 import {useEffect,useRef,useState} from 'react';
 import {request,query} from './api';
 import type {Action} from './api';
@@ -16,7 +18,7 @@ export function Workspace({token,session,onSession,onTask,onAction,onView}:Props
   const [catalog,setCatalog]=useState<Catalog>();
   const [mounts,setMounts]=useState<Mounts>({skills:[],tools:[]});
   const [saved,setSaved]=useState<Mounts>({skills:[],tools:[]});
-  const [panel,setPanel]=useState<'skills'|'tools'|'help'|'none'>('none');
+  const [panel,setPanel]=useState<'skills'|'tools'|'help'|'permissions'|'none'>('none');
   const [text,setText]=useState('');
   const [error,setError]=useState('');
   const [notice,setNotice]=useState('');
@@ -67,9 +69,11 @@ export function Workspace({token,session,onSession,onTask,onAction,onView}:Props
   }
   const filtered=(catalog?.commands??[]).filter(c=>(c.command+c.title+c.description).toLowerCase().includes((text.startsWith('/')?text:search).toLowerCase()));
   return <section className="workspace-console" aria-label="任务输入与能力配置">
-    <div className="composer-heading"><h2>今天想完成什么？</h2><button className="secondary" disabled={busy} onClick={()=>void newSession()}>＋ 新会话</button></div>
+    {document.getElementById('sidebar-controls')&&createPortal(<nav className="side-controls" aria-label="工作空间管理"><button className="new-chat" disabled={busy} onClick={()=>void newSession()}>＋ 新建对话</button><button aria-pressed={panel==='none'} onClick={()=>setPanel('none')}>◯ 对话与任务</button><button aria-pressed={panel==='skills'} onClick={()=>setPanel('skills')}>◇ 技能管理 · {saved.skills.length}</button><button aria-pressed={panel==='tools'} onClick={()=>setPanel('tools')}>⚒ 工具管理 · {saved.tools.length}</button><button aria-pressed={panel==='permissions'} onClick={()=>setPanel('permissions')}>▣ 工具与文件权限</button><button aria-pressed={panel==='help'} onClick={()=>setPanel('help')}>/ 指令说明</button></nav>,document.getElementById('sidebar-controls')!)}
+    {panel==='permissions'&&<Permissions token={token} session={session}/>}
+    <div className="composer-heading"><h2>今天想完成什么？</h2></div>
     <textarea aria-label="任务输入" value={text} maxLength={4000} placeholder={session?'描述任务目标，或输入 / 选择指令…':'先创建新会话，再选择需要挂载的技能和工具。'} disabled={!session||busy} onChange={e=>setText(e.target.value)}/>
-    <div className="composer-toolbar"><div className="capability-buttons"><button className="secondary" onClick={()=>setPanel(panel==='skills'?'none':'skills')}>技能 · {saved.skills.length}</button><button className="secondary" onClick={()=>setPanel(panel==='tools'?'none':'tools')}>工具 · {saved.tools.length}</button><button className="secondary" onClick={()=>setPanel(panel==='help'?'none':'help')}>/ 指令说明</button></div><button className="primary" disabled={!ready||busy||!text.trim()} onClick={()=>void submit()}>{busy?'提交中…':text.startsWith('/')?'选择指令':'提交任务 ↑'}</button></div>
+    <div className="composer-toolbar"><div className="capability-buttons" aria-label="快捷挂载"><button className="secondary" onClick={()=>setPanel(panel==='skills'?'none':'skills')}>技能 · {saved.skills.length}</button><button className="secondary" onClick={()=>setPanel(panel==='tools'?'none':'tools')}>工具 · {saved.tools.length}</button><button className="secondary" onClick={()=>setPanel(panel==='help'?'none':'help')}>/ 指令说明</button></div><button className="primary" disabled={!ready||busy||!text.trim()} onClick={()=>void submit()}>{busy?'提交中…':text.startsWith('/')?'选择指令':'提交任务 ↑'}</button></div>
     {error&&<p role="alert" className="alert">{error}</p>}{notice&&<p role="status" className="notice">{notice}</p>}
     {(panel==='skills'||panel==='tools')&&<div className="capability-panel"><div className="section-heading"><div><h3>{panel==='skills'?'技能库':'工具库'}</h3><p>勾选并保存以挂载到当前会话的新任务。挂载不会授予执行权限。</p></div><button className="primary" disabled={!ready||busy||!dirty} onClick={()=>void save()}>保存挂载</button></div>
       {!session&&<p>请先创建或选择会话。</p>}

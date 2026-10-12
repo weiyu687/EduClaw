@@ -37,6 +37,9 @@ def _roots():
 def authorize(tool_name, arguments):
     """Fail closed before any MCP transport call. No model-supplied grants."""
     decision = evaluate(tool_name, arguments)
+    from core.gui.permissions import denied
+    if denied(tool_name):
+        raise GlobalToolDenied(f'工具已在权限设置中禁用: {tool_name}')
     from core.security.permission_center import get_mode, CAPABILITIES
     if tool_name in CAPABILITIES and get_mode(tool_name) == "deny":
         raise GlobalToolDenied(f"工具已禁用或未经审核: {tool_name}")
@@ -70,7 +73,8 @@ def authorize(tool_name, arguments):
         roots = _roots()
     except (OSError, RuntimeError) as exc:
         raise GlobalToolDenied('File path cannot be safely resolved') from exc
-    if not any(target.is_relative_to(root) for root in roots) and not dynamic_read_allowed(target, consume=True):
+    from core.security.read_grants import consume_reviewed_read
+    if not consume_reviewed_read(tool_name, target) and not any(target.is_relative_to(root) for root in roots) and not dynamic_read_allowed(target, consume=True):
         raise GlobalToolDenied(f'File path is outside authorized read roots: {target}')
     if tool_name == 'get_all_files':
         if not target.is_dir():

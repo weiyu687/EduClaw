@@ -29,7 +29,7 @@ def main():
                 submissions=[]
                 page.on('request',lambda r:submissions.append(r.post_data_json) if r.url.endswith('/api/submit') else None)
                 page.goto(server.origin+'/#token='+server.token)
-                page.get_by_role('button',name='＋ 新会话',exact=True).click()
+                page.get_by_role('button',name='＋ 新建对话',exact=True).click()
                 expect(page.get_by_label('任务输入',exact=True)).to_be_enabled()
                 page.get_by_role('button',name='技能 · 0',exact=True).click()
                 page.get_by_label('挂载技能 sandbox',exact=True).check()
@@ -70,7 +70,7 @@ def main():
                 page.set_viewport_size({'width':390,'height':844})
                 assert page.evaluate('document.documentElement.scrollWidth <= innerWidth')
                 page.screenshot(path=str(ROOT/'logs'/'windows_workspace_mobile.png'),full_page=True)
-                page.get_by_role('button',name='＋ 新会话',exact=True).click()
+                page.get_by_role('button',name='＋ 新建对话',exact=True).click()
                 expect(page.get_by_role('button',name='技能 · 0',exact=True)).to_be_visible()
                 expect(page.get_by_role('button',name='工具 · 0',exact=True)).to_be_visible()
                 assert not errors,errors

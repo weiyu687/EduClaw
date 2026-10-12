@@ -18,7 +18,7 @@ python scripts/windows_docs_e2e.py
 ```
 
 已存在 checkout 时先检查本地修改，再使用 `git pull --ff-only` 同步；不要覆盖他人修改。
-构建仅写 8 个已知页面、导航及静态资源，不复制运行目录或凭据。
+构建仅写 9 个已知页面、导航及静态资源，不复制运行目录或凭据。
 
 审查两个输出目录的 `git diff`，提交各自文档文件并推送。站点使用仓库 Settings → Pages
 中的 `gh-pages` 分支根目录部署；Wiki 使用独立 `.wiki.git` 仓库的 `master` 分支。

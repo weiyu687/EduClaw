@@ -13,7 +13,7 @@ from core.gui.commands import command_catalog
 
 PAGES=[('Home','项目概览'),('Getting-Started','安装与启动'),('GUI-Guide','GUI 使用指南'),
        ('Commands','指令参考'),('Skills-and-Tools','技能与工具'),('Architecture','架构与安全'),
-       ('Development','测试与开发'),('Troubleshooting','常见问题')]
+       ('Long-Workflows','多文件长流程'),('Development','测试与开发'),('Troubleshooting','常见问题')]
 
 
 def sources():

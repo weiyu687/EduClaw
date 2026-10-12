@@ -4,9 +4,10 @@ from .get_all_files import get_all_files
 from .doc_retrieve import process_doc
 from .weather_tool import get_weather
 from .extract_csv import extract_csv
+from .structured_files import extract_text, extract_json, extract_jsonl, profile_csv
 
 all_tools = [
     extract_pdf, extract_word, extract_pptx, extract_xlsx,
     run_python_code, run_python_file, extract_py, get_all_files,
-    process_doc, get_weather, extract_csv
+    process_doc, get_weather, extract_csv, extract_text, extract_json, extract_jsonl, profile_csv
 ]

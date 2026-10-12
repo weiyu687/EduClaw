@@ -131,13 +131,17 @@ class Workspace:
 
     def plan(self,request_id,session,text,config):
         try:
-            if self.model_factory is None:
-                from core.llm.llm_factory import get_llm
-                model=get_llm(test_connection_test=False)
-            else: model=self.model_factory()
             async def draft():
                 async with asyncio.timeout(75):
-                    return await draft_plan(model,text,allowed_tools=config['tools'],skill_guidance=config['guidance'])
+                    if self.model_factory is not None:
+                        return await draft_plan(self.model_factory(),text,allowed_tools=config['tools'],skill_guidance=config['guidance'])
+                    # Each planning thread owns its event loop and HTTP transport.
+                    # SDK-global cached AsyncClients cannot cross closed asyncio.run loops.
+                    import httpx
+                    from core.llm.llm_factory import get_llm
+                    async with httpx.AsyncClient(timeout=60) as client:
+                        model=get_llm(test_connection_test=False,http_async_client=client)
+                        return await draft_plan(model,text,allowed_tools=config['tools'],skill_guidance=config['guidance'])
             steps=prepare_plan(text,asyncio.run(draft()))
             if any(x['tool'] not in config['tools'] for x in steps):
                 raise PermissionError('计划包含未挂载工具。')
