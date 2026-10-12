@@ -28,7 +28,10 @@
 
 TypeScript + React 本地工作台现已提供任务、步骤、结果证据和暂停/恢复/取消操作。
 按 [界面启动与测试说明](web/README.md) 构建后运行 `python -m core.gui.server`。
-工具审批和任务创建暂由 CLI 完成。
+支持文本创建任务、技能与工具查看及会话挂载、`/` 指令选择说明，以及 Python 代码审阅执行。
+文件授权和重规划仍由 CLI 完成。
+
+项目文档：[文档网站](https://weiyu687.github.io/EduClaw/) · [GitHub Wiki](https://github.com/weiyu687/EduClaw/wiki)。
 
 ## 项目介绍
 

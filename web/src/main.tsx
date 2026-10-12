@@ -3,6 +3,7 @@ import {createRoot} from 'react-dom/client';
 import {request,takeCredential,query,labels,actionLabels} from './api';
 import type {Session,Task,Detail,Preview,Action} from './api';
 import './style.css';
+import {Workspace} from './Workspace';
 
 function App(){
   const [token] = useState(takeCredential);
@@ -43,7 +44,7 @@ function App(){
   },[session,selected,token,tick]);
   useEffect(()=>{if(preview)dialog.current?.showModal();else dialog.current?.close();},[preview]);
   async function prepare(action:Action){
-    if(selected===undefined)return;setBusy(true);setError('');setExecutionWord('');
+    if(selected===undefined){setError('请先选择一个任务。');return;}setBusy(true);setError('');setExecutionWord('');
     try{setPreview(await request<Preview>(token,'/api/preview',{session,number:selected,action}));}
     catch(e){setError(e instanceof Error?e.message:'预览失败');}finally{setBusy(false);}
   }
@@ -64,11 +65,12 @@ function App(){
     <main><header><div><div className="eyebrow">WORKSPACE / TASKS</div><h1>任务工作台</h1><p>查看进度，核对结果，掌握下一步。</p></div><button className="secondary" onClick={()=>{setLoading(true);setTick(x=>x+1);}}>↻ 刷新</button></header>
       {error&&<div className="alert" role="alert">{error}<span>页面不会自动重试操作；请先刷新核查状态。</span></div>}
       {notice&&<div className="notice" role="status">{notice}</div>}
+      <Workspace key={session} token={token} session={session} onSession={id=>{setSession(id);setSelected(undefined);setDetail(undefined);setTick(x=>x+1);}} onTask={n=>{setSelected(n);setTick(x=>x+1);}} onAction={a=>void prepare(a)} onView={v=>{setTab(v);setTick(x=>x+1);}}/>
       <section className="overview" aria-label="任务概览"><div><span>全部任务</span><strong>{tasks.length}</strong></div><div><span>进行中</span><strong>{live}</strong></div><div><span>已完成</span><strong>{tasks.filter(t=>t.status==='completed').length}</strong></div><div className="overview-note">每一步，都有据可查</div></section>
       <div className="section-heading"><h2>我的任务</h2><label>会话 <select aria-label="选择会话" value={session} onChange={e=>{setSession(e.target.value);setSelected(undefined);setDetail(undefined);setTasks([]);setPreview(undefined);}}>{sessions.map(s=><option key={s.id} value={s.id}>{s.label} · {s.updated_at.slice(0,10)}</option>)}</select></label></div>
       <div className="work-grid"><section className="task-list" aria-label="任务列表">
         {loading&&<p role="status" className="empty">正在读取任务…</p>}
-        {!loading&&!tasks.length&&<div className="empty"><span>◇</span><h3>这里还没有任务</h3><p>在 CLI 创建多步骤任务后，点击刷新查看。界面暂不创建任务或审批工具。</p></div>}
+        {!loading&&!tasks.length&&<div className="empty"><span>◇</span><h3>这里还没有任务</h3><p>选择技能和工具，在上方输入目标创建第一个任务。</p></div>}
         {tasks.map(task=><button className={'task-card '+(selected===task.number?'selected':'')} key={task.number} onClick={()=>{setSelected(task.number);setDetail(undefined);setNotice('');setPreview(undefined);}}>
           <div className="card-meta"><span>任务 {String(task.number).padStart(2,'0')}</span><span className={'badge '+task.status}>{labels[task.control==='active'?task.status:task.control]??task.status}</span></div>
           <h3>{task.goal}</h3><div className="card-bottom"><span>{task.completed} / {task.total} 步已处理</span><span>查看详情 →</span></div><progress aria-label={`任务 ${task.number} 进度`} value={task.completed} max={task.total}/>
@@ -76,7 +78,7 @@ function App(){
       </section><section className="detail-panel" aria-label="任务详情">
         {!detail?<div className="empty detail-empty"><span>◎</span><h3>{selected===undefined?'选择一个任务':'正在加载任务'}</h3><p>步骤、依赖和结果证据将在这里展示。</p></div>:<>
           <div className="detail-top"><span className="eyebrow">TASK {String(detail.number).padStart(2,'0')}</span><span className="badge">{labels[detail.control==='active'?detail.status:detail.control]??detail.status}</span></div>
-          <h2 className="task-title">{detail.goal}</h2><div className="next-step"><strong>{detail.execution_pending?'正在执行':'下一步'}</strong><p>{detail.execution_pending?'正在连接工具或执行已确认的代码，结果将自动更新。':detail.recovery.message}</p><small>Python 代码可在此审阅执行；文件授权与重规划仍在 CLI 完成。关闭页面不会取消任务。</small></div>
+          <h2 className="task-title">{detail.goal}</h2><div className="next-step"><strong>{detail.status==='completed'?'任务已完成':detail.execution_pending?'正在执行':'下一步'}</strong><p>{detail.status==='completed'?'所有步骤已完成，可在结果证据中查看输出。':detail.execution_pending?'正在连接工具或执行已确认的代码，结果将自动更新。':detail.recovery.message}</p><small>Python 代码可在此审阅执行；文件授权与重规划仍在 CLI 完成。关闭页面不会取消任务。</small></div>
           {detail.execution_error&&<div className="alert" role="alert">执行进程已退出，请核查结果或在 CLI 使用 /失败 查看原因；不会自动重试。</div>}
           <div className="actions">{detail.actions.map(action=><button key={action} className={action==='execute'?'primary':action==='cancel'?'danger':'secondary'} disabled={busy} onClick={()=>void prepare(action)}>{actionLabels[action]}</button>)}</div>
           <div className="tabs" role="tablist" aria-label="任务内容"><button role="tab" aria-selected={tab==='steps'} onClick={()=>setTab('steps')}>执行步骤 <span>{detail.total}</span></button><button role="tab" aria-selected={tab==='results'} onClick={()=>setTab('results')}>结果证据 <span>{detail.results.length}</span></button></div>

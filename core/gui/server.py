@@ -8,6 +8,7 @@ import secrets
 from urllib.parse import parse_qs, urlsplit
 
 from core.gui.service import DashboardService
+from core.gui.workspace import Workspace
 
 
 class DashboardServer(ThreadingHTTPServer):
@@ -15,6 +16,7 @@ class DashboardServer(ThreadingHTTPServer):
 
     def __init__(self, directory, static_directory, port=0):
         self.service = DashboardService(directory)
+        self.workspace = Workspace(self.service)
         self.static_directory = Path(static_directory).resolve()
         self.token = secrets.token_urlsafe(32)
         super().__init__(('127.0.0.1', port), Handler)
@@ -83,6 +85,12 @@ class Handler(BaseHTTPRequestHandler):
             service = self.server.service
             if path.path == '/api/sessions' and not params:
                 result = service.sessions()
+            elif path.path == '/api/catalog' and not params:
+                result = self.server.workspace.catalog()
+            elif path.path == '/api/mounts' and set(params) == {'session'}:
+                result = self.server.workspace.mounts(params['session'])
+            elif path.path == '/api/submissions' and set(params) == {'session'}:
+                result = self.server.workspace.submissions(params['session'])
             elif path.path == '/api/tasks' and set(params) == {'session'}:
                 result = service.tasks(params['session'])
             elif path.path == '/api/task' and set(params) == {'session','number'}:
@@ -94,6 +102,8 @@ class Handler(BaseHTTPRequestHandler):
             self.reply(200, result)
         except (ValueError, LookupError, PermissionError) as exc:
             self.reply(409, {'error':str(exc)})
+        except (ConnectionError, BrokenPipeError):
+            pass  # Browser navigation can close an in-flight polling response.
         except Exception:
             self.reply(500, {'error':'无法读取任务数据，请检查数据目录和 CLI 诊断。'})
 
@@ -106,13 +116,19 @@ class Handler(BaseHTTPRequestHandler):
                     self.headers.get('Content-Type') != 'application/json'):
                 raise ValueError('仅接受定长 JSON 请求。')
             length = int(lengths[0])
-            if not 0 < length <= 4096:
+            if not 0 < length <= 32768:
                 raise ValueError('请求长度无效。')
             body = json.loads(self.rfile.read(length))
             if not isinstance(body, dict):
                 raise ValueError('请求必须为对象。')
             service = self.server.service
-            if self.path == '/api/preview' and set(body) == {'session','number','action'}:
+            if self.path == '/api/session' and not body:
+                result = self.server.workspace.new_session()
+            elif self.path == '/api/mounts' and set(body) == {'session','skills','tools'}:
+                result = self.server.workspace.save_mounts(body['session'],body['skills'],body['tools'])
+            elif self.path == '/api/submit' and set(body) == {'session','text','request_id'}:
+                result = self.server.workspace.submit(body['session'],body['text'],body['request_id'])
+            elif self.path == '/api/preview' and set(body) == {'session','number','action'}:
                 result = service.preview(body['session'], body['number'], body['action'])
             elif self.path == '/api/confirm' and set(body) == {'ticket','confirmation'}:
                 result = service.confirm(body['ticket'], body['confirmation'])
@@ -121,6 +137,8 @@ class Handler(BaseHTTPRequestHandler):
             self.reply(200, result)
         except (ValueError, LookupError, PermissionError, TypeError) as exc:
             self.reply(409, {'error':str(exc)})
+        except (ConnectionError, BrokenPipeError):
+            pass  # The mutation may be committed; clients must query its state.
         except Exception:
             self.reply(500, {'error':'操作未能确认完成。请刷新核查状态，不要重复提交。'})
 
