@@ -3,7 +3,7 @@
 <meta name="description" content="EduClaw 文档：项目概览"><title>项目概览 · EduClaw 文档</title>
 <link rel="stylesheet" href="style.css"><script src="search.js" defer></script></head>
 <body><a class="skip" href="#content">跳到正文</a><header><a class="brand" href="index.html">E <strong>EduClaw</strong><span>文档</span></a><div><a href="https://github.com/weiyu687/EduClaw/wiki">Wiki</a><a href="https://github.com/weiyu687/EduClaw">GitHub ↗</a></div></header>
-<div class="layout"><aside><label for="search">搜索文档</label><input id="search" type="search" placeholder="功能、指令、故障…"><nav aria-label="文档目录"><a aria-current="page" href="index.html">项目概览</a><a  href="Getting-Started.html">安装与启动</a><a  href="GUI-Guide.html">GUI 使用指南</a><a  href="Commands.html">指令参考</a><a  href="Skills-and-Tools.html">技能与工具</a><a  href="Architecture.html">架构与安全</a><a  href="Development.html">测试与开发</a><a  href="Troubleshooting.html">常见问题</a></nav><p>让每一步，都有据可查。</p></aside>
+<div class="layout"><aside><label for="search">搜索文档</label><input id="search" type="search" placeholder="功能、指令、故障…"><nav aria-label="文档目录"><a aria-current="page" href="index.html">项目概览</a><a  href="Getting-Started.html">安装与启动</a><a  href="GUI-Guide.html">GUI 使用指南</a><a  href="Commands.html">指令参考</a><a  href="Skills-and-Tools.html">技能与工具</a><a  href="Architecture.html">架构与安全</a><a  href="Long-Workflows.html">多文件长流程</a><a  href="Development.html">测试与开发</a><a  href="Troubleshooting.html">常见问题</a></nav><p>让每一步，都有据可查。</p></aside>
 <main id="content"><div id="search-results" aria-live="polite"></div><article><h1>EduClaw 文档</h1>
 <p>EduClaw 是面向学习、研究与个人工作的 AI Agent。你描述目标、选择技能和工具，系统起草计划；需要执行时，你审阅当前步骤，结果与进度持久保存。</p>
 <p>当前开发版本使用 <strong>Python + MCP + LangGraph + SQLite</strong>，界面使用 <strong>TypeScript + React</strong>，提供深色本地工作台。</p>
@@ -14,6 +14,7 @@
 <li><a href="Commands.html">指令参考</a>：GUI 可用指令、需要 CLI 的指令和高级指令入口。</li>
 <li><a href="Skills-and-Tools.html">技能与工具</a>：挂载的含义、技能格式、工具契约及扩展流程。</li>
 <li><a href="Architecture.html">架构与安全</a>：任务状态、审批、不可变结果和失败恢复。</li>
+<li><a href="Long-Workflows.html">多文件长流程</a>：项目对账与学习进度分析，跨工具依赖、暂停重启与证据报告。</li>
 <li><a href="Development.html">测试与开发</a>：测试命令、Windows 端到端验收和文档发布。</li>
 <li><a href="Troubleshooting.html">常见问题</a>：连接、模型、Docker、规划中断和重复提交。</li>
 </ul>
@@ -28,7 +29,7 @@
 <tbody>
 <tr>
 <td>文本目标</td>
-<td>GUI 新建会话后输入目标，异步生成最多 5 步待审批计划</td>
+<td>GUI 新建会话后输入目标，异步生成最多 12 步待审批计划</td>
 </tr>
 <tr>
 <td>技能与工具</td>

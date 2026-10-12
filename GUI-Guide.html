@@ -3,11 +3,11 @@
 <meta name="description" content="EduClaw 文档：GUI 使用指南"><title>GUI 使用指南 · EduClaw 文档</title>
 <link rel="stylesheet" href="style.css"><script src="search.js" defer></script></head>
 <body><a class="skip" href="#content">跳到正文</a><header><a class="brand" href="index.html">E <strong>EduClaw</strong><span>文档</span></a><div><a href="https://github.com/weiyu687/EduClaw/wiki">Wiki</a><a href="https://github.com/weiyu687/EduClaw">GitHub ↗</a></div></header>
-<div class="layout"><aside><label for="search">搜索文档</label><input id="search" type="search" placeholder="功能、指令、故障…"><nav aria-label="文档目录"><a  href="index.html">项目概览</a><a  href="Getting-Started.html">安装与启动</a><a aria-current="page" href="GUI-Guide.html">GUI 使用指南</a><a  href="Commands.html">指令参考</a><a  href="Skills-and-Tools.html">技能与工具</a><a  href="Architecture.html">架构与安全</a><a  href="Development.html">测试与开发</a><a  href="Troubleshooting.html">常见问题</a></nav><p>让每一步，都有据可查。</p></aside>
+<div class="layout"><aside><label for="search">搜索文档</label><input id="search" type="search" placeholder="功能、指令、故障…"><nav aria-label="文档目录"><a  href="index.html">项目概览</a><a  href="Getting-Started.html">安装与启动</a><a aria-current="page" href="GUI-Guide.html">GUI 使用指南</a><a  href="Commands.html">指令参考</a><a  href="Skills-and-Tools.html">技能与工具</a><a  href="Architecture.html">架构与安全</a><a  href="Long-Workflows.html">多文件长流程</a><a  href="Development.html">测试与开发</a><a  href="Troubleshooting.html">常见问题</a></nav><p>让每一步，都有据可查。</p></aside>
 <main id="content"><div id="search-results" aria-live="polite"></div><article><h1>GUI 使用指南</h1>
 <h2 id="section-1">创建第一个任务</h2>
 <ol>
-<li>点击“＋ 新会话”。新会话默认没有挂载技能和工具。</li>
+<li>点击“＋ 新建对话”。新会话默认没有挂载技能和工具。</li>
 <li>打开“工具”，勾选 <code>run_python_code</code>，点击“保存挂载”。</li>
 <li>可选：打开“技能”，勾选 <code>sandbox</code>，保存挂载。</li>
 <li>在文本框输入“使用 Python 计算 6*7 并输出结果”，点击“提交任务”。</li>
@@ -33,5 +33,11 @@
 <li>关闭页面不会取消已提交的工具执行。</li>
 </ul>
 <p>同一提交标识重复发送会返回原提交记录。网络超时后先查看“最近提交”和任务列表，避免把同一目标主动作为新任务提交。</p>
-<p>文件读取、重规划和证据修复仍需 <a href="Commands.html">CLI 指令</a>。GUI 尚不自动生成工具完成后的模型总结。</p>
-</article><footer>EduClaw · 当前开发版本 · Markdown 与 GitHub Wiki 同源<br><a href="https://github.com/weiyu687/EduClaw/tree/codex/roadmap-development/docs/wiki">查看文档源文件</a></footer></main><nav class="toc" aria-label="本页目录"><strong>本页内容</strong><a href="#section-1">创建第一个任务</a><a href="#section-2">挂载与卸载</a><a href="#section-3">输入指令</a><a href="#section-4">查看状态与控制执行</a></nav></div></body></html>
+<p>重规划和证据修复仍需 <a href="Commands.html">CLI 指令</a>。GUI 尚不自动生成工具完成后的模型总结。</p>
+<h2 id="section-5">待审批在哪里确认？</h2>
+<p>先点击“查看任务”或任务卡片。当前文件步骤显示“审批文件读取”，点击后核对工具和完整路径，再点击“确认审批文件读取”。Python 步骤点击“审阅并执行”，核对代码并输入 EXECUTE。每次确认只执行一步，后续步骤显示“等待前序步骤”，不会自动执行。</p>
+<h2 id="section-6">左侧栏与权限管理</h2>
+<p>左侧提供新建对话、历史对话、技能管理、工具管理、工具与文件权限、指令说明。会话选择与新建对话也在左侧；中央保留任务输入、审批和结果。</p>
+<p>“工具与文件权限”可禁用工具或恢复底层审批策略，设置适用于当前数据目录的所有会话，包括 CLI。恢复策略不是无条件允许；未知工具、代码和文件仍受到原有策略约束。禁用会在调用网关处阻止工具，已经启动的调用无法撤回。</p>
+<p>文件授权输入本机绝对路径，选择“仅一次读取”或“当前对话”，预览规范路径和范围后确认。文件夹授权包含子目录；仅允许读取。列表支持撤销授权，已使用的单次授权会标记。GUI 不新增持久跨会话授权，但可以查看和撤销 CLI 已创建的持久授权。任务中单次审批不留下持续文件授权。</p>
+</article><footer>EduClaw · 当前开发版本 · Markdown 与 GitHub Wiki 同源<br><a href="https://github.com/weiyu687/EduClaw/tree/codex/roadmap-development/docs/wiki">查看文档源文件</a></footer></main><nav class="toc" aria-label="本页目录"><strong>本页内容</strong><a href="#section-1">创建第一个任务</a><a href="#section-2">挂载与卸载</a><a href="#section-3">输入指令</a><a href="#section-4">查看状态与控制执行</a><a href="#section-5">待审批在哪里确认？</a><a href="#section-6">左侧栏与权限管理</a></nav></div></body></html>

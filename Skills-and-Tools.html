@@ -3,11 +3,49 @@
 <meta name="description" content="EduClaw 文档：技能与工具"><title>技能与工具 · EduClaw 文档</title>
 <link rel="stylesheet" href="style.css"><script src="search.js" defer></script></head>
 <body><a class="skip" href="#content">跳到正文</a><header><a class="brand" href="index.html">E <strong>EduClaw</strong><span>文档</span></a><div><a href="https://github.com/weiyu687/EduClaw/wiki">Wiki</a><a href="https://github.com/weiyu687/EduClaw">GitHub ↗</a></div></header>
-<div class="layout"><aside><label for="search">搜索文档</label><input id="search" type="search" placeholder="功能、指令、故障…"><nav aria-label="文档目录"><a  href="index.html">项目概览</a><a  href="Getting-Started.html">安装与启动</a><a  href="GUI-Guide.html">GUI 使用指南</a><a  href="Commands.html">指令参考</a><a aria-current="page" href="Skills-and-Tools.html">技能与工具</a><a  href="Architecture.html">架构与安全</a><a  href="Development.html">测试与开发</a><a  href="Troubleshooting.html">常见问题</a></nav><p>让每一步，都有据可查。</p></aside>
+<div class="layout"><aside><label for="search">搜索文档</label><input id="search" type="search" placeholder="功能、指令、故障…"><nav aria-label="文档目录"><a  href="index.html">项目概览</a><a  href="Getting-Started.html">安装与启动</a><a  href="GUI-Guide.html">GUI 使用指南</a><a  href="Commands.html">指令参考</a><a aria-current="page" href="Skills-and-Tools.html">技能与工具</a><a  href="Architecture.html">架构与安全</a><a  href="Long-Workflows.html">多文件长流程</a><a  href="Development.html">测试与开发</a><a  href="Troubleshooting.html">常见问题</a></nav><p>让每一步，都有据可查。</p></aside>
 <main id="content"><div id="search-results" aria-live="polite"></div><article><h1>技能与工具</h1>
 <h2 id="section-1">二者的区别</h2>
 <p>技能是 <code>SKILL.md</code> 文本指导，描述工作方法与适用场景。工具是可被执行的具体能力，有明确的参数、输出和权限边界。选中技能不会安装代码，选中工具不会授权任意调用。</p>
 <h2 id="section-2">已安装技能</h2>
+<p>新增场景技能：<code>project-audit</code>（多源预算对账）、<code>learning-progress</code>（成绩与出勤关联）、
+<code>data-quality</code>（空值、重复与格式检查）、<code>research-evidence</code>（研究资料证据整理）。
+前两项配套多文件真实端到端测试；研究整理技能提供指导模板，尚无独立完整业务验收。</p>
+<p>新增工具：</p>
+<table>
+<thead>
+<tr>
+<th>工具</th>
+<th>输入</th>
+<th>结构化结果</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>extract_text</td>
+<td>text_path：TXT、Markdown 或日志路径</td>
+<td>text、line_count、encoding、sha256</td>
+</tr>
+<tr>
+<td>extract_json</td>
+<td>json_path：JSON 路径</td>
+<td>data、root_type、sha256</td>
+</tr>
+<tr>
+<td>extract_jsonl</td>
+<td>jsonl_path：JSONL/NDJSON 路径</td>
+<td>records、record_count、sha256</td>
+</tr>
+<tr>
+<td>profile_csv</td>
+<td>csv_path：CSV 路径</td>
+<td>row_count、columns、missing、duplicate_rows、numeric</td>
+</tr>
+</tbody>
+</table>
+<p>以上均要求单次路径授权，不写入文件、不执行文件中的内容。输入最大 1 MiB，输出最大 2 MB。
+JSON 拒绝重复键、非有限数，最大深度 32、节点数 50000；JSONL 每行最大 64 KiB，最多 10000 条对象记录。
+CSV 数值统计用十进制字符串，忽略非数值、科学计数法和超过 64 字符的数值单元格；不会执行公式。</p>
 <p>工作台读取项目 <code>skills/&lt;id&gt;/SKILL.md</code>，提供名称、说明、版本和内容预览。已有技能包括 sandbox、document-pro、doc_retrieve 和 homework-grader。技能指导不保证相关业务流程均已完整验收；实际能力受已挂载工具、规划器与运行环境限制。</p>
 <p>新增本地技能时使用稳定标识，只用字母、数字、短横线和下划线：</p>
 <pre><code class="language-markdown">---
@@ -30,6 +68,6 @@ description: 示例技能的适用范围
 </ol>
 <p>详细接口规范见仓库 <a href="https://github.com/weiyu687/EduClaw/blob/codex/roadmap-development/docs/TOOL_SDK.md">工具 SDK</a>。目前没有第三方工具一键下载、任意 MCP 服务器挂载或动态加载入口字符串的功能。</p>
 <h2 id="section-4">规划与权限</h2>
-<p>只有 <code>plannable</code> 工具可以进入当前最多 5 步的计划。模型请求仅包含已挂载的规划工具契约，模型输出和规范化后的计划均再次检查工具集合。</p>
+<p>只有 <code>plannable</code> 工具可以进入当前最多 12 步的计划。模型请求仅包含已挂载的规划工具契约，模型输出和规范化后的计划均再次检查工具集合。</p>
 <p><code>run_python_code</code> 必须单独审阅并输入 <code>EXECUTE</code>。文件读取仍要求准确路径授权。工具权限偏好和全局网关继续生效：即使挂载了被禁用工具，挂载也不会解除禁用。</p>
 </article><footer>EduClaw · 当前开发版本 · Markdown 与 GitHub Wiki 同源<br><a href="https://github.com/weiyu687/EduClaw/tree/codex/roadmap-development/docs/wiki">查看文档源文件</a></footer></main><nav class="toc" aria-label="本页目录"><strong>本页内容</strong><a href="#section-1">二者的区别</a><a href="#section-2">已安装技能</a><a href="#section-3">工具注册与挂载</a><a href="#section-4">规划与权限</a></nav></div></body></html>

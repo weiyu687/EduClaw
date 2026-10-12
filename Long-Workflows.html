@@ -1,0 +1,95 @@
+<!doctype html>
+<html lang="zh-CN"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<meta name="description" content="EduClaw 文档：多文件长流程"><title>多文件长流程 · EduClaw 文档</title>
+<link rel="stylesheet" href="style.css"><script src="search.js" defer></script></head>
+<body><a class="skip" href="#content">跳到正文</a><header><a class="brand" href="index.html">E <strong>EduClaw</strong><span>文档</span></a><div><a href="https://github.com/weiyu687/EduClaw/wiki">Wiki</a><a href="https://github.com/weiyu687/EduClaw">GitHub ↗</a></div></header>
+<div class="layout"><aside><label for="search">搜索文档</label><input id="search" type="search" placeholder="功能、指令、故障…"><nav aria-label="文档目录"><a  href="index.html">项目概览</a><a  href="Getting-Started.html">安装与启动</a><a  href="GUI-Guide.html">GUI 使用指南</a><a  href="Commands.html">指令参考</a><a  href="Skills-and-Tools.html">技能与工具</a><a  href="Architecture.html">架构与安全</a><a aria-current="page" href="Long-Workflows.html">多文件长流程</a><a  href="Development.html">测试与开发</a><a  href="Troubleshooting.html">常见问题</a></nav><p>让每一步，都有据可查。</p></aside>
+<main id="content"><div id="search-results" aria-live="polite"></div><article><h1>多文件长流程</h1>
+<p>当前多步骤计划上限为 12 步，逐步审批、串行执行。每一步拥有独立认领和不可变结果，长流程不会变成一次性授权整个任务。</p>
+<h2 id="section-1">项目预算对账：8 步</h2>
+<p>挂载 <code>project-audit</code> 与 <code>data-quality</code> 技能，以及 <code>extract_csv</code>、<code>extract_json</code>、<code>extract_jsonl</code>、<code>extract_text</code>、<code>profile_csv</code>、<code>run_python_code</code> 工具。</p>
+<p>输入准备：交易 CSV（id、project、amount、note），预算 JSON（budgets 按项目映射），调整 JSONL（project、adjustment），Markdown 对账规则。文件必须为 UTF-8，可带 BOM。</p>
+<pre><code class="language-text">请对我明确指定的交易 CSV、预算 JSON、调整 JSONL 和规则 Markdown 进行项目对账。
+先分别读取四个文件，再分析 CSV 空值和重复记录。
+依据真实读取结果，按项目汇总交易与调整，核对预算与净支出，生成超支清单。
+最后合并计算结果、数据质量结论和规则说明，输出带来源步骤的报告。
+</code></pre>
+<p>请在实际输入中提供四个文件的完整绝对路径。建议分步：</p>
+<table>
+<thead>
+<tr>
+<th>步骤</th>
+<th>工具</th>
+<th>目的与依赖</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>1</td>
+<td>extract_csv</td>
+<td>读取交易记录</td>
+</tr>
+<tr>
+<td>2</td>
+<td>extract_json</td>
+<td>读取预算规则</td>
+</tr>
+<tr>
+<td>3</td>
+<td>extract_jsonl</td>
+<td>读取调整事件</td>
+</tr>
+<tr>
+<td>4</td>
+<td>extract_text</td>
+<td>读取对账说明</td>
+</tr>
+<tr>
+<td>5</td>
+<td>profile_csv</td>
+<td>检查空值、完全重复行及数值列</td>
+</tr>
+<tr>
+<td>6</td>
+<td>run_python_code</td>
+<td>引用 1、2、3，按项目计算净支出与预算差额</td>
+</tr>
+<tr>
+<td>7</td>
+<td>run_python_code</td>
+<td>引用 5、6，生成质量核查和超支清单</td>
+</tr>
+<tr>
+<td>8</td>
+<td>run_python_code</td>
+<td>引用 4、6、7，汇总报告与来源步骤</td>
+</tr>
+</tbody>
+</table>
+<h2 id="section-2">学习进度分析：7 步</h2>
+<p>挂载 <code>learning-progress</code> 与 <code>data-quality</code>。使用成绩 CSV（id、quiz、exam）、权重 JSON、出勤 JSONL 和课程说明文本。</p>
+<p>前五步分别读取四个来源并执行 CSV 质量分析；第六步关联 ID，按规则计算加权分和实际出勤，标注需关注样本；第七步汇总质量结果、反馈和证据来源。分析只作为学习反馈，不自动作出录取、处分等高影响决定。</p>
+<h2 id="section-3">中途暂停与重启</h2>
+<ol>
+<li>在 CLI 用 <code>/sessions</code>、<code>/use &lt;ID&gt;</code> 和 <code>/任务 &lt;编号&gt;</code> 选择 GUI 创建的任务。</li>
+<li><code>/允许</code> 先展示当前读取范围；确认同一步骤的 <code>/允许</code> 才读取。切换步骤需新授权。</li>
+<li>在读完文件后 <code>/暂停</code>，退出并重启 CLI。</li>
+<li>重新选择会话，用 <code>/恢复</code> 查看范围并输入 <code>RESUME</code>；已有结果不重读、不重算。</li>
+<li><code>/继续</code> 查看下一步完整代码，逐步输入 <code>EXECUTE</code>。</li>
+<li>回到 GUI 查看各步骤证据、依赖关系和最终报告。</li>
+</ol>
+<p>文件读取审批目前仍在 CLI；Python 审阅执行也可使用 GUI。任何失败或结果不确定都应先核查，不能删除认领来强制重跑。</p>
+<h2 id="section-4">中间结果约定</h2>
+<p>后续会引用的 Python 步骤必须仅输出一个合法 JSON，例如 <code>print(json.dumps(result, ensure_ascii=False))</code>。不要混入日志或 Markdown，否则下一步无法作为 JSON 引用。</p>
+<p>使用 <code>{{step:N:json:/field}}</code> 引用前序结果。单个引用值上限 12000 字符，解析后代码上限 32 KiB；大文件应先生成聚合结果或选取必要字段，不能把所有原始数据直接塞入代码。</p>
+<h2 id="section-5">实际验收</h2>
+<pre><code class="language-powershell">python scripts/windows_long_workflows_e2e.py
+</code></pre>
+<p>也可用 <code>--scenario project</code>、<code>--scenario learning</code> 或 <code>--scenario invalid</code> 单独验收。
+<code>invalid</code> 在计划生成后破坏 JSONL 的第三步输入，验证前两步保留、第三步失败，后四步不执行。</p>
+<p>脚本创建隔离的合成数据，真实调用配置模型、MCP 与 Docker；从 GUI 创建并挂载任务，通过 CLI 完成文件授权与代码审批，再从重启后的 GUI 检查全部结果。项目流程在第 5 步后暂停并重启，核对原结果摘要不变和总认领次数。</p>
+<p>结果报告写到 <code>logs/long_workflows_report.json</code>，截图为 <code>logs/long_*_plan.png</code> 与 <code>logs/long_*_results.png</code>。这些属于自动化实机验收，不等同于真实用户可用性评估。</p>
+<p>真实模型的计划不是确定性产物，网络失败或不合格计划会被阻断，不能保证每次规划成功。
+失败后应查看状态并明确重新提交，系统不会为了通过验收自动替换成固定计划或重试工具。</p>
+<p>GUI 现在也可逐步审批全部文件读取和 Python 步骤，入口见 <a href="GUI-Guide.html">GUI 使用指南</a>。<code>python scripts/windows_gui3_e2e.py</code> 验证完整 8 步 GUI 审批、权限保存及撤销。</p>
+</article><footer>EduClaw · 当前开发版本 · Markdown 与 GitHub Wiki 同源<br><a href="https://github.com/weiyu687/EduClaw/tree/codex/roadmap-development/docs/wiki">查看文档源文件</a></footer></main><nav class="toc" aria-label="本页目录"><strong>本页内容</strong><a href="#section-1">项目预算对账：8 步</a><a href="#section-2">学习进度分析：7 步</a><a href="#section-3">中途暂停与重启</a><a href="#section-4">中间结果约定</a><a href="#section-5">实际验收</a></nav></div></body></html>

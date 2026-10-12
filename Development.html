@@ -3,7 +3,7 @@
 <meta name="description" content="EduClaw 文档：测试与开发"><title>测试与开发 · EduClaw 文档</title>
 <link rel="stylesheet" href="style.css"><script src="search.js" defer></script></head>
 <body><a class="skip" href="#content">跳到正文</a><header><a class="brand" href="index.html">E <strong>EduClaw</strong><span>文档</span></a><div><a href="https://github.com/weiyu687/EduClaw/wiki">Wiki</a><a href="https://github.com/weiyu687/EduClaw">GitHub ↗</a></div></header>
-<div class="layout"><aside><label for="search">搜索文档</label><input id="search" type="search" placeholder="功能、指令、故障…"><nav aria-label="文档目录"><a  href="index.html">项目概览</a><a  href="Getting-Started.html">安装与启动</a><a  href="GUI-Guide.html">GUI 使用指南</a><a  href="Commands.html">指令参考</a><a  href="Skills-and-Tools.html">技能与工具</a><a  href="Architecture.html">架构与安全</a><a aria-current="page" href="Development.html">测试与开发</a><a  href="Troubleshooting.html">常见问题</a></nav><p>让每一步，都有据可查。</p></aside>
+<div class="layout"><aside><label for="search">搜索文档</label><input id="search" type="search" placeholder="功能、指令、故障…"><nav aria-label="文档目录"><a  href="index.html">项目概览</a><a  href="Getting-Started.html">安装与启动</a><a  href="GUI-Guide.html">GUI 使用指南</a><a  href="Commands.html">指令参考</a><a  href="Skills-and-Tools.html">技能与工具</a><a  href="Architecture.html">架构与安全</a><a  href="Long-Workflows.html">多文件长流程</a><a aria-current="page" href="Development.html">测试与开发</a><a  href="Troubleshooting.html">常见问题</a></nav><p>让每一步，都有据可查。</p></aside>
 <main id="content"><div id="search-results" aria-live="polite"></div><article><h1>测试与开发</h1>
 <h2 id="section-1">前端</h2>
 <pre><code class="language-powershell">cd web
@@ -16,6 +16,7 @@ npm run build
 <h2 id="section-2">Python 与 Windows 验收</h2>
 <pre><code class="language-powershell">python -m pytest test/test_phase_gui1.py test/test_phase_gui2.py -q
 python scripts/windows_workspace_e2e.py
+python scripts/windows_long_workflows_e2e.py
 python scripts/windows_gui_e2e.py
 python scripts/windows_registry_e2e.py
 python scripts/windows_recovery_e2e.py --only-cancel
