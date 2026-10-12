@@ -1,0 +1,35 @@
+<!doctype html>
+<html lang="zh-CN"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<meta name="description" content="EduClaw 文档：技能与工具"><title>技能与工具 · EduClaw 文档</title>
+<link rel="stylesheet" href="style.css"><script src="search.js" defer></script></head>
+<body><a class="skip" href="#content">跳到正文</a><header><a class="brand" href="index.html">E <strong>EduClaw</strong><span>文档</span></a><div><a href="https://github.com/weiyu687/EduClaw/wiki">Wiki</a><a href="https://github.com/weiyu687/EduClaw">GitHub ↗</a></div></header>
+<div class="layout"><aside><label for="search">搜索文档</label><input id="search" type="search" placeholder="功能、指令、故障…"><nav aria-label="文档目录"><a  href="index.html">项目概览</a><a  href="Getting-Started.html">安装与启动</a><a  href="GUI-Guide.html">GUI 使用指南</a><a  href="Commands.html">指令参考</a><a aria-current="page" href="Skills-and-Tools.html">技能与工具</a><a  href="Architecture.html">架构与安全</a><a  href="Development.html">测试与开发</a><a  href="Troubleshooting.html">常见问题</a></nav><p>让每一步，都有据可查。</p></aside>
+<main id="content"><div id="search-results" aria-live="polite"></div><article><h1>技能与工具</h1>
+<h2 id="section-1">二者的区别</h2>
+<p>技能是 <code>SKILL.md</code> 文本指导，描述工作方法与适用场景。工具是可被执行的具体能力，有明确的参数、输出和权限边界。选中技能不会安装代码，选中工具不会授权任意调用。</p>
+<h2 id="section-2">已安装技能</h2>
+<p>工作台读取项目 <code>skills/&lt;id&gt;/SKILL.md</code>，提供名称、说明、版本和内容预览。已有技能包括 sandbox、document-pro、doc_retrieve 和 homework-grader。技能指导不保证相关业务流程均已完整验收；实际能力受已挂载工具、规划器与运行环境限制。</p>
+<p>新增本地技能时使用稳定标识，只用字母、数字、短横线和下划线：</p>
+<pre><code class="language-markdown">---
+name: example-skill
+version: 1.0.0
+description: 示例技能的适用范围
+---
+
+# 工作方法
+先明确目标，再检查已授权证据。需要代码执行时展示准确代码供用户审阅。
+</code></pre>
+<p>保存到 <code>skills/example-skill/SKILL.md</code>，刷新工作台后查看并挂载。技能是低信任参考，不能覆盖用户目标或工具授权规则。文件路径必须来自用户输入，不能从技能正文获得路径授权。</p>
+<h2 id="section-3">工具注册与挂载</h2>
+<p>工作台只展示应用注册的可信契约。新工具须先完成代码接入与测试：</p>
+<ol>
+<li>在 <code>core/tool_contracts/builtin.json</code> 登记版本、输入输出 Schema、风险、输出大小和适配器名。</li>
+<li>实现适配器，通过 <code>core/tools/__init__.py</code> 显式绑定。</li>
+<li>增加契约与权限测试，实际运行 MCP 和 Windows 验收。</li>
+<li>发布匹配的客户端与服务端，重启工作台后查看并挂载。</li>
+</ol>
+<p>详细接口规范见仓库 <a href="https://github.com/weiyu687/EduClaw/blob/codex/roadmap-development/docs/TOOL_SDK.md">工具 SDK</a>。目前没有第三方工具一键下载、任意 MCP 服务器挂载或动态加载入口字符串的功能。</p>
+<h2 id="section-4">规划与权限</h2>
+<p>只有 <code>plannable</code> 工具可以进入当前最多 5 步的计划。模型请求仅包含已挂载的规划工具契约，模型输出和规范化后的计划均再次检查工具集合。</p>
+<p><code>run_python_code</code> 必须单独审阅并输入 <code>EXECUTE</code>。文件读取仍要求准确路径授权。工具权限偏好和全局网关继续生效：即使挂载了被禁用工具，挂载也不会解除禁用。</p>
+</article><footer>EduClaw · 当前开发版本 · Markdown 与 GitHub Wiki 同源<br><a href="https://github.com/weiyu687/EduClaw/tree/codex/roadmap-development/docs/wiki">查看文档源文件</a></footer></main><nav class="toc" aria-label="本页目录"><strong>本页内容</strong><a href="#section-1">二者的区别</a><a href="#section-2">已安装技能</a><a href="#section-3">工具注册与挂载</a><a href="#section-4">规划与权限</a></nav></div></body></html>

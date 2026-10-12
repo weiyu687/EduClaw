@@ -1,0 +1,135 @@
+<!doctype html>
+<html lang="zh-CN"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<meta name="description" content="EduClaw 文档：指令参考"><title>指令参考 · EduClaw 文档</title>
+<link rel="stylesheet" href="style.css"><script src="search.js" defer></script></head>
+<body><a class="skip" href="#content">跳到正文</a><header><a class="brand" href="index.html">E <strong>EduClaw</strong><span>文档</span></a><div><a href="https://github.com/weiyu687/EduClaw/wiki">Wiki</a><a href="https://github.com/weiyu687/EduClaw">GitHub ↗</a></div></header>
+<div class="layout"><aside><label for="search">搜索文档</label><input id="search" type="search" placeholder="功能、指令、故障…"><nav aria-label="文档目录"><a  href="index.html">项目概览</a><a  href="Getting-Started.html">安装与启动</a><a  href="GUI-Guide.html">GUI 使用指南</a><a aria-current="page" href="Commands.html">指令参考</a><a  href="Skills-and-Tools.html">技能与工具</a><a  href="Architecture.html">架构与安全</a><a  href="Development.html">测试与开发</a><a  href="Troubleshooting.html">常见问题</a></nav><p>让每一步，都有据可查。</p></aside>
+<main id="content"><div id="search-results" aria-live="polite"></div><article><h1>指令参考</h1>
+<p>在 GUI 输入 <code>/</code> 或打开“/ 指令说明”，可以搜索并选择指令。任务操作需要先选中任务，执行仍需独立确认。</p>
+<table>
+<thead>
+<tr>
+<th>指令</th>
+<th>用途</th>
+<th>支持范围与说明</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>/新建</code></td>
+<td>创建新会话</td>
+<td>GUI：新建一个独立会话，挂载设置独立保存。</td>
+</tr>
+<tr>
+<td><code>/任务</code></td>
+<td>查看任务</td>
+<td>GUI：查看当前会话的任务，点击卡片选择操作对象。</td>
+</tr>
+<tr>
+<td><code>/状态</code></td>
+<td>查看进度</td>
+<td>GUI：展示所选任务步骤和状态。</td>
+</tr>
+<tr>
+<td><code>/结果</code></td>
+<td>查看结果</td>
+<td>GUI：展示所选任务保存的结果与摘要校验。</td>
+</tr>
+<tr>
+<td><code>/继续</code></td>
+<td>审阅代码</td>
+<td>GUI：打开当前 Python 步骤代码预览，仍需输入 EXECUTE。</td>
+</tr>
+<tr>
+<td><code>/暂停</code></td>
+<td>暂停任务</td>
+<td>GUI：确认后阻止启动后续步骤，在途调用可能完成。</td>
+</tr>
+<tr>
+<td><code>/恢复</code></td>
+<td>解除暂停</td>
+<td>GUI：确认解除暂停，不会自动执行代码。</td>
+</tr>
+<tr>
+<td><code>/取消任务</code></td>
+<td>取消任务</td>
+<td>GUI：确认取消，已产生的外部效果不保证撤销。</td>
+</tr>
+<tr>
+<td><code>/技能</code></td>
+<td>技能与挂载</td>
+<td>GUI：查看本地技能内容，选择新任务的指导技能。</td>
+</tr>
+<tr>
+<td><code>/工具</code></td>
+<td>工具与挂载</td>
+<td>GUI：查看可信工具契约，选择新任务可用工具。</td>
+</tr>
+<tr>
+<td><code>/帮助</code></td>
+<td>指令说明</td>
+<td>GUI：查看全部指令及其支持范围。</td>
+</tr>
+<tr>
+<td><code>/允许</code></td>
+<td>文件授权</td>
+<td>CLI：在 CLI 授权当前步骤的准确文件范围。</td>
+</tr>
+<tr>
+<td><code>/拒绝</code></td>
+<td>拒绝步骤</td>
+<td>CLI：在 CLI 拒绝当前步骤。</td>
+</tr>
+<tr>
+<td><code>/重规划</code></td>
+<td>重规划</td>
+<td>CLI：在 CLI 起草当前任务的新计划并查看差异。</td>
+</tr>
+<tr>
+<td><code>/确认</code></td>
+<td>确认重规划</td>
+<td>CLI：在 CLI 确认已审阅的重规划。</td>
+</tr>
+<tr>
+<td><code>/取消</code></td>
+<td>取消重规划</td>
+<td>CLI：在 CLI 取消重规划草案。</td>
+</tr>
+<tr>
+<td><code>/诊断</code></td>
+<td>恢复诊断</td>
+<td>CLI：在 CLI 核对检查点及结果证据。</td>
+</tr>
+<tr>
+<td><code>/失败</code></td>
+<td>失败分类</td>
+<td>CLI：在 CLI 查看失败事件及诊断。</td>
+</tr>
+<tr>
+<td><code>/tool-contracts</code></td>
+<td>工具连接检查</td>
+<td>CLI：在 CLI 连接 MCP 并核对契约。</td>
+</tr>
+<tr>
+<td><code>/help advanced</code></td>
+<td>高级指令</td>
+<td>CLI：在 CLI 查看兼容与开发者指令。</td>
+</tr>
+</tbody>
+</table>
+<h2 id="section-1">CLI 兼容命令</h2>
+<p>CLI 的 <code>/help advanced</code> 列出高级与兼容命令。以下为现有帮助原文，GUI 不将其转换为任意终端命令。</p>
+<pre><code class="language-text">兼容及开发者命令（高级）
+/multi /multi-status /multi-approve /multi-deny
+/flow-code /flow-status /flow-approve /flow-deny
+/auto on|off /auto-status
+/code-propose /code-approve /code-deny /code-status
+/permissions /permit /deny-read /allow-read /revoke-read
+/skills /agent-step-run /agent-step-approve /agent-step-result
+/step-run /step-approve /step-result
+/plan-new /plans /plan /plan-approve /plan-reject
+/task-new /tasks /task /step /task-events /task-cancel
+/new /use /sessions /runs /events /status /interrupted /resume /approve-resume
+</code></pre>
+<p>授权类、恢复类和重规划类命令需在 CLI 查看当前操作范围并按提示确认。GUI 的挂载不替代这些授权。</p>
+</article><footer>EduClaw · 当前开发版本 · Markdown 与 GitHub Wiki 同源<br><a href="https://github.com/weiyu687/EduClaw/tree/codex/roadmap-development/docs/wiki">查看文档源文件</a></footer></main><nav class="toc" aria-label="本页目录"><strong>本页内容</strong><a href="#section-1">CLI 兼容命令</a></nav></div></body></html>

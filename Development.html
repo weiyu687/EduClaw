@@ -1,0 +1,32 @@
+<!doctype html>
+<html lang="zh-CN"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<meta name="description" content="EduClaw 文档：测试与开发"><title>测试与开发 · EduClaw 文档</title>
+<link rel="stylesheet" href="style.css"><script src="search.js" defer></script></head>
+<body><a class="skip" href="#content">跳到正文</a><header><a class="brand" href="index.html">E <strong>EduClaw</strong><span>文档</span></a><div><a href="https://github.com/weiyu687/EduClaw/wiki">Wiki</a><a href="https://github.com/weiyu687/EduClaw">GitHub ↗</a></div></header>
+<div class="layout"><aside><label for="search">搜索文档</label><input id="search" type="search" placeholder="功能、指令、故障…"><nav aria-label="文档目录"><a  href="index.html">项目概览</a><a  href="Getting-Started.html">安装与启动</a><a  href="GUI-Guide.html">GUI 使用指南</a><a  href="Commands.html">指令参考</a><a  href="Skills-and-Tools.html">技能与工具</a><a  href="Architecture.html">架构与安全</a><a aria-current="page" href="Development.html">测试与开发</a><a  href="Troubleshooting.html">常见问题</a></nav><p>让每一步，都有据可查。</p></aside>
+<main id="content"><div id="search-results" aria-live="polite"></div><article><h1>测试与开发</h1>
+<h2 id="section-1">前端</h2>
+<pre><code class="language-powershell">cd web
+npm ci
+npm run typecheck
+npm test
+npm run build
+</code></pre>
+<p>React + TypeScript + Vite。验收使用生产构建，同源 Python 服务提供静态资源和 API。</p>
+<h2 id="section-2">Python 与 Windows 验收</h2>
+<pre><code class="language-powershell">python -m pytest test/test_phase_gui1.py test/test_phase_gui2.py -q
+python scripts/windows_workspace_e2e.py
+python scripts/windows_gui_e2e.py
+python scripts/windows_registry_e2e.py
+python scripts/windows_recovery_e2e.py --only-cancel
+</code></pre>
+<p>Windows 浏览器验收需要 Playwright、已安装 Microsoft Edge、真实模型配置、MCP 及 Docker。脚本使用隔离临时数据目录，实际调用工具并检查 Windows 文件句柄和资源清理。截图保存在 <code>logs/</code>，不随代码发布。</p>
+<p><code>windows_workspace_e2e.py</code> 从空数据开始，通过 GUI 创建会话、挂载技能工具、提交目标、审阅代码、执行并查看结果，同时验证挂载持久化、会话隔离和重复提交去重。</p>
+<h2 id="section-3">文档源与发布</h2>
+<p>Wiki 和网站的统一来源是 <code>docs/wiki/*.md</code>。构建脚本生成指令参考，并把本地页面链接分别转换为 Wiki 链接和静态 HTML 链接。</p>
+<pre><code class="language-powershell">python -m pip install -r docs/requirements.txt
+python scripts/build_docs.py --site-dir logs/docs-site --wiki-dir logs/wiki-publish
+</code></pre>
+<p><code>logs/wiki-publish</code> 应先克隆项目的 Wiki Git 仓库。站点产物通过 <code>gh-pages</code> 分支发布到 GitHub Pages，网站为纯静态文档，不部署本机任务 API，也不上传运行数据库、日志或密钥。</p>
+<p>构建后检查页面导航与移动端布局，再将 Wiki 和站点提交到各自 Git 仓库。完整阶段记录见 <a href="https://github.com/weiyu687/EduClaw/blob/codex/roadmap-development/docs/DEVELOPMENT_STATUS.md">开发验收记录</a>。</p>
+</article><footer>EduClaw · 当前开发版本 · Markdown 与 GitHub Wiki 同源<br><a href="https://github.com/weiyu687/EduClaw/tree/codex/roadmap-development/docs/wiki">查看文档源文件</a></footer></main><nav class="toc" aria-label="本页目录"><strong>本页内容</strong><a href="#section-1">前端</a><a href="#section-2">Python 与 Windows 验收</a><a href="#section-3">文档源与发布</a></nav></div></body></html>

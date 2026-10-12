@@ -1,0 +1,25 @@
+<!doctype html>
+<html lang="zh-CN"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<meta name="description" content="EduClaw 文档：常见问题"><title>常见问题 · EduClaw 文档</title>
+<link rel="stylesheet" href="style.css"><script src="search.js" defer></script></head>
+<body><a class="skip" href="#content">跳到正文</a><header><a class="brand" href="index.html">E <strong>EduClaw</strong><span>文档</span></a><div><a href="https://github.com/weiyu687/EduClaw/wiki">Wiki</a><a href="https://github.com/weiyu687/EduClaw">GitHub ↗</a></div></header>
+<div class="layout"><aside><label for="search">搜索文档</label><input id="search" type="search" placeholder="功能、指令、故障…"><nav aria-label="文档目录"><a  href="index.html">项目概览</a><a  href="Getting-Started.html">安装与启动</a><a  href="GUI-Guide.html">GUI 使用指南</a><a  href="Commands.html">指令参考</a><a  href="Skills-and-Tools.html">技能与工具</a><a  href="Architecture.html">架构与安全</a><a  href="Development.html">测试与开发</a><a aria-current="page" href="Troubleshooting.html">常见问题</a></nav><p>让每一步，都有据可查。</p></aside>
+<main id="content"><div id="search-results" aria-live="polite"></div><article><h1>常见问题</h1>
+<h2 id="section-1">页面提示凭据或来源无效</h2>
+<p>使用终端本次启动输出的地址。重启后旧凭据失效。不要将地址从 <code>127.0.0.1</code> 改成其他主机名，也不要用其他来源的页面代理 API。</p>
+<h2 id="section-2">任务输入不可用</h2>
+<p>先新建或选择会话。提交前至少挂载一个支持规划的工具，并保存修改。新会话默认不挂载任何能力。</p>
+<h2 id="section-3">挂载了工具但不能规划</h2>
+<p>检查工具卡片是否标注“当前规划器暂不支持”。规划器只接受已支持的读取工具和 Python 代码步骤；挂载不会扩展其步骤协议。</p>
+<h2 id="section-4">规划失败</h2>
+<p>核对本机模型变量、网络和目标是否能由已挂载工具完成。模型输出未知工具、未指定路径、无效代码或超限计划都会失败。错误消息隐藏模型供应商的原始异常以避免暴露敏感信息。</p>
+<p>服务重启导致规划中断时先检查任务列表；系统不会自动重试，防止重复生成任务。</p>
+<h2 id="section-5">Python 执行失败</h2>
+<p>确认 Docker 可用、<code>python:3.10-slim</code> 镜像存在，以及 MCP 能启动。CLI 的 <code>/失败</code> 与 <code>/诊断</code> 可查看原因。执行已经认领而结果不确定时不要删除认领记录重跑；先核查保存结果和外部效果。</p>
+<h2 id="section-6">文件任务停在待授权</h2>
+<p>这是当前 GUI 的能力边界。通过 CLI 切换到同一会话，选择任务，使用 <code>/允许</code> 查看并确认准确文件范围；之后的 Python 步骤可回到 GUI 审阅。</p>
+<h2 id="section-7">Wiki 与网站不同步</h2>
+<p>两处均从 <code>docs/wiki</code> 构建。修改 Markdown 后重新构建并发布两个目标。GitHub Pages 部署需要时间；以远端分支提交和 Pages 构建状态为准。</p>
+<h2 id="section-8">提交超时或重复点击</h2>
+<p>同一提交标识在服务端去重。先查看最近提交和任务列表。规划、代码执行和生命周期操作都有独立状态，不应靠重复点击来恢复未知结果。</p>
+</article><footer>EduClaw · 当前开发版本 · Markdown 与 GitHub Wiki 同源<br><a href="https://github.com/weiyu687/EduClaw/tree/codex/roadmap-development/docs/wiki">查看文档源文件</a></footer></main><nav class="toc" aria-label="本页目录"><strong>本页内容</strong><a href="#section-1">页面提示凭据或来源无效</a><a href="#section-2">任务输入不可用</a><a href="#section-3">挂载了工具但不能规划</a><a href="#section-4">规划失败</a><a href="#section-5">Python 执行失败</a><a href="#section-6">文件任务停在待授权</a><a href="#section-7">Wiki 与网站不同步</a><a href="#section-8">提交超时或重复点击</a></nav></div></body></html>
