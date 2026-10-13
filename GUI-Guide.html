@@ -6,7 +6,7 @@
 <div class="layout"><aside><label for="search">搜索文档</label><input id="search" type="search" placeholder="功能、指令、故障…"><nav aria-label="文档目录"><a  href="index.html">项目概览</a><a  href="Getting-Started.html">安装与启动</a><a aria-current="page" href="GUI-Guide.html">GUI 使用指南</a><a  href="Commands.html">指令参考</a><a  href="Skills-and-Tools.html">技能与工具</a><a  href="Architecture.html">架构与安全</a><a  href="Long-Workflows.html">多文件长流程</a><a  href="Development.html">测试与开发</a><a  href="Troubleshooting.html">常见问题</a></nav><p>让每一步，都有据可查。</p></aside>
 <main id="content"><div id="search-results" aria-live="polite"></div><article><h1>GUI 使用指南</h1>
 <h2 id="section-1">普通多轮对话</h2>
-<p>新建对话后默认进入“普通对话”，无需挂载工具。输入消息并发送，可以继续追问；历史保存在本地，刷新后恢复。回复过程中显示“正在回复”，同一对话一次只处理一条消息。普通对话不调用工具，也不会把消息自动规划成任务。</p>
+<p>新建对话后默认进入“普通对话”，无需挂载工具。输入消息并发送，可以继续追问；历史保存在本地，刷新后恢复。回复过程中显示“正在回复”，同一对话一次只处理一条消息。普通对话可以按需调用公开资料搜索，直接返回带来源的回答；不会自动创建文件或执行代码。</p>
 <p>GUI 与 CLI 使用相同的普通对话历史。CLI 输入 <code>/聊天</code> 进入普通对话模式，<code>/任务模式</code> 返回任务路由；<code>/chat 消息内容</code> 可发起单轮普通对话，<code>/history</code> 或 <code>/对话记录</code> 查看历史。用 <code>/use</code> 切换到同一会话后可以接着追问。模型上下文使用最近 24 轮普通对话，旧版工具 Agent 的检查点历史不自动混入普通对话。</p>
 <h2 id="section-2">名称、重命名和删除</h2>
 <p>首条消息先生成简短临时名称，回复完成后使用模型概括的主题标题；手动名称不会被自动覆盖。左侧“重命名”修改当前会话名称，与 CLI <code>/rename-session 名称</code> 双向同步。</p>
@@ -19,7 +19,7 @@
 <li>搜索、工作目录内读取和新建文本默认自动执行。已有文件覆盖会暂停，点击“审批工具操作”，核对原内容及新内容后确认。</li>
 <li>Python 仍需“审阅并执行”，核对代码并输入 <code>EXECUTE</code>。</li>
 </ol>
-<p>最多两项规划同时进行，每个计划最多 12 步。模型规划期限为 75 秒，单次自动执行进程最多 240 秒。失败或中断不自动重试；先核对结果再决定下一步。普通对话保持不调用工具。</p>
+<p>最多两项规划同时进行，每个计划最多 12 步。模型规划期限为 75 秒，单次自动执行进程最多 240 秒。失败或中断不自动重试；先核对结果再决定下一步。简单搜索可以直接在普通对话完成，不必创建任务。</p>
 <h2 id="section-4">技能偏好与工具目录</h2>
 <p>技能卡片可以展开阅读完整指导内容；超长内容在界面截断并提示。工具卡片显示说明、版本、风险类型、规划支持情况、输入和输出 Schema。</p>
 <p>技能勾选后点击“保存挂载”才会生效。取消勾选并保存可移除手动偏好；系统仍会按任务需要选择适合的技能。配置按会话保存，刷新后保留，不影响其他会话。</p>
@@ -51,5 +51,48 @@
 <p>工作目录显示在权限面板，默认为所选数据目录下的 <code>workspace</code>。只有该目录内的文本、数据和静态文档可写入；不会自动覆盖已有文件。工作目录外读取仍需要路径授权，现有授权目录内的读取可以自动推进。代码永远不能设置成自动批准。</p>
 <p>CLI 使用 <code>/agent 目标</code> 创建同类自动任务，<code>/tool-approve 任务编号</code> 审阅等待确认的步骤。<code>/tool-modes</code> 查看工作目录及策略，<code>/tool-mode public_search ask</code> 可把搜索改成每步确认。设置与 GUI 共用。</p>
 <h2 id="section-11">新闻请求</h2>
-<p>任务模式支持“给我最新的AI新闻资讯，昨天的”和“给我最近的AI新闻资讯总结”。新闻摘要直接显示在任务详情，包含北京时间范围、来源与发布时间。搜索失败、无匹配报道和摘要失败分别显示，不把百科搜索当成新闻搜索。</p>
-</article><footer>EduClaw · 当前开发版本 · Markdown 与 GitHub Wiki 同源<br><a href="https://github.com/weiyu687/EduClaw/tree/codex/roadmap-development/docs/wiki">查看文档源文件</a></footer></main><nav class="toc" aria-label="本页目录"><strong>本页内容</strong><a href="#section-1">普通多轮对话</a><a href="#section-2">名称、重命名和删除</a><a href="#section-3">创建第一个任务</a><a href="#section-4">技能偏好与工具目录</a><a href="#section-5">输入指令</a><a href="#section-6">查看状态与控制执行</a><a href="#section-7">待审批在哪里确认？</a><a href="#section-8">左侧栏与权限管理</a><a href="#section-9">审批后的步骤状态</a><a href="#section-10">自动工具与文件工作目录</a><a href="#section-11">新闻请求</a></nav></div></body></html>
+<p>直接在普通对话输入“给我最新的AI新闻资讯，昨天的”或“给我最近的AI新闻资讯总结”即可获得检索结果和摘要，无需切换模式。任务模式也保留同类能力。普通对话的摘要直接出现在消息中；任务模式的摘要显示在任务详情。两者均包含北京时间范围、来源与发布时间。搜索失败、无匹配报道和摘要失败分别显示，不把百科搜索当成新闻搜索。</p>
+<h2 id="section-12">如何选择对话与任务</h2>
+<p>默认直接对话。系统根据当前请求和最近对话判断需要哪些能力，而不是仅按文字长短分流：</p>
+<table>
+<thead>
+<tr>
+<th>请求</th>
+<th>处理方式</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>解释概念、写作、翻译、制定学习计划</td>
+<td>在对话中回答，必要时澄清</td>
+</tr>
+<tr>
+<td>最新 AI 新闻、昨天的新闻</td>
+<td>对话内调用 news_search，返回北京时间范围和来源</td>
+</tr>
+<tr>
+<td>搜索公开知识资料</td>
+<td>对话内调用 public_search（Wikipedia，不是通用全网搜索）</td>
+</tr>
+<tr>
+<td>基于刚才资料继续讨论</td>
+<td>使用已有上下文，无需重复搜索</td>
+</tr>
+<tr>
+<td>搜索后写文件、读回核对，或运行代码</td>
+<td>显示任务建议和原因；点击“准备任务 · 确认后提交”填入目标，用户提交后才创建</td>
+</tr>
+</tbody>
+</table>
+<p>普通对话每条最多执行一次公开搜索。搜索走与任务相同的 MCP 权限网关。若设为“每步确认”，会建议创建任务以审阅；禁用则说明无法检索，不会绕过限制。失败时明确告知，摘要失败时保留真实来源。模型分流可能误判，可补充需求或直接使用任务模式。</p>
+<p>CLI 的 <code>/chat 消息</code> 和 <code>/聊天</code> 使用同一机制。遇到任务建议时会提供 <code>/agent 目标</code> 的创建方式；不会自动运行。搜索证据和任务建议与消息一起保存在本地会话记录。</p>
+<h2 id="section-13">黑灰界面与快捷操作</h2>
+<p>新版采用中性黑灰配色，保留 EduClaw 的书页标识与学习主题欢迎页。侧栏可收起，支持搜索历史对话；技能、工具、权限和指令使用独立窗口。窄屏采用抽屉式侧栏。</p>
+<ul>
+<li>Enter 发送，Shift + Enter 换行；中文输入法选词不会触发发送。</li>
+<li>回复支持 Markdown 表格、列表、代码块、链接和复制；代码可单独复制。</li>
+<li>外部图片不自动加载，HTML 不执行，链接仅允许 HTTP、HTTPS 和邮件协议。</li>
+<li>管理窗口可用 Escape 关闭，并将键盘焦点返回入口按钮。</li>
+<li>欢迎页卡片填入示例目标，不会直接发送。</li>
+</ul>
+</article><footer>EduClaw · 当前开发版本 · Markdown 与 GitHub Wiki 同源<br><a href="https://github.com/weiyu687/EduClaw/tree/codex/roadmap-development/docs/wiki">查看文档源文件</a></footer></main><nav class="toc" aria-label="本页目录"><strong>本页内容</strong><a href="#section-1">普通多轮对话</a><a href="#section-2">名称、重命名和删除</a><a href="#section-3">创建第一个任务</a><a href="#section-4">技能偏好与工具目录</a><a href="#section-5">输入指令</a><a href="#section-6">查看状态与控制执行</a><a href="#section-7">待审批在哪里确认？</a><a href="#section-8">左侧栏与权限管理</a><a href="#section-9">审批后的步骤状态</a><a href="#section-10">自动工具与文件工作目录</a><a href="#section-11">新闻请求</a><a href="#section-12">如何选择对话与任务</a><a href="#section-13">黑灰界面与快捷操作</a></nav></div></body></html>
