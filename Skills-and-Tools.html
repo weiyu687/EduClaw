@@ -43,7 +43,7 @@
 </tr>
 </tbody>
 </table>
-<p>以上均要求单次路径授权，不写入文件、不执行文件中的内容。输入最大 1 MiB，输出最大 2 MB。
+<p>以上均要求工作目录或有效路径授权，不写入文件、不执行文件中的内容。输入最大 1 MiB，输出最大 2 MB。
 JSON 拒绝重复键、非有限数，最大深度 32、节点数 50000；JSONL 每行最大 64 KiB，最多 10000 条对象记录。
 CSV 数值统计用十进制字符串，忽略非数值、科学计数法和超过 64 字符的数值单元格；不会执行公式。</p>
 <p>工作台读取项目 <code>skills/&lt;id&gt;/SKILL.md</code>，提供名称、说明、版本和内容预览。已有技能包括 sandbox、document-pro、doc_retrieve 和 homework-grader。技能指导不保证相关业务流程均已完整验收；实际能力受已挂载工具、规划器与运行环境限制。</p>
@@ -68,6 +68,64 @@ description: 示例技能的适用范围
 </ol>
 <p>详细接口规范见仓库 <a href="https://github.com/weiyu687/EduClaw/blob/codex/roadmap-development/docs/TOOL_SDK.md">工具 SDK</a>。目前没有第三方工具一键下载、任意 MCP 服务器挂载或动态加载入口字符串的功能。</p>
 <h2 id="section-4">规划与权限</h2>
-<p>只有 <code>plannable</code> 工具可以进入当前最多 12 步的计划。模型请求仅包含已挂载的规划工具契约，模型输出和规范化后的计划均再次检查工具集合。</p>
-<p><code>run_python_code</code> 必须单独审阅并输入 <code>EXECUTE</code>。文件读取仍要求准确路径授权。工具权限偏好和全局网关继续生效：即使挂载了被禁用工具，挂载也不会解除禁用。</p>
-</article><footer>EduClaw · 当前开发版本 · Markdown 与 GitHub Wiki 同源<br><a href="https://github.com/weiyu687/EduClaw/tree/codex/roadmap-development/docs/wiki">查看文档源文件</a></footer></main><nav class="toc" aria-label="本页目录"><strong>本页内容</strong><a href="#section-1">二者的区别</a><a href="#section-2">已安装技能</a><a href="#section-3">工具注册与挂载</a><a href="#section-4">规划与权限</a></nav></div></body></html>
+<p>只有 <code>plannable</code> 工具可以进入当前最多 12 步的计划。模型请求包含受信任且未禁用的规划工具契约，模型输出和规范化后的计划均再次检查工具集合。</p>
+<p><code>run_python_code</code> 必须单独审阅并输入 <code>EXECUTE</code>。工作目录外文件读取仍要求准确路径授权。工具权限偏好和全局网关继续生效：即使挂载了被禁用工具，挂载也不会解除禁用。</p>
+<h2 id="section-5">免密钥搜索与官方 Filesystem MCP</h2>
+<p>新增 <code>public_search(query, limit)</code>，从 Wikipedia 获取标题、摘要和原始链接，无需搜索服务密钥。当前使用英文 Wikipedia，适合公开知识资料；该工具不覆盖全网、实时新闻或付费论文；新闻使用下方 news_search。网络失败会停止对应步骤，不生成虚假搜索证据。</p>
+<p>安装固定版本的官方文件服务：</p>
+<pre><code class="language-powershell">npm ci --prefix integrations/filesystem
+</code></pre>
+<p>Node.js 需要在 PATH 中。新增受控适配器：</p>
+<table>
+<thead>
+<tr>
+<th>工具</th>
+<th>能力</th>
+<th>默认策略</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>public_search</td>
+<td>搜索公开知识，返回最多 10 条结果</td>
+<td>自动；可改成确认或禁用</td>
+</tr>
+<tr>
+<td>mcp_list_files</td>
+<td>通过官方 MCP 列出工作目录</td>
+<td>自动</td>
+</tr>
+<tr>
+<td>mcp_read_file</td>
+<td>通过官方 MCP 读取工作目录内文本，最大 1 MB</td>
+<td>自动</td>
+</tr>
+<tr>
+<td>write_text_file</td>
+<td>通过官方 MCP 写文本，最大 200 KB</td>
+<td>新文件自动，已有文件确认</td>
+</tr>
+</tbody>
+</table>
+<p>写入支持 TXT、MD、JSON、JSONL、CSV、TSV、HTML、CSS、SVG。默认根目录为 <code>data/workspace</code>，随 <code>--data-dir</code> 改变，也可通过 <code>EDUCLAW_WORKSPACE_ROOT</code> 配置。禁止越界、相对路径和可执行脚本写入；审批绑定内容摘要，内容变化必须重新预览。该阶段不提供删除或移动文件。</p>
+<p>报告内容可以引用前序结果 <code>{{step:1:json:}}</code>，运行时替换成真实工具结果。文件内容只是数据，不会被作为 Python 执行。</p>
+<h2 id="section-6">标准 MCP 连接</h2>
+<p><code>/mcp-tools</code> 检查官方 Filesystem MCP；<code>/mcp-tools C:\path\mcp.json</code> 读取标准 <code>mcpServers</code> 配置并发现工具。支持 stdio 和 Streamable HTTP（远程要求 HTTPS，本机允许 HTTP）。配置为本机可信配置，stdio 会启动其中指定的程序。</p>
+<pre><code class="language-json">{
+  &quot;mcpServers&quot;: {
+    &quot;example&quot;: {
+      &quot;type&quot;: &quot;streamable-http&quot;,
+      &quot;url&quot;: &quot;https://your-server.example/mcp&quot;,
+      &quot;header_env&quot;: {&quot;Authorization&quot;: &quot;MY_MCP_AUTHORIZATION&quot;}
+    }
+  }
+}
+</code></pre>
+<p>令牌只通过本地环境变量填写，不放进仓库。工具发现不等于可执行：当前自动工作流使用已完成契约和权限适配的工具，任意第三方服务仍须通过上述工具注册流程接入。官方 Filesystem 的实际 stdio 读写已在 Windows 验收；其他远程服务需逐个验证。</p>
+<h2 id="section-7">上游技能</h2>
+<p>已引入 Anthropic 官方 skills 仓库中的 <code>frontend-design</code> 与 <code>mcp-builder</code>，本地标识为 <code>community-frontend-design</code> 和 <code>community-mcp-builder</code>。保留 Apache 2.0 许可证及 SOURCE.json 的固定提交信息，来源为 <a href="https://github.com/anthropics/skills/tree/dbd4588f9e1033efb41dad4bef2f7947c8993d44">anthropics/skills</a>。技能是参考指导，附带脚本不会自动运行，不授予网络、文件或进程权限。</p>
+<h2 id="section-8">最新新闻与“昨天”查询</h2>
+<p>新增 <code>news_search(query, period, limit)</code>，免密钥读取 Google News 公开 RSS。<code>latest</code> 为最近 24 小时，<code>today</code> 为北京时间今天，<code>yesterday</code> 为北京时间昨天，<code>week</code> 为最近 7 天。日期在执行时计算，按条目的实际发布时间再次过滤，不依赖模型猜日期，也不把旧新闻填充进指定范围。</p>
+<p>可直接在任务模式输入“给我最新的AI新闻资讯，昨天的”或“给我最近的AI新闻资讯总结”。系统选择新闻工具，完成后使用保存的标题与摘要生成中文归纳，每条附带真实来源和发布时间。摘要不表示已经阅读全文；无结果会明确说明。公开 RSS 不是稳定的商业 API，可能出现网络限制或无结果，不保证全量覆盖。工具可改成每步确认或禁用。</p>
+<p>新闻工具只访问固定的 Google News RSS 地址，查询长度、条数、响应体和超时有界。新闻文本仅为不可信数据，摘要模型不带工具；来源编号必须指向已获得的条目。旧的失败提交保留历史状态，升级后重新提交原文即可。</p>
+</article><footer>EduClaw · 当前开发版本 · Markdown 与 GitHub Wiki 同源<br><a href="https://github.com/weiyu687/EduClaw/tree/codex/roadmap-development/docs/wiki">查看文档源文件</a></footer></main><nav class="toc" aria-label="本页目录"><strong>本页内容</strong><a href="#section-1">二者的区别</a><a href="#section-2">已安装技能</a><a href="#section-3">工具注册与挂载</a><a href="#section-4">规划与权限</a><a href="#section-5">免密钥搜索与官方 Filesystem MCP</a><a href="#section-6">标准 MCP 连接</a><a href="#section-7">上游技能</a><a href="#section-8">最新新闻与“昨天”查询</a></nav></div></body></html>

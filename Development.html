@@ -30,4 +30,9 @@ python scripts/build_docs.py --site-dir logs/docs-site --wiki-dir logs/wiki-publ
 </code></pre>
 <p><code>logs/wiki-publish</code> 应先克隆项目的 Wiki Git 仓库。站点产物通过 <code>gh-pages</code> 分支发布到 GitHub Pages，网站为纯静态文档，不部署本机任务 API，也不上传运行数据库、日志或密钥。</p>
 <p>构建后检查页面导航与移动端布局，再将 Wiki 和站点提交到各自 Git 仓库。完整阶段记录见 <a href="https://github.com/weiyu687/EduClaw/blob/codex/roadmap-development/docs/DEVELOPMENT_STATUS.md">开发验收记录</a>。</p>
-</article><footer>EduClaw · 当前开发版本 · Markdown 与 GitHub Wiki 同源<br><a href="https://github.com/weiyu687/EduClaw/tree/codex/roadmap-development/docs/wiki">查看文档源文件</a></footer></main><nav class="toc" aria-label="本页目录"><strong>本页内容</strong><a href="#section-1">前端</a><a href="#section-2">Python 与 Windows 验收</a><a href="#section-3">文档源与发布</a></nav></div></body></html>
+<p>会话与状态同步验收：<code>python scripts/windows_gui4_e2e.py</code>（真实模型、Windows Edge、GUI/CLI 往返多轮对话、摘要与手动名称、删除及 Docker 审批状态）。</p>
+<h2 id="section-4">MCP 与自动任务验收</h2>
+<p><code>python scripts/windows_mcp_agent_e2e.py</code> 使用 Windows Edge、真实模型、Wikipedia 和官方 Filesystem MCP，验证 GUI/CLI 搜索、写入、读回和目录列表，覆盖审批，以及 CLI 权限设置与 GUI 确认的一致性。</p>
+<p>阶段回归运行 <code>python -m pytest test --ignore=test/test_agent_memory_e2e.py --ignore=test/test_memory_system.py -q</code>。这两个旧记忆测试文件是手动异步集成脚本，不属于该回归；直接运行全目录 pytest 会因未配置异步插件报错，本阶段未宣称记忆系统通过验收。</p>
+<p><code>python scripts/windows_news_e2e.py</code> 原样重放“最新的AI新闻资讯，昨天的”和“最近的AI新闻资讯总结”，真实检索 RSS、核对日期范围、生成来源绑定摘要，并在 Windows Edge 查看。</p>
+</article><footer>EduClaw · 当前开发版本 · Markdown 与 GitHub Wiki 同源<br><a href="https://github.com/weiyu687/EduClaw/tree/codex/roadmap-development/docs/wiki">查看文档源文件</a></footer></main><nav class="toc" aria-label="本页目录"><strong>本页内容</strong><a href="#section-1">前端</a><a href="#section-2">Python 与 Windows 验收</a><a href="#section-3">文档源与发布</a><a href="#section-4">MCP 与自动任务验收</a></nav></div></body></html>

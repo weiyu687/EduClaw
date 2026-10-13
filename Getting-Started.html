@@ -35,4 +35,6 @@ python -m core.gui.server
 </code></pre>
 <p><code>/sessions</code> 查看会话，<code>/use &lt;ID&gt;</code> 切换到对应会话，<code>/任务</code> 查看并选择任务。GUI 与 CLI 使用同一数据目录时，任务进度和执行认领共享。</p>
 <p>继续阅读 <a href="GUI-Guide.html">GUI 使用指南</a> 与 <a href="Troubleshooting.html">常见问题</a>。</p>
-</article><footer>EduClaw · 当前开发版本 · Markdown 与 GitHub Wiki 同源<br><a href="https://github.com/weiyu687/EduClaw/tree/codex/roadmap-development/docs/wiki">查看文档源文件</a></footer></main><nav class="toc" aria-label="本页目录"><strong>本页内容</strong><a href="#section-1">环境要求</a><a href="#section-2">获取当前开发版本</a><a href="#section-3">启动 GUI</a><a href="#section-4">启动 CLI</a></nav></div></body></html>
+<h2 id="section-5">启用文件 MCP</h2>
+<p>在仓库根目录运行 <code>npm ci --prefix integrations/filesystem</code>，安装固定版本的官方 Filesystem MCP。Node.js 需在 PATH 中；更新后重新构建前端并重启 GUI。任务模式自动选用工具，搜索无需服务密钥，模型配置仍沿用本地设置。</p>
+</article><footer>EduClaw · 当前开发版本 · Markdown 与 GitHub Wiki 同源<br><a href="https://github.com/weiyu687/EduClaw/tree/codex/roadmap-development/docs/wiki">查看文档源文件</a></footer></main><nav class="toc" aria-label="本页目录"><strong>本页内容</strong><a href="#section-1">环境要求</a><a href="#section-2">获取当前开发版本</a><a href="#section-3">启动 GUI</a><a href="#section-4">启动 CLI</a><a href="#section-5">启用文件 MCP</a></nav></div></body></html>
