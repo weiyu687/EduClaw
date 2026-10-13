@@ -35,6 +35,8 @@ def classification(name):
         return ('auto', 'deny'), 'auto', '公开只读'
     if name in FILE_ARGUMENTS:
         return ('ask', 'deny'), 'ask', '按路径授权'
+    if name == 'write_text_file':
+        return ('ask','deny'), 'ask', '工作目录写入，覆盖需确认'
     if name in APPROVAL_EXECUTE:
         return ('always_ask', 'deny'), 'always_ask', '每次审批'
     return ('deny',), 'deny', '未适配，禁止执行'

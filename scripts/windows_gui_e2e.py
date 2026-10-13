@@ -44,6 +44,7 @@ def main():
                 expect(page.get_by_text('这里还没有任务',exact=True)).to_be_visible()
                 assert 'token=' not in page.url
                 page.get_by_label('选择会话').select_option(session)
+                page.get_by_role('button',name='任务模式',exact=True).click()
                 card = page.locator('.task-card').first
                 expect(card).to_be_visible();card.focus();page.keyboard.press('Enter')
                 expect(page.get_by_role('button',name='暂停任务',exact=True)).to_be_visible()

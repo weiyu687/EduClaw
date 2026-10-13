@@ -34,7 +34,7 @@ class ToolRegistry:
                 raise ValueError('Invalid tool version')
             if item.get('adapter') != name:
                 raise ValueError('Adapter must be explicitly bound by tool name')
-            if item.get('risk') not in ('path_read', 'public_read', 'code_execute', 'denied'):
+            if item.get('risk') not in ('path_read', 'path_write', 'public_read', 'code_execute', 'denied'):
                 raise ValueError('Unknown risk class')
             if item.get('output_encoding') not in ('text', 'json'):
                 raise ValueError('Unknown output encoding')
@@ -61,7 +61,7 @@ class ToolRegistry:
                 if (field not in item['inputSchema'].get('required', []) or
                         item['inputSchema'].get('properties', {}).get(field, {}).get('type') != 'string'):
                     raise ValueError('Read contract must declare a required path')
-            if item.get('plannable') and item['risk'] not in ('path_read', 'code_execute'):
+            if item.get('plannable') and item['risk'] not in ('path_read', 'path_write', 'public_read', 'code_execute'):
                 raise ValueError('No planning adapter for this risk class')
             item['digest'] = hashlib.sha256(json.dumps(item, sort_keys=True, ensure_ascii=False).encode()).hexdigest()
             self._items[name] = item

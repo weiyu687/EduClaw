@@ -37,6 +37,15 @@ def _roots():
 def authorize(tool_name, arguments):
     """Fail closed before any MCP transport call. No model-supplied grants."""
     decision = evaluate(tool_name, arguments)
+    from core.security.read_grants import current_session, db_path
+    state_db=db_path().with_name('educlaw_state.sqlite3')
+    if current_session() and state_db.exists():
+        import sqlite3
+        from contextlib import closing
+        with closing(sqlite3.connect(state_db)) as db:
+            cols={r[1] for r in db.execute('PRAGMA table_info(sessions)')}
+            if 'deleted_at' in cols and db.execute('SELECT 1 FROM sessions WHERE id=? AND deleted_at IS NOT NULL',(current_session(),)).fetchone():
+                raise GlobalToolDenied('会话已删除，禁止调用工具。')
     from core.gui.permissions import denied
     if denied(tool_name):
         raise GlobalToolDenied(f'工具已在权限设置中禁用: {tool_name}')
@@ -54,6 +63,20 @@ def authorize(tool_name, arguments):
     except ValueError as exc:
         raise GlobalToolDenied(str(exc)) from exc
     if tool_name in NO_FILE_READ:
+        from core.gui.permissions import tool_modes
+        from core.security.write_approval import consume
+        mode=next(x['mode'] for x in tool_modes(db_path().parent) if x['name']==tool_name)
+        if mode=='ask' and not consume(arguments,tool_name):
+            raise GlobalToolDenied('此工具已设置为每步确认。')
+        return
+    if tool_name=='write_text_file':
+        from core.security.workspace_policy import workspace_path
+        from core.security.write_approval import consume
+        target=workspace_path(arguments['path'])
+        from core.gui.permissions import tool_modes
+        mode=next(x['mode'] for x in tool_modes(db_path().parent) if x['name']==tool_name)
+        if (target.exists() or mode=='ask') and not consume(arguments):
+            raise GlobalToolDenied('覆盖已有文件必须确认准确内容。')
         return
     if tool_name == "run_python_code":
         if authorize_code(tool_name, arguments):
@@ -74,9 +97,15 @@ def authorize(tool_name, arguments):
     except (OSError, RuntimeError) as exc:
         raise GlobalToolDenied('File path cannot be safely resolved') from exc
     from core.security.read_grants import consume_reviewed_read
-    if not consume_reviewed_read(tool_name, target) and not any(target.is_relative_to(root) for root in roots) and not dynamic_read_allowed(target, consume=True):
+    from core.security.workspace_policy import workspace_root
+    from core.gui.permissions import tool_modes
+    mode=next(x['mode'] for x in tool_modes(db_path().parent) if x['name']==tool_name)
+    reviewed=consume_reviewed_read(tool_name,target)
+    if mode=='ask' and not reviewed:
+        raise GlobalToolDenied('此工具已设置为每步确认。')
+    if not target.is_relative_to(workspace_root()) and not reviewed and not any(target.is_relative_to(root) for root in roots) and not dynamic_read_allowed(target, consume=True):
         raise GlobalToolDenied(f'File path is outside authorized read roots: {target}')
-    if tool_name == 'get_all_files':
+    if tool_name in ('get_all_files','mcp_list_files'):
         if not target.is_dir():
             raise GlobalToolDenied('Expected an authorized directory')
     elif not target.is_file():

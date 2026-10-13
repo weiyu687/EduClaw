@@ -1,0 +1,6 @@
+{
+  "repository": "https://github.com/anthropics/skills",
+  "commit": "dbd4588f9e1033efb41dad4bef2f7947c8993d44",
+  "path": "skills/frontend-design",
+  "execution": "guidance only; bundled scripts are not automatically executed"
+}

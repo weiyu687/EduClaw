@@ -10,7 +10,7 @@ def test_explanations_not_execution():
         assert decision.explanation_requested and not decision.execution_requested
 
 
-def test_answer_only_never_calls_agent_graph_or_mcp():
+def test_answer_only_never_calls_agent_graph_or_mcp(tmp_path):
     agent = object.__new__(EduClawAgent)
     agent.session_id = 'test-session'
     agent.model = MagicMock()
@@ -19,13 +19,15 @@ def test_answer_only_never_calls_agent_graph_or_mcp():
     agent.agent.ainvoke = AsyncMock()
     agent.mcp_client = MagicMock()
     agent.mcp_client.use_tool = AsyncMock()
-    agent.state_manager = MagicMock()
-    agent.state_manager.start_run.return_value = 'test-run'
+    from core.state.manager import StateManager
+    agent.state_manager = StateManager(tmp_path/'state.sqlite3')
+    agent.state_manager.ensure_session(agent.session_id)
     result = asyncio.run(agent.answer_only('举例说明 Python 装饰器'))
     assert '解释' in result
     agent.agent.ainvoke.assert_not_awaited()
     agent.mcp_client.use_tool.assert_not_awaited()
-    agent.state_manager.finish_run.assert_called_once_with('test-run', 'completed', output=result)
+    from core.state.conversation import Conversation
+    assert Conversation(agent.state_manager.path).history(agent.session_id)[0]['answer']==result
 
 
 def test_explicit_execution_remains_eligible():

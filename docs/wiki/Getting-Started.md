@@ -51,3 +51,7 @@ python -m core.usr.main
 `/sessions` 查看会话，`/use <ID>` 切换到对应会话，`/任务` 查看并选择任务。GUI 与 CLI 使用同一数据目录时，任务进度和执行认领共享。
 
 继续阅读 [GUI 使用指南](GUI-Guide) 与 [常见问题](Troubleshooting)。
+
+## 启用文件 MCP
+
+在仓库根目录运行 `npm ci --prefix integrations/filesystem`，安装固定版本的官方 Filesystem MCP。Node.js 需在 PATH 中；更新后重新构建前端并重启 GUI。任务模式自动选用工具，搜索无需服务密钥，模型配置仍沿用本地设置。

@@ -46,6 +46,9 @@ class TaskCatalog:
                     db.execute(f"ALTER TABLE {table} ADD COLUMN title TEXT NOT NULL DEFAULT ''")
                 if 'deleted_at' not in cols:
                     db.execute(f'ALTER TABLE {table} ADD COLUMN deleted_at TEXT')
+                if table=='sessions' and 'title_manual' not in cols:
+                    db.execute('ALTER TABLE sessions ADD COLUMN title_manual INTEGER NOT NULL DEFAULT 0')
+                    db.execute("UPDATE sessions SET title_manual=1 WHERE title<>''")
 
     def sessions(self, user_id=None):
         with self._connect(self.state_db) as db:
@@ -71,9 +74,9 @@ class TaskCatalog:
         title = clean_title(title)
         with self._connect(self.state_db) as db:
             if user_id is None:
-                result = db.execute('UPDATE sessions SET title=? WHERE id=? AND deleted_at IS NULL', (title, session_id))
+                result = db.execute('UPDATE sessions SET title=?,title_manual=1 WHERE id=? AND deleted_at IS NULL', (title, session_id))
             else:
-                result = db.execute('UPDATE sessions SET title=? WHERE id=? AND user_id=? AND deleted_at IS NULL', (title, session_id, user_id))
+                result = db.execute('UPDATE sessions SET title=?,title_manual=1 WHERE id=? AND user_id=? AND deleted_at IS NULL', (title, session_id, user_id))
             if result.rowcount != 1:
                 raise LookupError('会话不存在或无权限')
         return title

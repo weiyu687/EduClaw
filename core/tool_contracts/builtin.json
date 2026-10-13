@@ -606,5 +606,177 @@
       "additionalProperties": false
     },
     "max_output_bytes": 2000000
+  },
+  {
+    "name": "public_search",
+    "description": "免费搜索 Wikipedia 公开资料，返回标题、摘要和来源链接；不是全网搜索。",
+    "inputSchema": {
+      "type": "object",
+      "properties": {
+        "query": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 400
+        },
+        "limit": {
+          "type": "integer",
+          "minimum": 1,
+          "maximum": 10
+        }
+      },
+      "required": [
+        "query"
+      ],
+      "additionalProperties": false
+    },
+    "version": "1.0.0",
+    "sdk_version": 1,
+    "adapter": "public_search",
+    "risk": "public_read",
+    "resource_argument": null,
+    "plannable": true,
+    "extensions": [],
+    "output_encoding": "json",
+    "output_schema": {
+      "type": "object"
+    },
+    "max_output_bytes": 1000000
+  },
+  {
+    "name": "mcp_read_file",
+    "description": "通过官方 Filesystem MCP 读取工作目录内 UTF-8 文本文件。",
+    "inputSchema": {
+      "type": "object",
+      "properties": {
+        "path": {
+          "type": "string"
+        }
+      },
+      "required": [
+        "path"
+      ],
+      "additionalProperties": false
+    },
+    "version": "1.0.0",
+    "sdk_version": 1,
+    "adapter": "mcp_read_file",
+    "risk": "path_read",
+    "resource_argument": "path",
+    "plannable": true,
+    "extensions": [],
+    "output_encoding": "json",
+    "output_schema": {
+      "type": "object"
+    },
+    "max_output_bytes": 1000000
+  },
+  {
+    "name": "mcp_list_files",
+    "description": "通过官方 Filesystem MCP 列出工作目录中的文件。",
+    "inputSchema": {
+      "type": "object",
+      "properties": {
+        "path": {
+          "type": "string"
+        }
+      },
+      "required": [
+        "path"
+      ],
+      "additionalProperties": false
+    },
+    "version": "1.0.0",
+    "sdk_version": 1,
+    "adapter": "mcp_list_files",
+    "risk": "path_read",
+    "resource_argument": "path",
+    "plannable": true,
+    "extensions": [],
+    "output_encoding": "json",
+    "output_schema": {
+      "type": "object"
+    },
+    "max_output_bytes": 1000000
+  },
+  {
+    "name": "write_text_file",
+    "description": "通过官方 Filesystem MCP 写入工作目录内的文本或数据文件。content 可嵌入前序 JSON 引用 {{step:1:json:}}；新文件自动写入，覆盖需确认。",
+    "inputSchema": {
+      "type": "object",
+      "properties": {
+        "path": {
+          "type": "string"
+        },
+        "content": {
+          "type": "string",
+          "maxLength": 200000
+        },
+        "expected_sha256": {
+          "type": "string",
+          "pattern": "^([a-f0-9]{64})?$"
+        }
+      },
+      "required": [
+        "path",
+        "content"
+      ],
+      "additionalProperties": false
+    },
+    "version": "1.0.0",
+    "sdk_version": 1,
+    "adapter": "write_text_file",
+    "risk": "path_write",
+    "resource_argument": "path",
+    "plannable": true,
+    "extensions": [],
+    "output_encoding": "json",
+    "output_schema": {
+      "type": "object"
+    },
+    "max_output_bytes": 1000000
+  },
+  {
+    "name": "news_search",
+    "description": "免密钥搜索公开新闻标题、摘要、来源和发布时间。period: latest=最近24小时，today=北京时间今天，yesterday=北京时间昨天，week=最近7天。按实际发布时间过滤，不读全文。",
+    "inputSchema": {
+      "type": "object",
+      "properties": {
+        "query": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 200
+        },
+        "period": {
+          "type": "string",
+          "enum": [
+            "latest",
+            "today",
+            "yesterday",
+            "week"
+          ]
+        },
+        "limit": {
+          "type": "integer",
+          "minimum": 1,
+          "maximum": 15
+        }
+      },
+      "required": [
+        "query"
+      ],
+      "additionalProperties": false
+    },
+    "version": "1.0.0",
+    "sdk_version": 1,
+    "adapter": "news_search",
+    "risk": "public_read",
+    "resource_argument": null,
+    "plannable": true,
+    "extensions": [],
+    "output_encoding": "json",
+    "output_schema": {
+      "type": "object"
+    },
+    "max_output_bytes": 1000000
   }
 ]

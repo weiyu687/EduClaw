@@ -93,6 +93,8 @@ class Handler(BaseHTTPRequestHandler):
                 result = service.permissions(params['session'])
             elif path.path == '/api/submissions' and set(params) == {'session'}:
                 result = self.server.workspace.submissions(params['session'])
+            elif path.path == '/api/chat' and set(params)=={'session'}:
+                result = self.server.workspace.conversation.history(params['session'])
             elif path.path == '/api/tasks' and set(params) == {'session'}:
                 result = service.tasks(params['session'])
             elif path.path == '/api/task' and set(params) == {'session','number'}:
@@ -130,6 +132,10 @@ class Handler(BaseHTTPRequestHandler):
                 result = self.server.workspace.save_mounts(body['session'],body['skills'],body['tools'])
             elif self.path == '/api/submit' and set(body) == {'session','text','request_id'}:
                 result = self.server.workspace.submit(body['session'],body['text'],body['request_id'])
+            elif self.path == '/api/chat' and set(body)=={'session','text','request_id'}:
+                result = self.server.workspace.chat(body['session'],body['text'],body['request_id'])
+            elif self.path == '/api/session/change' and set(body)=={'session','action','value'}:
+                result = service.session_change(body['session'],body['action'],body['value'])
             elif self.path == '/api/preview' and set(body) == {'session','number','action'}:
                 result = service.preview(body['session'], body['number'], body['action'])
             elif self.path == '/api/permissions' and set(body) == {'session','kind','value','mode'}:

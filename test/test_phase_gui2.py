@@ -46,8 +46,7 @@ def test_mounts_session_isolation_validation_and_restart(workspace):
 
 def test_submission_uses_mounts_never_executes_and_is_idempotent(workspace):
     w,s,model=workspace
-    with pytest.raises(PermissionError): w.submit(s,'计算 6*7','a'*32)
-    w.save_mounts(s,['sandbox'],['run_python_code'])
+    w.save_mounts(s,['sandbox'],[])
     w.submit(s,'计算 6*7','a'*32)
     row=finished(w,s,'a'*32)
     assert row['status']=='ready',row
@@ -63,9 +62,11 @@ def test_submission_uses_mounts_never_executes_and_is_idempotent(workspace):
     with pytest.raises(LookupError): w.submission(other,'a'*32)
 
 
-def test_unmounted_tool_rejected_and_failure_redacted(workspace):
+def test_disabled_tool_rejected_and_failure_redacted(workspace):
     w,s,model=workspace
     w.save_mounts(s,[],['extract_csv'])
+    from core.gui.permissions import set_tool_mode
+    set_tool_mode(w.dashboard.directory,'run_python_code','deny')
     w.submit(s,'计算 6*7','b'*32)
     row=finished(w,s,'b'*32)
     assert row['status']=='failed' and not w.dashboard.tasks(s)
@@ -103,8 +104,9 @@ def test_explicit_unsupported_tool_is_not_substituted(workspace):
     w,s,model=workspace
     w.save_mounts(s,[],['run_python_code'])
     with pytest.raises(PermissionError): w.submit(s,'使用 run_python_file 执行文件','e'*32)
-    with pytest.raises(PermissionError): w.submit(s,'使用 extract_csv 读取数据','f'*32)
     assert not model.calls
+    w.submit(s,'使用 extract_csv 读取数据','f'*32)
+    assert finished(w,s,'f'*32)['status']=='ready'
 
 
 def test_each_planning_loop_owns_and_closes_its_transport(workspace,monkeypatch):

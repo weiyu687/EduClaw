@@ -27,7 +27,7 @@ class ReadStepService:
         digest = hashlib.sha256(json.dumps([session, task, index, step, path], sort_keys=True).encode()).hexdigest()
         return dict(index=index, tool=step['tool'], path=path, arguments=step['arguments'], digest=digest)
 
-    async def execute(self, session, task, digest, client):
+    async def execute(self, session, task, digest, client, approved=True):
         b = self.base
         index = b.flow.pending(session, task)['index']
         with b.ledger.operation_lock(session, task, index):
@@ -37,7 +37,8 @@ class ReadStepService:
             b.ledger.claim(session, task, index, arguments_digest=fingerprint(review['tool'],review['arguments']))
             b.ledger.event(session, task, index, 'read_approved', {'path':review['path'], 'digest':digest})
             try:
-                with session_context(session), reviewed_read(review['tool'], review['path']):
+                from contextlib import nullcontext
+                with session_context(session), (reviewed_read(review['tool'], review['path']) if approved else nullcontext()):
                     response = await controlled_call(lambda:client.use_tool(review['tool'],review['arguments']),b.ledger,session,task)
                 full = normalize_response(response)
                 outcome = dict(status='uncertain' if getattr(response,'isError',False) else 'completed', output=full[:20000])

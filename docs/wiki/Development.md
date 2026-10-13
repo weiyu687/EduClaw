@@ -39,3 +39,13 @@ python scripts/build_docs.py --site-dir logs/docs-site --wiki-dir logs/wiki-publ
 `logs/wiki-publish` 应先克隆项目的 Wiki Git 仓库。站点产物通过 `gh-pages` 分支发布到 GitHub Pages，网站为纯静态文档，不部署本机任务 API，也不上传运行数据库、日志或密钥。
 
 构建后检查页面导航与移动端布局，再将 Wiki 和站点提交到各自 Git 仓库。完整阶段记录见 [开发验收记录](https://github.com/weiyu687/EduClaw/blob/codex/roadmap-development/docs/DEVELOPMENT_STATUS.md)。
+
+会话与状态同步验收：`python scripts/windows_gui4_e2e.py`（真实模型、Windows Edge、GUI/CLI 往返多轮对话、摘要与手动名称、删除及 Docker 审批状态）。
+
+## MCP 与自动任务验收
+
+`python scripts/windows_mcp_agent_e2e.py` 使用 Windows Edge、真实模型、Wikipedia 和官方 Filesystem MCP，验证 GUI/CLI 搜索、写入、读回和目录列表，覆盖审批，以及 CLI 权限设置与 GUI 确认的一致性。
+
+阶段回归运行 `python -m pytest test --ignore=test/test_agent_memory_e2e.py --ignore=test/test_memory_system.py -q`。这两个旧记忆测试文件是手动异步集成脚本，不属于该回归；直接运行全目录 pytest 会因未配置异步插件报错，本阶段未宣称记忆系统通过验收。
+
+`python scripts/windows_news_e2e.py` 原样重放“最新的AI新闻资讯，昨天的”和“最近的AI新闻资讯总结”，真实检索 RSS、核对日期范围、生成来源绑定摘要，并在 Windows Edge 查看。

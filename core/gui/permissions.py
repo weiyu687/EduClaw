@@ -12,13 +12,15 @@ def tool_modes(directory):
         db.execute('CREATE TABLE IF NOT EXISTS gui_tool_modes(tool TEXT PRIMARY KEY, mode TEXT NOT NULL)')
         rows = dict(db.execute('SELECT tool,mode FROM gui_tool_modes'))
         db.commit()
-    return [dict(name=t['name'], mode=rows.get(t['name'], 'ask'), risk=t['risk'])
+    return [dict(name=t['name'], mode=rows.get(t['name'], 'auto' if t['risk'] in ('public_read','path_read','path_write') else 'ask'), risk=t['risk'])
             for t in builtin_registry().items()]
 
 
 def set_tool_mode(directory, tool, mode):
-    if mode not in ('ask', 'deny') or tool not in {t['name'] for t in builtin_registry().items()}:
+    if mode not in ('auto', 'ask', 'deny') or tool not in {t['name'] for t in builtin_registry().items()}:
         raise ValueError('工具或权限设置无效。')
+    if mode=='auto' and builtin_registry().get(tool)['risk'] not in ('public_read','path_read','path_write'):
+        raise ValueError('执行代码不支持自动批准。')
     tool_modes(directory)
     with closing(sqlite3.connect(Path(directory) / 'educlaw_permissions.sqlite3')) as db:
         db.execute('INSERT INTO gui_tool_modes VALUES(?,?) ON CONFLICT(tool) DO UPDATE SET mode=excluded.mode', (tool, mode))
@@ -34,4 +36,4 @@ def denied(tool):
         if not db.execute("SELECT 1 FROM sqlite_master WHERE name='gui_tool_modes'").fetchone():
             return False
         row = db.execute('SELECT mode FROM gui_tool_modes WHERE tool=?', (tool,)).fetchone()
-    return bool(row and row[0] != 'ask')
+    return bool(row and row[0] not in ('ask','auto'))

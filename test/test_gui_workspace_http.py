@@ -26,5 +26,18 @@ def test_permissions_http_boundary(server):
     change={'session':'s','kind':'tool','value':'extract_text','mode':'deny'}
     assert call(server,'/api/permissions',method='POST',body=change,headers={k:v for k,v in auth.items() if k!='Origin'})[0]==403
     assert call(server,'/api/permissions',method='POST',body=change,headers=auth)[0]==200
-    assert call(server,'/api/permissions',method='POST',body={**change,'mode':'auto'},headers=auth)[0]==409
+    assert call(server,'/api/permissions',method='POST',body={**change,'mode':'auto'},headers=auth)[0]==200
+    assert call(server,'/api/permissions',method='POST',body={**change,'value':'run_python_code','mode':'auto'},headers=auth)[0]==409
     assert call(server,'/api/permissions',method='POST',body={**change,'session':'unknown'},headers=auth)[0]==409
+
+def test_chat_and_session_management_http_boundary(server):
+    auth={'Authorization':'Bearer '+server.token,'Content-Type':'application/json','Origin':server.origin}
+    assert call(server,'/api/chat?session=s')[0]==403
+    assert call(server,'/api/chat?session=s',headers=auth)[0]==200
+    rename={'session':'s','action':'rename','value':'共同的会话标题'}
+    assert call(server,'/api/session/change',method='POST',body=rename,headers={k:v for k,v in auth.items() if k!='Origin'})[0]==403
+    assert call(server,'/api/session/change',method='POST',body=rename,headers=auth)[0]==200
+    status,body,_=call(server,'/api/sessions',headers=auth)
+    assert any(s['label']=='共同的会话标题' for s in json.loads(body))
+    assert call(server,'/api/chat?session=missing',headers=auth)[0]==409
+    assert call(server,'/api/session/change',method='POST',body={**rename,'action':'delete_confirm','value':'forged'},headers=auth)[0]==409

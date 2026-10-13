@@ -28,6 +28,8 @@ class Workspace:
         self.owner = uuid.uuid4().hex
         self.slots = threading.BoundedSemaphore(2)
         self.model_factory = model_factory
+        from core.state.conversation import Conversation
+        self.conversation=Conversation(dashboard.directory/'educlaw_state.sqlite3')
         with self.db() as db:
             db.executescript('''
                 CREATE TABLE IF NOT EXISTS mounts(session TEXT PRIMARY KEY, skills TEXT, tools TEXT);
@@ -51,6 +53,17 @@ class Workspace:
 
     def new_session(self):
         return {'session':StateManager(self.dashboard.directory/'educlaw_state.sqlite3').ensure_session()}
+
+    def chat(self,session,text,request_id):
+        self.validate_session(session)
+        with self.dashboard.lock:
+            rid,fresh=self.conversation.begin(session,text,request_id)
+            if fresh:
+                def reply():
+                    try:asyncio.run(self.conversation.complete(session,rid,self.model_factory() if self.model_factory else None))
+                    except Exception:pass  # Status persists; provider errors are never exposed.
+                threading.Thread(target=reply,daemon=True).start()
+        return {'id':rid}
 
     def catalog(self):
         skills=[]
@@ -85,6 +98,8 @@ class Workspace:
         if not isinstance(request_id,str) or not re.fullmatch(r'[a-zA-Z0-9_-]{16,80}',request_id):
             raise ValueError('提交标识无效。')
         text=text.strip()
+        with self.conversation.state._connection() as db:
+            db.execute("UPDATE sessions SET title=? WHERE id=? AND title=''",(text[:24],session))
         policy=explicit_tool_policy(text)
         if policy and policy[1]=='deny':
             raise PermissionError(policy[2])
@@ -95,11 +110,10 @@ class Workspace:
                 if old['session']!=session or old['goal']!=text:
                     raise PermissionError('提交标识已用于其他请求。')
                 return self.submission(session,request_id)
-            config=self.mounts(session)
-            if policy and policy[0] not in config['tools']:
-                raise PermissionError('明确指定的工具尚未挂载。')
-            if not any(x['name'] in config['tools'] and x['plannable'] for x in builtin_registry().items()):
-                raise PermissionError('请先挂载至少一个支持任务规划的工具。')
+            from core.security.workspace_policy import select_capabilities
+            from core.security.read_grants import permission_database
+            with permission_database(self.dashboard.directory/'educlaw_permissions.sqlite3'):
+                config=select_capabilities(text,self.skills,self.mounts(session)['skills'])
             config['guidance']='\n\n'.join(self.skills.load(x) for x in config['skills'])
             if len(config['guidance'])>48000:
                 raise ValueError('挂载技能内容过长，请减少技能。')
@@ -130,6 +144,11 @@ class Workspace:
         return [self.submission(session,x) for x in ids]
 
     def plan(self,request_id,session,text,config):
+        from core.security.read_grants import permission_database
+        with permission_database(self.dashboard.directory/'educlaw_permissions.sqlite3'):
+            self._plan(request_id,session,text,config)
+
+    def _plan(self,request_id,session,text,config):
         try:
             async def draft():
                 async with asyncio.timeout(75):
@@ -154,11 +173,20 @@ class Workspace:
                 context.flow.begin(session,text,[{'tool':s['tool'],'arguments':s['arguments']} for s in steps],task_id=task)
                 context.created(session,task)
                 number=next(n for n,s in context.tasks(session) if s.values['task_id']==task)
+            self.dashboard.start_auto(session,number)
             with self.db() as db:
                 db.execute("UPDATE submissions SET status='ready',number=? WHERE id=?",(number,request_id))
         except Exception as exc:
             # Raw provider exceptions can contain credentials or request URLs.
-            message=('规划失败：'+type(exc).__name__+'。请检查模型配置、挂载范围或目标是否受支持；未自动执行工具。')
+            from core.security.multi_step_graph import UnsupportedGoalError
+            if isinstance(exc,UnsupportedGoalError):
+                message='当前可用工具无法完成这个目标。请检查工具是否被禁用，或调整目标；新闻请求需要 news_search。'
+            elif isinstance(exc,ValueError):
+                message='模型返回的计划格式或参数无效，未创建可执行任务。请简化目标后重试；无需手动挂载工具。'
+            elif isinstance(exc,PermissionError):
+                message='计划被权限策略阻止。请查看“工具与文件权限”，检查所需工具或文件范围。'
+            else:
+                message='规划服务暂时不可用。请检查模型连接后重试；未自动重试工具操作。'
             with self.db() as db:
                 db.execute("UPDATE submissions SET status='failed',error=? WHERE id=?",(message,request_id))
         finally:

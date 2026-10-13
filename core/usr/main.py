@@ -481,6 +481,7 @@ async def run_interactive_app():
                 finally:
                     operation_stack.close()
 
+        conversation_mode = False
         while True:
             user_input = await asyncio.to_thread(input, "You: ")
 
@@ -492,6 +493,90 @@ async def run_interactive_app():
                 continue
 
             command = user_input.strip()
+            if command=='/tool-modes' or command.startswith('/tool-mode '):
+                from core.gui.service import DashboardService
+                try:
+                    dashboard=DashboardService(Path(agent.state_manager.path).parent)
+                    if command.startswith('/tool-mode '):
+                        _,name,mode=command.split()
+                        dashboard.permission_change(agent.session_id,'tool',name,mode)
+                    console.print(dashboard.permissions(agent.session_id),markup=False)
+                except Exception as exc:console.print('权限设置未完成：'+str(exc),markup=False)
+                continue
+            if command.startswith('/agent '):
+                from core.gui.service import DashboardService
+                from core.gui.workspace import Workspace
+                import uuid
+                dashboard=DashboardService(Path(agent.state_manager.path).parent)
+                workspace=Workspace(dashboard)
+                try:
+                    request_id=uuid.uuid4().hex
+                    workspace.submit(agent.session_id,command.split(maxsplit=1)[1],request_id)
+                    while True:
+                        row=workspace.submission(agent.session_id,request_id)
+                        if row['status']!='planning':break
+                        await asyncio.sleep(.25)
+                    if row['status']!='ready':raise ValueError(row['error'] or '规划中断')
+                    job=dashboard.jobs.get((agent.session_id,row['number']))
+                    if job:await asyncio.to_thread(job.wait,timeout=245)
+                    detail=dashboard.detail(agent.session_id,row['number'])
+                    console.print(f"任务 {row['number']}：{detail['status']}，已完成 {detail['completed']}/{detail['total']} 步。",markup=False)
+                    for result in detail['results']:console.print(result['summary'],markup=False)
+                    if detail.get('summary'):console.print(detail['summary']['answer'],markup=False)
+                    if detail['status']=='running':console.print('需要确认时使用 /tool-approve '+str(row['number'])+'；/状态 查看详情。')
+                except Exception as exc:console.print('Agent 任务未完成：'+str(exc),markup=False)
+                continue
+            if command.startswith('/tool-approve '):
+                from core.gui.service import DashboardService
+                try:
+                    dashboard=DashboardService(Path(agent.state_manager.path).parent)
+                    number=int(command.split(maxsplit=1)[1])
+                    detail=dashboard.detail(agent.session_id,number)
+                    action=next(a for a in ('tool','read','execute') if a in detail['actions'])
+                    preview=dashboard.preview(agent.session_id,number,action)
+                    console.print(preview,markup=False)
+                    word='EXECUTE' if action=='execute' else 'CONFIRM'
+                    answer=(await asyncio.to_thread(input,'输入 '+word+' 确认当前操作: ')).strip()
+                    dashboard.confirm(preview['ticket'],answer)
+                    job=dashboard.jobs.get((agent.session_id,number))
+                    if job:await asyncio.to_thread(job.wait,timeout=245)
+                    console.print(dashboard.detail(agent.session_id,number)['status'],markup=False)
+                except Exception as exc:console.print('审批未完成：'+str(exc),markup=False)
+                continue
+            if command=='/mcp-tools' or command.startswith('/mcp-tools '):
+                from core.mcp.connections import discover
+                from core.tools.mcp_files import configuration
+                try:
+                    configs={'filesystem':configuration()} if command=='/mcp-tools' else json.loads(Path(command.split(maxsplit=1)[1]).read_text(encoding='utf-8'))['mcpServers']
+                    for name,config in configs.items():
+                        discovered=await discover(config)
+                        console.print(name+': '+', '.join(t['name'] for t in discovered),markup=False)
+                except Exception as exc:console.print('MCP 连接失败：'+type(exc).__name__,markup=False)
+                continue
+
+            if command in ('/chat','/聊天'):
+                conversation_mode=True
+                console.print('已切换普通对话，输入 /任务模式 返回任务与工具路由。')
+                continue
+            if command in ('/task-mode','/任务模式'):
+                conversation_mode=False
+                console.print('已切换任务模式，工具执行仍需审批。')
+                continue
+            if conversation_mode and not command.startswith('/'):
+                response=await agent.answer_only(command)
+                console.print(response,markup=False)
+                continue
+            if command.startswith(('/chat ', '/聊天 ')):
+                response=await agent.answer_only(command.split(maxsplit=1)[1])
+                console.print(response,markup=False)
+                continue
+            if command in ('/history','/对话记录'):
+                from core.state.conversation import Conversation
+                for turn in Conversation(agent.state_manager.path).history(agent.session_id):
+                    console.print('你：'+turn['text'],markup=False)
+                    console.print('助手：'+(turn['answer'] or '['+turn['status']+']'),markup=False)
+                continue
+
             from core.security import permission_requests as _pr
             context_response = task_context.handle(agent.session_id, command,
                 read_binding=multi_reads.peek(agent.session_id),
@@ -1783,7 +1868,7 @@ async def run_interactive_app():
             # Agent chooses its read-only MCP tool using its existing LangGraph setup.
             # All actual calls are still checked by the global gateway.
             with session_context(agent.session_id):
-                response = await agent.chat(user_input)
+                response = await agent.chat(user_input) if intent_decision.execution_requested else await agent.answer_only(user_input)
 
             console.print(f"\n[bold white]Agent:[/bold white] {response}\n")
 

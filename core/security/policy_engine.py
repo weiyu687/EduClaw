@@ -39,6 +39,8 @@ def evaluate(tool: str, arguments: Mapping | None) -> Decision:
         return Decision(str(tool), Risk.DENIED, False, 'Tool name is invalid')
     if not isinstance(arguments, dict):
         return Decision(tool, Risk.DENIED, False, 'Tool arguments must be an object')
+    if tool=='write_text_file':
+        return Decision(tool,Risk.EXECUTE,True,'Workspace writes; overwrites require exact approval','path')
     if tool in FILE_ARGUMENTS:
         key = FILE_ARGUMENTS[tool]
         value = arguments.get(key)

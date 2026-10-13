@@ -156,7 +156,7 @@ def test_diagnostics_never_executes_tool():
     class Changed(Client):
         async def get_tools(self):
             descriptors = await super().get_tools()
-            descriptors[-1].outputSchema = {'type':'object'}
+            descriptors[-1].outputSchema = {'type':'null'}
             return descriptors
     assert asyncio.run(inspect_tools(Changed()))[-1]['status'] == 'contract_mismatch'
 

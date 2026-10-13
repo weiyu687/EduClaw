@@ -26,6 +26,6 @@ EduClaw 是面向学习、研究与个人工作的 AI Agent。你描述目标、
 | 文件授权与重规划 | 通过 CLI 完成 |
 | 文档 | GitHub Wiki 与 GitHub Pages 使用同一套 Markdown 源文件 |
 
-GUI 当前是任务工作台；开放式聊天、文件上传、第三方工具一键安装、桌面安装包尚未交付。已挂载的非规划工具会明确标注，不会被自动加入多步骤计划。
+GUI 支持普通多轮对话和自动任务，工具按目标选择，低风险操作按策略推进。已接入免密钥 Wikipedia 资料搜索、带日期筛选的公开新闻搜索和官方 Filesystem MCP。文件上传、第三方工具一键安装、桌面安装包尚未交付。
 
 [GitHub 源码](https://github.com/weiyu687/EduClaw) · [开发分支](https://github.com/weiyu687/EduClaw/tree/codex/roadmap-development) · [GitHub Wiki](https://github.com/weiyu687/EduClaw/wiki) · [文档网站](https://weiyu687.github.io/EduClaw/)
