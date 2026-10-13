@@ -78,6 +78,13 @@ def authorize(tool_name, arguments):
         if (target.exists() or mode=='ask') and not consume(arguments):
             raise GlobalToolDenied('覆盖已有文件必须确认准确内容。')
         return
+    if tool_name=='run_terminal':
+        from core.security.terminal_policy import terminal_arguments
+        from core.security.write_approval import consume
+        canonical=terminal_arguments(arguments)
+        if canonical!=arguments or not current_session() or not consume(arguments,tool_name):
+            raise GlobalToolDenied('终端必须审批准确目录、命令及超时，每次仅执行一次。')
+        return
     if tool_name == "run_python_code":
         if authorize_code(tool_name, arguments):
             return

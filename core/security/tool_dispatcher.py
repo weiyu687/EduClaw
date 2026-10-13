@@ -40,7 +40,7 @@ def explicit_tool_policy(message):
         tool = found.group(0).lower()
         if tool == 'run_python_code':
             return (tool, 'python', 'Only draft code; execution still needs exact approval')
-        if tool in ('public_search','write_text_file'):
+        if tool in ('public_search','news_search','write_text_file','run_terminal'):
             return (tool,'read','规划后按工具风险策略处理')
         if tool in READ_TOOL_NAMES:
             return (tool, 'read', 'Read tool remains subject to file authorization')

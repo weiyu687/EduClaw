@@ -1,3 +1,4 @@
+import {Terminal} from './Terminal';
 import {createPortal} from 'react-dom';
 import {Icon} from './Icon';
 import {RichText,CopyButton} from './RichText';
@@ -23,7 +24,7 @@ export function Workspace({token,session,onSession,onTask,onAction,onView,mode,o
   const [catalog,setCatalog]=useState<Catalog>();
   const [mounts,setMounts]=useState<Mounts>({skills:[],tools:[]});
   const [saved,setSaved]=useState<Mounts>({skills:[],tools:[]});
-  const [panel,setPanel]=useState<'skills'|'tools'|'help'|'permissions'|'none'>('none');
+  const [panel,setPanel]=useState<'skills'|'tools'|'help'|'permissions'|'terminal'|'none'>('none');
   const [text,setText]=useState('');
   const [error,setError]=useState('');
   const [notice,setNotice]=useState('');
@@ -59,7 +60,7 @@ export function Workspace({token,session,onSession,onTask,onAction,onView,mode,o
     setText('');
     if(c.action==='chat'||c.action==='task_mode'){setPanel('none');onMode(c.action==='chat'?'chat':'task');return;}
     if(c.action==='new'){setPanel('none');await newSession();return;}
-    if(c.action==='skills'||c.action==='tools'||c.action==='help'){setPanel(c.action);return;}
+    if(c.action==='skills'||c.action==='tools'||c.action==='help'||c.action==='terminal'){setPanel(c.action);return;}
     if(c.action==='tasks'){setPanel('none');onView('steps');return;}
     if(c.action==='steps'||c.action==='results'){setPanel('none');onView(c.action);return;}
     setPanel('none');onAction(c.action as Action);
@@ -98,6 +99,7 @@ export function Workspace({token,session,onSession,onTask,onAction,onView,mode,o
       <div className="nav-section-label">工作空间</div>
       <button aria-label={'◇ 技能管理 · '+saved.skills.length} aria-pressed={panel==='skills'} onClick={()=>setPanel('skills')}><Icon name="spark"/><span>技能库</span><small>{saved.skills.length||'探索'}</small></button>
       <button aria-label="⚒ 工具管理 · 自动" aria-pressed={panel==='tools'} onClick={()=>setPanel('tools')}><Icon name="tools"/><span>工具库</span><small>自动</small></button>
+      <button aria-label="终端" aria-pressed={panel==='terminal'} onClick={()=>setPanel('terminal')}><Icon name="command"/><span>终端</span><small>PowerShell</small></button>
       <button aria-label="▣ 工具与文件权限" aria-pressed={panel==='permissions'} onClick={()=>setPanel('permissions')}><Icon name="shield"/><span>权限与文件</span></button>
       <button aria-label="/ 指令说明" aria-pressed={panel==='help'} onClick={()=>setPanel('help')}><Icon name="command"/><span>指令指南</span></button>
     </nav>,document.getElementById('sidebar-controls')!)}
@@ -109,8 +111,9 @@ export function Workspace({token,session,onSession,onTask,onAction,onView,mode,o
     <div className="composer-toolbar"><div className="capability-buttons" aria-label="快捷挂载"><button className="composer-chip" aria-label={'技能 · '+saved.skills.length} onClick={()=>setPanel('skills')}><Icon name="spark" size={15}/>技能{saved.skills.length>0&&<small>{saved.skills.length}</small>}</button><button className="composer-chip" aria-label="工具 · 自动" onClick={()=>setPanel('tools')}><Icon name="tools" size={15}/>自动工具</button><button className="composer-chip slash-chip" aria-label="/ 指令说明" onClick={()=>setPanel('help')}>/</button></div><button className="send-button" aria-label={busy?'提交中…':text.startsWith('/')?'选择指令':mode==='chat'?'发送消息 ↑':'提交任务 ↑'} disabled={sendDisabled} onClick={()=>void submit()}><Icon name="arrow" size={20}/></button></div></div>
     <div className="composer-note"><span>{mode==='chat'?'直接提问 · 按需搜索公开资料':'低风险自动执行 · 重要操作由你确认'}</span><span>Enter 发送 · Shift + Enter 换行</span></div>
     {error&&<p role="alert" className="alert">{error}</p>}{notice&&panel==='none'&&<p role="status" className="notice">{notice}</p>}
-    <PanelDialog open={panel!=='none'} title={({skills:'技能库',tools:'工具库',permissions:'权限与文件',help:'指令指南',none:''})[panel]} onClose={()=>setPanel('none')}>
+    <PanelDialog open={panel!=='none'} title={({skills:'技能库',tools:'工具库',permissions:'权限与文件',terminal:'终端',help:'指令指南',none:''})[panel]} onClose={()=>setPanel('none')}>
       {error&&<p role="alert" className="alert">{error}</p>}{notice&&<p role="status" className="notice">{notice}</p>}
+      {panel==='terminal'&&<Terminal token={token} session={session} onTask={n=>{setPanel('none');onTask(n);}}/>}
       {panel==='permissions'&&<Permissions token={token} session={session}/>}
       {(panel==='skills'||panel==='tools')&&<div className="capability-panel"><div className="section-heading"><p>{panel==='skills'?'为你的助手选择擅长的领域，也可由任务自动匹配。':'按任务自动选择工具。你始终可以在权限设置中管理它们。'}</p>{panel==='skills'&&<button className="primary" disabled={!ready||busy||!dirty} onClick={()=>void save()}>保存挂载{dirty?' · 未保存':''}</button>}</div>
         <div className="catalog-search"><Icon name="search"/><input aria-label="搜索能力" placeholder={panel==='skills'?'搜索技能名称或用途':'搜索工具名称或用途'} value={catalogSearch} onChange={e=>setCatalogSearch(e.target.value)}/></div>

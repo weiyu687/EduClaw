@@ -336,3 +336,15 @@ Windows Edge、真实模型、真实 Wikipedia 与官方 Filesystem MCP：GUI �
 补充：在包含旧版“无法联网，请切换任务模式”回复的历史会话中，真实模型仍成功调用新闻 MCP 并返回来源，旧拒绝不会锁定新能力。长流程验收首次业务断言全部成功，但 Windows 临时目录清理遇到工作进程尚未关闭 SQLite 的竞争；验收清理已改为等待已启动的工作进程正常退出，不忽略清理错误。
 
 最终长流程复跑正常退出：GUI 与 CLI 各 4 步（Wikipedia 搜索→官方 Filesystem MCP 写入/读回/列目录），覆盖等待与确认、CLI 设置搜索每步确认后 GUI 审批、结果完整性全部通过。
+
+## 2026-10-14：指定目录终端贯通 Agent、CLI 与 GUI
+
+新增原生 MCP 工具 run_terminal，支持在本机现有绝对目录中运行 Windows PowerShell。自然语言规划会选择此工具处理终端、构建、测试与 Git 操作；GUI 侧栏新增“终端”，CLI 新增 /terminal JSON，并兼容 /tool-approve 与 /继续。各入口共用任务、审批和结果记录。
+
+每条命令绑定准确工作目录、命令和超时，经 EXECUTE 确认后仅执行一次；工具权限支持每步确认或禁用。输出展示标准输出、错误输出、退出码、耗时和截断状态，刷新后仍可查询。采用 Windows Job Object 管理进程树，超时、取消或命令结束时清理本次子进程，不自动重放失败命令。
+
+边界：当前是非交互、独立执行的 PowerShell 命令，不是持久终端；最长 180 秒，不支持常驻服务。工作目录是起始位置而非文件沙箱，执行使用当前用户权限，取消不会撤销已产生的文件变更。依赖 integrations/terminal/requirements.txt 中的 pywin32。
+
+验收：Python 阶段回归 514 项通过，前端 7 项测试与生产构建通过。Windows Edge 真实 GUI、CLI、MCP 和模型规划覆盖中文及空格目录、审批前不执行、输出与退出码、刷新留存、运行取消、超时、禁用权限及窄屏布局。额外实际验证 CLI /继续；修复真实验收发现的 /terminal 缺少 JSON 导入问题。Wiki/Pages 9 页构建、导航、搜索、锚点与窄屏检查通过。
+
+可复现脚本：test/test_terminal.py、scripts/windows_terminal_e2e.py、scripts/windows_docs_e2e.py。真实运行日志和截图保留在本机 logs，不上传会话数据库。

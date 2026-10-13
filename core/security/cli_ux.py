@@ -5,8 +5,9 @@ No LLM is involved in approval or task selection.
 import re
 
 HELP = '''EduClaw 命令速查
+  /terminal <JSON>              指定 cwd、command、timeout_seconds 准备终端命令
   /agent <目标>                 自动规划、选择能力并执行已允许的低风险步骤
-  /tool-approve <编号>           审阅并确认等待权限的步骤（GUI 共用策略）
+  /tool-approve <编号>           审阅等待权限的步骤；终端核对目录和命令后输入 EXECUTE
   /mcp-tools [配置文件]          发现标准 MCP 服务工具；发现本身不授予执行权限
   /tool-modes                   查看与 GUI 共用的工具策略和工作目录
   /tool-mode <工具> auto|ask|deny 设置自动、每步确认或禁用；代码不能自动批准

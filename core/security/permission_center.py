@@ -11,6 +11,7 @@ from pathlib import Path
 
 # Conservative capability registry. Future integrations register here, not in CLI.
 CAPABILITIES = {
+    'run_terminal': {'label':'本机终端命令','modes':('always_ask','deny'),'default':'always_ask'},
     'get_weather': {'label': '公开天气查询', 'modes': ('auto', 'deny'), 'default': 'auto'},
     'run_python_code': {'label': 'Python 代码执行', 'modes': ('always_ask', 'deny'), 'default': 'always_ask'},
 }

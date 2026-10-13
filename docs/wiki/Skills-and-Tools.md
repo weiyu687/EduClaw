@@ -109,3 +109,21 @@ Node.js 需要在 PATH 中。新增受控适配器：
 可直接在任务模式输入“给我最新的AI新闻资讯，昨天的”或“给我最近的AI新闻资讯总结”。系统选择新闻工具，完成后使用保存的标题与摘要生成中文归纳，每条附带真实来源和发布时间。摘要不表示已经阅读全文；无结果会明确说明。公开 RSS 不是稳定的商业 API，可能出现网络限制或无结果，不保证全量覆盖。工具可改成每步确认或禁用。
 
 新闻工具只访问固定的 Google News RSS 地址，查询长度、条数、响应体和超时有界。新闻文本仅为不可信数据，摘要模型不带工具；来源编号必须指向已获得的条目。旧的失败提交保留历史状态，升级后重新提交原文即可。
+
+
+## 本机终端工具
+
+`run_terminal(cwd, command, timeout_seconds=60)` 执行指定目录下的 Windows PowerShell 命令。`cwd` 必须为存在的本机绝对目录；不支持 UNC 网络共享。适用于构建、测试、Git 和本机项目操作。工具属于代码执行级别，不能自动批准。
+
+执行无用户 Profile、无交互输入，子进程不继承 agent 的 API 密钥环境变量；输出包含 `execution_status`、`exit_code`、`stdout`、`stderr`、`duration_seconds` 和 `truncated`。这不是 Docker 沙箱，不能把指定工作目录当成文件访问边界。普通 Python 计算仍使用原有沙箱工具。
+
+CLI 直接准备示例（将目录换成本机实际目录）：
+
+```text
+/terminal {"cwd":"D:\\projects\\demo","command":"Get-Location; Get-ChildItem","timeout_seconds":60}
+/tool-approve 1
+EXECUTE
+/结果 1
+```
+
+编号以实际创建结果为准。`/继续 1` 也可审阅终端命令；`/取消任务 1` 请求取消在途执行。GUI/CLI 使用同一任务账本、权限和结果证据。

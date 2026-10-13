@@ -5,6 +5,7 @@ Author: Gongmin Wei
 Date: 2026-04-01
 """
 import asyncio
+import json
 from rich.console import Console
 import logging
 import re
@@ -316,6 +317,21 @@ async def run_interactive_app():
                         raise PermissionError('任务已暂停或取消，禁止执行')
                     pending = multi_flow.pending(agent.session_id, task)
                     idx, step = pending['index'], pending['step']
+                    if step['tool']=='run_terminal':
+                        from core.gui.service import DashboardService
+                        dashboard=DashboardService(Path(agent.state_manager.path).parent)
+                        with dashboard.stores(agent.session_id) as (context,life):
+                            number=next(n for n,snapshot in context.tasks(agent.session_id) if snapshot.values['task_id']==task)
+                        review=dashboard.preview(agent.session_id,number,'tool')
+                        console.print(review,markup=False)
+                        answer=(await asyncio.to_thread(input,'输入 EXECUTE 确认当前终端命令: ')).strip()
+                        if answer!='EXECUTE':
+                            console.print('未执行，仍等待审批');return
+                        dashboard.confirm(review['ticket'],answer)
+                        await asyncio.to_thread(dashboard.jobs[(agent.session_id,number)].wait,timeout=245)
+                        detail=dashboard.detail(agent.session_id,number)
+                        for result in detail['results']:console.print(result['summary'],markup=False)
+                        return
                     if multi_ledger.status(agent.session_id, task, idx):
                         raise PermissionError('步骤已被认领，可能已经执行；禁止重复执行')
                     if replan_store.blocking_for(agent.session_id, task) or multi_ledger.frozen(agent.session_id, task):
@@ -493,6 +509,15 @@ async def run_interactive_app():
                 continue
 
             command = user_input.strip()
+            if command.startswith('/terminal '):
+                from core.gui.service import DashboardService
+                try:
+                    dashboard=DashboardService(Path(agent.state_manager.path).parent)
+                    arguments=json.loads(command.split(maxsplit=1)[1])
+                    row=dashboard.terminal_task(agent.session_id,arguments,__import__('uuid').uuid4().hex)
+                    console.print('终端命令已准备，尚未执行。审批：/tool-approve '+str(row['number']),markup=False)
+                except Exception as exc:console.print('终端任务创建失败：'+str(exc),markup=False)
+                continue
             if command=='/tool-modes' or command.startswith('/tool-mode '):
                 from core.gui.service import DashboardService
                 try:
@@ -535,7 +560,7 @@ async def run_interactive_app():
                     action=next(a for a in ('tool','read','execute') if a in detail['actions'])
                     preview=dashboard.preview(agent.session_id,number,action)
                     console.print(preview,markup=False)
-                    word='EXECUTE' if action=='execute' else 'CONFIRM'
+                    word=preview.get('confirmation','EXECUTE' if action=='execute' else 'CONFIRM')
                     answer=(await asyncio.to_thread(input,'输入 '+word+' 确认当前操作: ')).strip()
                     dashboard.confirm(preview['ticket'],answer)
                     job=dashboard.jobs.get((agent.session_id,number))

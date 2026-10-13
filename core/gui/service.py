@@ -40,6 +40,30 @@ class DashboardService:
         return CodeStepService(context.flow,life.ledger,life.results,
             DagStore(self.directory/'educlaw_dag_plans.sqlite3'),context.replans,life)
 
+    def terminal_task(self,session,arguments,request_id):
+        """Create an exact terminal step without an LLM; execution is separate."""
+        import re
+        from core.security.terminal_policy import terminal_arguments
+        from core.security.goal_loop import GoalStore
+        if not isinstance(request_id,str) or not re.fullmatch(r'[A-Za-z0-9_-]{16,80}',request_id):
+            raise ValueError('提交标识无效。')
+        if not any(s['id']==session for s in self.sessions()):raise LookupError('会话不存在。')
+        args=terminal_arguments(arguments)
+        if next(x['mode'] for x in tool_modes(self.directory) if x['name']=='run_terminal')=='deny':
+            raise PermissionError('终端已禁用，请先在权限设置中启用每步确认。')
+        task='terminal_'+hashlib.sha256((session+':'+request_id).encode()).hexdigest()[:32]
+        steps=[{'tool':'run_terminal','arguments':args}]
+        with self.lock,self.stores(session) as (context,life):
+            for number,snapshot in context.tasks(session):
+                if snapshot.values['task_id']==task:
+                    if snapshot.values['steps']!=steps:raise PermissionError('提交标识已用于另一条命令。')
+                    return {'number':number}
+            goal='终端：'+args['cwd']+'\n'+args['command']
+            DagStore(self.directory/'educlaw_dag_plans.sqlite3').create(session,task,steps)
+            GoalStore(self.directory/'educlaw_goals.sqlite3').create(session,task,goal)
+            context.flow.begin(session,goal,steps,task_id=task);context.created(session,task)
+            return {'number':next(n for n,s in context.tasks(session) if s.values['task_id']==task)}
+
     def start_auto(self,session,number):
         with self.lock, self.stores(session) as (context,life):
             from core.security.workspace_policy import automatic
@@ -189,6 +213,14 @@ class DashboardService:
                 result['results'].append(dict(step=row['idx']+1, status=row['status'], digest=row['digest'],
                     intact=intact, truncated=bool(saved['truncated']), summary=readable_result(saved['payload']),
                     content=saved['payload'][:20000], preview_truncated=len(saved['payload']) > 20000))
+                if row['tool']=='run_terminal':
+                    try:
+                        terminal=json.loads(saved['payload'])
+                        if isinstance(terminal,dict) and terminal.get('shell')=='Windows PowerShell':
+                            terminal['truncated']=terminal.get('truncated',False) or len(terminal.get('stdout',''))>16000 or len(terminal.get('stderr',''))>16000
+                            terminal['stdout']=terminal.get('stdout','')[:16000];terminal['stderr']=terminal.get('stderr','')[:16000]
+                            result['results'][-1]['terminal']=terminal
+                    except (ValueError,TypeError):pass
             try:
                 result['recovery'] = life.preview(session, task)
             except (ValueError, PermissionError, LookupError) as exc:
@@ -267,12 +299,16 @@ class DashboardService:
                     review=(ReadStepService(steps) if action=='read' else ToolStepService(steps) if action=='tool' else steps).preview(session,task)
                     self.tickets[token]['code_digest']=review['digest']
                     extra=({'path':review['path'],'tool':review['tool']} if action=='read' else {'arguments':review['arguments'],'before':review['before'],'tool':review['tool']} if action=='tool' else {'code':review['code']}) | {'step':review['index']+1}
+            if extra.get('tool')=='run_terminal':
+                self.tickets[token]['confirmation']='EXECUTE'
+                extra['confirmation']='EXECUTE'
+                messages['tool']='此命令在本机以当前用户权限运行，目录只是起始位置而非沙箱。核对命令、目录及超时后输入 EXECUTE；不能撤销已产生的效果。'
             return dict(ticket=token, action=action, number=number, goal=detail['goal'], message=messages[action], expires_in=120,**extra)
 
     def confirm(self, ticket, confirmation):
         with self.lock:
             item = self.tickets.pop(ticket, None) if isinstance(ticket, str) else None
-            if not item or item['action']=='file_grant' or item['expires'] <= self.clock() or confirmation != ('EXECUTE' if item['action']=='execute' else 'CONFIRM'):
+            if not item or item['action']=='file_grant' or item['expires'] <= self.clock() or confirmation != item.get('confirmation',('EXECUTE' if item['action']=='execute' else 'CONFIRM')):
                 raise PermissionError('确认已消耗、过期或无效，请重新预览。')
             session, number = item['session'], item['number']
             binding, _ = self._binding(session, number)

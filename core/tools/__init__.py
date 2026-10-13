@@ -1,3 +1,4 @@
+from .terminal import run_terminal
 from .public_search import public_search
 from .news_search import news_search
 from .mcp_files import mcp_read_file,mcp_list_files,write_text_file
@@ -10,6 +11,7 @@ from .extract_csv import extract_csv
 from .structured_files import extract_text, extract_json, extract_jsonl, profile_csv
 
 all_tools = [
+    run_terminal,
     public_search,news_search,mcp_read_file,mcp_list_files,write_text_file,
     extract_pdf, extract_word, extract_pptx, extract_xlsx,
     run_python_code, run_python_file, extract_py, get_all_files,

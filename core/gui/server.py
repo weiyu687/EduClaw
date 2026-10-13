@@ -134,6 +134,8 @@ class Handler(BaseHTTPRequestHandler):
                 result = self.server.workspace.submit(body['session'],body['text'],body['request_id'])
             elif self.path == '/api/chat' and set(body)=={'session','text','request_id'}:
                 result = self.server.workspace.chat(body['session'],body['text'],body['request_id'])
+            elif self.path == '/api/terminal' and set(body)=={'session','arguments','request_id'}:
+                result = service.terminal_task(body['session'],body['arguments'],body['request_id'])
             elif self.path == '/api/session/change' and set(body)=={'session','action','value'}:
                 result = service.session_change(body['session'],body['action'],body['value'])
             elif self.path == '/api/preview' and set(body) == {'session','number','action'}:

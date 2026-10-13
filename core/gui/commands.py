@@ -1,5 +1,7 @@
 """Shared GUI command descriptions; contains no execution dispatcher."""
 COMMANDS = [
+    ('/终端','终端命令','在指定本机目录准备 PowerShell 命令，核对后逐次执行。','terminal'),
+    ('/terminal','CLI 终端','CLI 用法：/terminal {"cwd":"绝对目录","command":"命令","timeout_seconds":60}；再 /tool-approve 编号。','cli'),
     ('/聊天','普通对话','直接对话，按需搜索公开资料；复杂执行可确认创建任务，历史与 CLI 共用。','chat'),
     ('/任务模式','任务模式','自动选择能力；按权限执行低风险步骤，覆盖文件和代码执行需要确认。','task_mode'),
     ('/新建','创建新会话','新建一个独立会话，挂载设置独立保存。','new'),
