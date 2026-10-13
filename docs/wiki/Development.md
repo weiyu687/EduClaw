@@ -49,3 +49,10 @@ python scripts/build_docs.py --site-dir logs/docs-site --wiki-dir logs/wiki-publ
 阶段回归运行 `python -m pytest test --ignore=test/test_agent_memory_e2e.py --ignore=test/test_memory_system.py -q`。这两个旧记忆测试文件是手动异步集成脚本，不属于该回归；直接运行全目录 pytest 会因未配置异步插件报错，本阶段未宣称记忆系统通过验收。
 
 `python scripts/windows_news_e2e.py` 原样重放“最新的AI新闻资讯，昨天的”和“最近的AI新闻资讯总结”，真实检索 RSS、核对日期范围、生成来源绑定摘要，并在 Windows Edge 查看。
+
+
+## 对话优先与黑灰 UI 验收
+
+`python scripts/windows_conversation_ui_e2e.py` 在真实 Windows Edge 中验证 GUI/CLI 联网新闻、来源链接、基于历史追问、复杂目标仅提出任务建议、技能保存、工具搜索、权限面板、中文输入法、剪贴板与移动端焦点。使用真实模型及 MCP，外部服务不可用时会失败，不会用假数据冒充验收。
+
+`web` 目录下运行 `npm test` 和 `npm run build` 验证 Markdown 安全渲染及类型与打包；`test/test_chat_actions.py` 覆盖权限阻断、未知路由、来源越界、历史数据库迁移及搜索证据保存。
