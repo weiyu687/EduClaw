@@ -26,6 +26,14 @@
 
 ## CSV 示例
 
+后续增量还提供 `extract_text`、`extract_json`、`extract_jsonl` 和 `profile_csv`，全部为
+结构化只读工具，沿用准确路径授权。定义见 `builtin.json`，多源组合示例见
+[多文件长流程](https://weiyu687.github.io/EduClaw/Long-Workflows.html)。
+
+扩展提示：工具不一定拥有独占扩展名。`profile_csv` 与 `extract_csv` 都读取 CSV，但
+只有 `extract_csv` 是 `.csv` 默认读取器；显式工具策略根据风险注册项判断，不依赖
+扩展名映射反推出所有工具名称。
+
 `extract_csv(csv_path)` 只读取 UTF-8 / UTF-8 BOM 文件，返回：
 
 ```json

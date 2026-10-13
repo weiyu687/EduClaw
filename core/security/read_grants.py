@@ -8,9 +8,34 @@ from pathlib import Path
 
 _current_session = contextvars.ContextVar('educlaw_read_session', default=None)
 _DB_ENV = 'EDUCLAW_PERMISSION_DB'
+_database = contextvars.ContextVar('educlaw_permission_database', default=None)
+_reviewed_read = contextvars.ContextVar('educlaw_reviewed_read', default=None)
+
+@contextmanager
+def permission_database(path):
+    token = _database.set(Path(path))
+    try:
+        yield
+    finally:
+        _database.reset(token)
+
+@contextmanager
+def reviewed_read(tool, path):
+    token = _reviewed_read.set({'tool':tool, 'path':canonical(path), 'remaining':True})
+    try:
+        yield
+    finally:
+        _reviewed_read.reset(token)
+
+def consume_reviewed_read(tool, path):
+    item = _reviewed_read.get()
+    if item and item['remaining'] and item['tool'] == tool and item['path'] == str(path):
+        item['remaining'] = False
+        return True
+    return False
 
 def db_path():
-    return Path(os.environ.get(_DB_ENV, 'data/educlaw_permissions.sqlite3'))
+    return _database.get() or Path(os.environ.get(_DB_ENV, 'data/educlaw_permissions.sqlite3'))
 
 @contextmanager
 def session_context(session_id):

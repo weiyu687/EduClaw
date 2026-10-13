@@ -36,6 +36,12 @@ class StateManager:
                 CREATE INDEX IF NOT EXISTS idx_runs_session ON runs(session_id, created_at);
                 CREATE INDEX IF NOT EXISTS idx_events_run ON events(run_id, id);
             ''')
+            columns = {r[1] for r in db.execute('PRAGMA table_info(sessions)')}
+            for name, spec in [('title',"TEXT NOT NULL DEFAULT ''"),('deleted_at','TEXT'),('title_manual','INTEGER NOT NULL DEFAULT 0')]:
+                if name not in columns:
+                    db.execute(f'ALTER TABLE sessions ADD COLUMN {name} {spec}')
+                    if name == 'title_manual':
+                        db.execute("UPDATE sessions SET title_manual=1 WHERE title<>''")
 
     def _connect(self):
         db = sqlite3.connect(self.path, timeout=30)
@@ -61,7 +67,9 @@ class StateManager:
     def ensure_session(self, session_id=None, user_id=None):
         session_id = session_id or str(uuid.uuid4())
         with self._lock, self._connection() as db:
-            existing = db.execute('SELECT user_id FROM sessions WHERE id=?', (session_id,)).fetchone()
+            existing = db.execute('SELECT user_id,deleted_at FROM sessions WHERE id=?', (session_id,)).fetchone()
+            if existing and existing[1]:
+                raise PermissionError('会话已删除，不能重新打开。')
             if existing and user_id is not None and existing[0] not in (None, user_id):
                 raise PermissionError('Session belongs to another user')
             if existing:
@@ -74,9 +82,9 @@ class StateManager:
         with self._lock, self._connection() as db:
             db.row_factory = sqlite3.Row
             if user_id is None:
-                rows = db.execute('SELECT * FROM sessions ORDER BY updated_at DESC').fetchall()
+                rows = db.execute('SELECT * FROM sessions WHERE deleted_at IS NULL ORDER BY updated_at DESC').fetchall()
             else:
-                rows = db.execute('SELECT * FROM sessions WHERE user_id=? ORDER BY updated_at DESC', (user_id,)).fetchall()
+                rows = db.execute('SELECT * FROM sessions WHERE user_id=? AND deleted_at IS NULL ORDER BY updated_at DESC', (user_id,)).fetchall()
             return [dict(row) for row in rows]
 
     def start_run(self, session_id, text):

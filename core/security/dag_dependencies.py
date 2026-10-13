@@ -23,7 +23,7 @@ def dependencies(steps):
         explicit = step.get('depends_on', [])
         if not isinstance(explicit, list) or any(type(n) is not int for n in explicit):
             raise ValueError('depends_on must be a list of 1-based step numbers')
-        code = step['arguments'].get('code', '') if step.get('tool') == 'run_python_code' else ''
+        code = step['arguments'].get('code', '') if step.get('tool') == 'run_python_code' else step['arguments'].get('content','') if step.get('tool')=='write_text_file' else ''
         if not isinstance(code, str):
             raise ValueError('Invalid code argument')
         if '{{step:' in code and '{{step:' in _REF.sub('', code):

@@ -53,12 +53,30 @@ class SafeDelete:
         return hashlib.sha256(json.dumps(payload,sort_keys=True,ensure_ascii=False).encode()).hexdigest()
 
     def preview_session(self, session_id, user_id=None, current_session=None):
+        self._check_activity(session_id)
         row=self._session(session_id,user_id)
         tasks=self._tasks(session_id)
         active=[t for t in tasks if t['status'] in ('claimed','planning')]
         if active: raise PermissionError('会话存在正在规划或已认领执行的任务，禁止删除；请先安全结束任务')
         payload={'kind':'session','id':session_id,'user_id':user_id,'session':row,'tasks':tasks}
         return self._issue(payload, f"会话：{row['title'] or '未命名会话'} ({session_id[:8]}…)；关联自主任务 {len(tasks)} 个；{'当前会话，删除后将自动切换到新会话' if session_id == current_session else '非当前会话'}。会话与关联自主任务将软删除，不能继续执行。其他历史记录不会物理清除。")
+
+    def _check_activity(self, session):
+        with self._db(self.state_db) as db:
+            if db.execute("SELECT 1 FROM sqlite_master WHERE name='chat_turns'").fetchone():
+                if db.execute("SELECT 1 FROM chat_turns WHERE session=? AND status='generating' AND created>?",(session,time.time()-120)).fetchone():
+                    raise PermissionError('对话正在回复，请完成后再删除。')
+        path=self.state_db.with_name('educlaw_multi_checkpoints.sqlite3')
+        if path.exists():
+            from core.security.multi_step_graph import MultiStepFlow,ExecutionLedger
+            flow=MultiStepFlow(path)
+            try:
+                ledger=ExecutionLedger(path.with_name('educlaw_multi_claims.sqlite3'))
+                for snap in flow.list_tasks(session):
+                    state=snap.values
+                    if state['status']=='running' and ledger.control(session,state['task_id'])!='cancelled':
+                        raise PermissionError('会话有未结束任务，请先取消或完成任务再删除。')
+            finally:flow.close()
 
     def preview_task(self, session_id, task_id, user_id=None):
         self._session(session_id,user_id)
@@ -85,6 +103,7 @@ class SafeDelete:
             raise PermissionError('无有效确认令牌；请重新预览')
         p=pending['payload']
         if p['kind']=='session':
+            self._check_activity(p['id'])
             row=self._session(p['id'],p['user_id']); tasks=self._tasks(p['id'])
             now={'kind':'session','id':p['id'],'user_id':p['user_id'],'session':row,'tasks':tasks}
         else:

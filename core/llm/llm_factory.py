@@ -14,7 +14,7 @@ logger = get_logger("CLIENT")
 load_dotenv()
 
 
-def get_llm(test_connection_test: bool = True) -> ChatOpenAI:
+def get_llm(test_connection_test: bool = True, *, http_async_client=None) -> ChatOpenAI:
     """初始化LLM。"""
     model_name = os.getenv("EDUCLAW_MODEL_NAME")
     api_key = os.getenv("EDUCLAW_MODEL_API_KEY")
@@ -40,6 +40,7 @@ def get_llm(test_connection_test: bool = True) -> ChatOpenAI:
         openai_api_base=base_url,
         timeout=60,
         max_retries=0,
+        http_async_client=http_async_client,
         # temperature=0.7
     )
 

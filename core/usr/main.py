@@ -114,6 +114,8 @@ async def run_interactive_app():
             console.print('[yellow]多步骤执行不可用：请安装 langgraph-checkpoint-sqlite[/yellow]')
         lifecycle = TaskLifecycle(multi_flow, multi_ledger, result_store, recovery_audit)
         replan_service = ReplanService(multi_flow, multi_ledger, result_store, dag_store, goal_store, replan_store)
+        from core.security.code_step_service import CodeStepService
+        code_steps = CodeStepService(multi_flow, multi_ledger, result_store, dag_store, replan_store, lifecycle)
         task_context = TaskContext(focus_store, multi_flow, replan_store, multi_ledger, result_store)
         catalog = TaskCatalog(agent.state_manager.path, autonomous_store.path)
         auto_mode = True
@@ -331,75 +333,66 @@ async def run_interactive_app():
                         if confirmed_read is not None:
                             raise PermissionError('文件授权不能执行其他工具')
                         if step['tool'] == 'run_python_code':
-                            preview_code = resolve_code(step['arguments']['code'], session=agent.session_id,
-                                task=task, current_index=idx, result_store=result_store)
-                            validate_resolved_code(preview_code)
+                            code_review = code_steps.preview(agent.session_id, task)
+                            preview_code = code_review['code']
                             console.print(f'[yellow]请核对实际执行代码（已解析步骤引用）：\n{preview_code}[/yellow]')
                         confirmation = (await asyncio.to_thread(input, '输入 EXECUTE 确认当前步骤: ')).strip()
                         if confirmation != 'EXECUTE':
                             console.print('未执行，仍等待审批')
                             return
-                    # Resolve references only from immutable, completed results in this session.
-                    # The resolved Python code is still subject to explicit execution approval.
-                    resolved_code = None
                     if step['tool'] == 'run_python_code':
-                        resolved_code = resolve_code(step['arguments']['code'], session=agent.session_id,
-                            task=task, current_index=idx, result_store=result_store)
-                        validate_resolved_code(resolved_code)
-                    # OS ownership prevents recovery racing a still-live result writer.
-                    operation_stack.enter_context(multi_ledger.operation_lock(agent.session_id, task, idx))
-                    # Durable claim BEFORE any tool call. Crash => uncertain, never replay.
-                    if step['tool'] in READ_ARGS:
-                        require_waiting(recovery_audit, agent.session_id, 'multi', task, idx,
-                                        multi_flow, multi_ledger, autonomous_store)
-                        recovery_audit.transition(agent.session_id, 'multi', task, idx, 'waiting', 'claimed')
-                    approved_args = {'code': resolved_code} if step['tool'] == 'run_python_code' else step['arguments']
-                    multi_ledger.claim(agent.session_id, task, idx,
-                        arguments_digest=fingerprint(step['tool'], approved_args))
-                    outcome = {'status':'uncertain','output':'Execution claimed; outcome unknown'}
-                    try:
-                        tool, args = step['tool'], step['arguments']
-                        if tool == 'run_python_code':
-                            req = propose_code(agent.session_id, resolved_code)
-                            _, exact_args, digest = claim_code(agent.session_id, req['id'])
-                            if exact_args != {'code': resolved_code}: raise PermissionError('Code arguments changed')
-                            with session_context(agent.session_id), approved_call(agent.session_id, req['id'], digest):
-                                response = await controlled_call(lambda: agent.mcp_client.use_tool(tool, exact_args),
-                                    multi_ledger, agent.session_id, task,
-                                    progress=lambda seconds: console.print(f'当前步骤仍在执行，已等待 {seconds} 秒；另一入口可 /取消任务。'))
-                        elif tool in READ_ARGS:
-                            if confirmed_read is None:
-                                raise PermissionError('缺少已确认的读取授权')
-                            with session_context(agent.session_id):
-                                response = await controlled_call(lambda: agent.mcp_client.use_tool(tool, args),
-                                    multi_ledger, agent.session_id, task,
-                                    progress=lambda seconds: console.print(f'当前步骤仍在执行，已等待 {seconds} 秒。'))
-                        else:
-                            raise PermissionError('Unsupported tool')
-                        outcome = {'status':'uncertain' if getattr(response,'isError',False) else 'completed',
-                                   'output':normalize_response(response)[:20000]}
-                        full_output = normalize_response(response)
-                    except Exception as exc:
-                        failure = lifecycle.failure(agent.session_id, task, idx, exc)
-                        console.print(f'失败类别：{failure.category}；不会自动重放。', markup=False)
-                        outcome = {'status':'uncertain','output':str(exc)}
-                        full_output = str(exc)
-                    # Persist an immutable result snapshot before marking the step finished.
-                    # A storage failure leaves the claimed step uncertain; never replay.
-                    try:
-                        stored = result_store.put(agent.session_id, task, idx, step['tool'],
-                                                  outcome['status'], full_output)
-                    except Exception as exc:
-                        lifecycle.failure(agent.session_id, task, idx, exc, 'persistence')
-                        console.print(f'[yellow]结果持久化失败；步骤已认领，禁止重试: {exc}[/yellow]')
-                        return
-                    multi_ledger.finish(agent.session_id, task, idx, outcome['status'])
-                    if step['tool'] in READ_ARGS:
-                        recovery_audit.transition(agent.session_id, 'multi', task, idx, 'claimed',
-                                                  'completed' if outcome['status']=='completed' else 'uncertain')
+                        execution = await code_steps.execute(agent.session_id, task, code_review['digest'], agent.mcp_client,
+                            progress=lambda seconds: console.print(f'当前步骤仍在执行，已等待 {seconds} 秒；另一入口可 /取消任务。'))
+                        stored, outcome, full_output = execution['stored'], execution['outcome'], execution['full_output']
+                        if execution['failure']:
+                            console.print(f"失败类别：{execution['failure']}；不会自动重放。", markup=False)
+                    else:
+                        # OS ownership prevents recovery racing a still-live result writer.
+                        operation_stack.enter_context(multi_ledger.operation_lock(agent.session_id, task, idx))
+                        # Durable claim BEFORE any tool call. Crash => uncertain, never replay.
+                        if step['tool'] in READ_ARGS:
+                            require_waiting(recovery_audit, agent.session_id, 'multi', task, idx,
+                                            multi_flow, multi_ledger, autonomous_store)
+                            recovery_audit.transition(agent.session_id, 'multi', task, idx, 'waiting', 'claimed')
+                        approved_args = step['arguments']
+                        multi_ledger.claim(agent.session_id, task, idx,
+                            arguments_digest=fingerprint(step['tool'], approved_args))
+                        outcome = {'status':'uncertain','output':'Execution claimed; outcome unknown'}
+                        try:
+                            tool, args = step['tool'], step['arguments']
+                            if tool in READ_ARGS:
+                                if confirmed_read is None:
+                                    raise PermissionError('缺少已确认的读取授权')
+                                with session_context(agent.session_id):
+                                    response = await controlled_call(lambda: agent.mcp_client.use_tool(tool, args),
+                                        multi_ledger, agent.session_id, task,
+                                        progress=lambda seconds: console.print(f'当前步骤仍在执行，已等待 {seconds} 秒。'))
+                            else:
+                                raise PermissionError('Unsupported tool')
+                            outcome = {'status':'uncertain' if getattr(response,'isError',False) else 'completed',
+                                       'output':normalize_response(response)[:20000]}
+                            full_output = normalize_response(response)
+                        except Exception as exc:
+                            failure = lifecycle.failure(agent.session_id, task, idx, exc)
+                            console.print(f'失败类别：{failure.category}；不会自动重放。', markup=False)
+                            outcome = {'status':'uncertain','output':str(exc)}
+                            full_output = str(exc)
+                        # Persist an immutable result snapshot before marking the step finished.
+                        # A storage failure leaves the claimed step uncertain; never replay.
+                        try:
+                            stored = result_store.put(agent.session_id, task, idx, step['tool'],
+                                                      outcome['status'], full_output)
+                        except Exception as exc:
+                            lifecycle.failure(agent.session_id, task, idx, exc, 'persistence')
+                            console.print(f'[yellow]结果持久化失败；步骤已认领，禁止重试: {exc}[/yellow]')
+                            return
+                        multi_ledger.finish(agent.session_id, task, idx, outcome['status'])
+                        if step['tool'] in READ_ARGS:
+                            recovery_audit.transition(agent.session_id, 'multi', task, idx, 'claimed',
+                                                      'completed' if outcome['status']=='completed' else 'uncertain')
                     console.print(f"[cyan]步骤结果: {outcome['status']} | SHA256: {stored['digest'][:12]} | {compact_preview(full_output)}\n查看完整结果: /multi-result {task} {idx+1}[/cyan]")
                     try:
-                        next_step = multi_flow.resume(agent.session_id, task, outcome)
+                        next_step = execution['next_step'] if step['tool'] == 'run_python_code' else multi_flow.resume(agent.session_id, task, outcome)
                         multi_ledger.acknowledge_cancel(agent.session_id, task, idx, outcome['status'])
                         if next_step.get('finished'):
                             state = next_step['state']
@@ -484,10 +477,11 @@ async def run_interactive_app():
                         console.print(f'[yellow]执行已认领，但恢复检查点失败；禁止重试: {exc}[/yellow]')
                 except Exception as exc:
                     lifecycle.failure(agent.session_id, task, idx, exc, 'schema' if isinstance(exc, (ValueError, SyntaxError)) else 'execution')
-                    console.print(f'[yellow]多步骤审批失败（未执行新工具）: {exc}[/yellow]')
+                    console.print(f'[yellow]多步骤审批或保存失败，请核查执行记录，勿重试: {exc}[/yellow]')
                 finally:
                     operation_stack.close()
 
+        conversation_mode = False
         while True:
             user_input = await asyncio.to_thread(input, "You: ")
 
@@ -499,6 +493,90 @@ async def run_interactive_app():
                 continue
 
             command = user_input.strip()
+            if command=='/tool-modes' or command.startswith('/tool-mode '):
+                from core.gui.service import DashboardService
+                try:
+                    dashboard=DashboardService(Path(agent.state_manager.path).parent)
+                    if command.startswith('/tool-mode '):
+                        _,name,mode=command.split()
+                        dashboard.permission_change(agent.session_id,'tool',name,mode)
+                    console.print(dashboard.permissions(agent.session_id),markup=False)
+                except Exception as exc:console.print('权限设置未完成：'+str(exc),markup=False)
+                continue
+            if command.startswith('/agent '):
+                from core.gui.service import DashboardService
+                from core.gui.workspace import Workspace
+                import uuid
+                dashboard=DashboardService(Path(agent.state_manager.path).parent)
+                workspace=Workspace(dashboard)
+                try:
+                    request_id=uuid.uuid4().hex
+                    workspace.submit(agent.session_id,command.split(maxsplit=1)[1],request_id)
+                    while True:
+                        row=workspace.submission(agent.session_id,request_id)
+                        if row['status']!='planning':break
+                        await asyncio.sleep(.25)
+                    if row['status']!='ready':raise ValueError(row['error'] or '规划中断')
+                    job=dashboard.jobs.get((agent.session_id,row['number']))
+                    if job:await asyncio.to_thread(job.wait,timeout=245)
+                    detail=dashboard.detail(agent.session_id,row['number'])
+                    console.print(f"任务 {row['number']}：{detail['status']}，已完成 {detail['completed']}/{detail['total']} 步。",markup=False)
+                    for result in detail['results']:console.print(result['summary'],markup=False)
+                    if detail.get('summary'):console.print(detail['summary']['answer'],markup=False)
+                    if detail['status']=='running':console.print('需要确认时使用 /tool-approve '+str(row['number'])+'；/状态 查看详情。')
+                except Exception as exc:console.print('Agent 任务未完成：'+str(exc),markup=False)
+                continue
+            if command.startswith('/tool-approve '):
+                from core.gui.service import DashboardService
+                try:
+                    dashboard=DashboardService(Path(agent.state_manager.path).parent)
+                    number=int(command.split(maxsplit=1)[1])
+                    detail=dashboard.detail(agent.session_id,number)
+                    action=next(a for a in ('tool','read','execute') if a in detail['actions'])
+                    preview=dashboard.preview(agent.session_id,number,action)
+                    console.print(preview,markup=False)
+                    word='EXECUTE' if action=='execute' else 'CONFIRM'
+                    answer=(await asyncio.to_thread(input,'输入 '+word+' 确认当前操作: ')).strip()
+                    dashboard.confirm(preview['ticket'],answer)
+                    job=dashboard.jobs.get((agent.session_id,number))
+                    if job:await asyncio.to_thread(job.wait,timeout=245)
+                    console.print(dashboard.detail(agent.session_id,number)['status'],markup=False)
+                except Exception as exc:console.print('审批未完成：'+str(exc),markup=False)
+                continue
+            if command=='/mcp-tools' or command.startswith('/mcp-tools '):
+                from core.mcp.connections import discover
+                from core.tools.mcp_files import configuration
+                try:
+                    configs={'filesystem':configuration()} if command=='/mcp-tools' else json.loads(Path(command.split(maxsplit=1)[1]).read_text(encoding='utf-8'))['mcpServers']
+                    for name,config in configs.items():
+                        discovered=await discover(config)
+                        console.print(name+': '+', '.join(t['name'] for t in discovered),markup=False)
+                except Exception as exc:console.print('MCP 连接失败：'+type(exc).__name__,markup=False)
+                continue
+
+            if command in ('/chat','/聊天'):
+                conversation_mode=True
+                console.print('已切换普通对话，输入 /任务模式 返回任务与工具路由。')
+                continue
+            if command in ('/task-mode','/任务模式'):
+                conversation_mode=False
+                console.print('已切换任务模式，工具执行仍需审批。')
+                continue
+            if conversation_mode and not command.startswith('/'):
+                response=await agent.answer_only(command)
+                console.print(response,markup=False)
+                continue
+            if command.startswith(('/chat ', '/聊天 ')):
+                response=await agent.answer_only(command.split(maxsplit=1)[1])
+                console.print(response,markup=False)
+                continue
+            if command in ('/history','/对话记录'):
+                from core.state.conversation import Conversation
+                for turn in Conversation(agent.state_manager.path).history(agent.session_id):
+                    console.print('你：'+turn['text'],markup=False)
+                    console.print('助手：'+(turn['answer'] or '['+turn['status']+']'),markup=False)
+                continue
+
             from core.security import permission_requests as _pr
             context_response = task_context.handle(agent.session_id, command,
                 read_binding=multi_reads.peek(agent.session_id),
@@ -1790,7 +1868,7 @@ async def run_interactive_app():
             # Agent chooses its read-only MCP tool using its existing LangGraph setup.
             # All actual calls are still checked by the global gateway.
             with session_context(agent.session_id):
-                response = await agent.chat(user_input)
+                response = await agent.chat(user_input) if intent_decision.execution_requested else await agent.answer_only(user_input)
 
             console.print(f"\n[bold white]Agent:[/bold white] {response}\n")
 

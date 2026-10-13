@@ -2,7 +2,13 @@
 
 React + TypeScript + Vite。前端只通过本地 API 读取任务和提交确认，不连接 SQLite，
 不运行模型，不直接调用 MCP。界面包含会话/任务列表、步骤依赖、结果证据，以及
-暂停、解除暂停和取消。文件/代码审批、任务创建、重规划和证据修复仍在 CLI 完成。
+暂停、解除暂停和取消。采用炭黑背景、灰阶面板和清晰焦点的深色界面。
+Python 步骤可在界面审阅完整代码，输入 `EXECUTE` 后执行。支持新建会话、文本创建任务、
+技能偏好、自动工具选择、文件权限和 `/` 指令说明；重规划和证据修复仍在 CLI 完成。
+
+任务模式按目标自动选择工具，技能可设置偏好。技能快照仅影响新任务，
+不会授予路径或执行权限。规划异步进行、最多两项并发，重复提交标识会返回同一记录。
+指令菜单明确区分 GUI 可执行操作与 CLI 用法说明，不提供任意终端命令执行。
 
 ## Windows 启动
 
@@ -39,6 +45,9 @@ cd ..
 python -m pytest test/test_phase_gui1.py -q
 python -m pip install playwright
 python scripts/windows_gui_e2e.py
+python scripts/windows_workspace_e2e.py
+python scripts/windows_gui3_e2e.py
+python scripts/windows_gui4_e2e.py
 ```
 
 Windows 浏览器验收使用本机 Microsoft Edge，无需下载 Chromium。需要原项目的
@@ -56,5 +65,16 @@ Windows 浏览器验收使用本机 Microsoft Edge，无需下载 Chromium。需
 - 工具内容使用 React 文本节点显示，无 HTML 渲染；配置 CSP、禁止框架嵌入和缓存。
 
 本机其他进程或拥有文件系统访问权的用户不在浏览器来源隔离的防护范围内。
-不把此原型暴露到局域网或公网。后续仍需完成共享审批服务、完整 GUI 旅程、
+Python 执行与 CLI 共用 `CodeStepService`，重新验证代码摘要并原子认领当前步骤。
+后台进程只接收任务身份和审批摘要，不接收浏览器提交的代码。每个服务最多同时运行
+4 个执行进程，连接和执行整体期限为 90 秒；页面关闭不会取消已提交任务。
+
+`educlaw_gui.sqlite3` 保存会话挂载和提交记录；服务重启后未完成规划显示中断，不自动重试。
+文档见 [GitHub Pages](https://weiyu687.github.io/EduClaw/) 和 [Wiki](https://github.com/weiyu687/EduClaw/wiki)。
+
+不把此原型暴露到局域网或公网。后续仍需完成完整 GUI 旅程、
 可访问性审查、故障恢复界面和目标用户可用性验收。
+
+普通对话默认启用，共用 CLI 多轮记录；任务模式需显式切换。会话名称和软删除同步到 CLI。重启服务以使用新 API，刷新浏览器以加载新界面。
+
+文件读写依赖官方 Filesystem MCP：仓库根目录运行 `npm ci --prefix integrations/filesystem`。搜索使用免密钥 Wikipedia。自动任务按策略推进；覆盖已有文件、执行 Python 仍需确认。CLI 对应 `/agent`、`/tool-approve`、`/tool-modes`，具体说明见文档网站。

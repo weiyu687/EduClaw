@@ -34,6 +34,11 @@ def readable_result(payload):
     except (ValueError, TypeError):
         return compact_preview(payload, 1600)
     if isinstance(value, dict):
+        if value.get('provider')=='Google News RSS' and isinstance(value.get('results'),list):
+            lines=[value.get('message',''),f"北京时间：{value.get('start','')} 至 {value.get('end_exclusive','')}（不含结束时间）"]
+            for item in value['results']:
+                lines.append(f"\n{item.get('title','')}\n{item.get('source','')} · {item.get('published_at','')}\n{item.get('url','')}")
+            return '\n'.join(lines)
         lines = []
         for key, item in list(value.items())[:12]:
             description = (f'列表，共 {len(item)} 项' if isinstance(item, list) else
@@ -167,7 +172,9 @@ class TaskContext:
                 lines = [f"任务 {number}：{snap.values['goal']}",
                          f"状态：{snap.values['status']}；控制：{mode}；进度：{idx}/{len(steps)}"]
                 for i, step in enumerate(steps):
-                    status = snap.values.get('results', [])[i]['status'] if i < len(snap.values.get('results', [])) else '待执行'
+                    from core.security.step_status import step_status,LABELS
+                    code=step_status(snap.values,self.ledger,session,i)
+                    status=LABELS.get(code,code)
                     lines.append(f"  {i+1}. {step['tool']} | {status}")
                 next_action = ('任务已暂停，/恢复 查看将执行与不会重放的步骤。' if mode == 'paused' else
                                '任务已取消或正在取消，/诊断 核查结果；不会重放。' if mode in ('cancel_requested', 'cancelled') else
