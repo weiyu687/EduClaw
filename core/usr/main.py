@@ -556,11 +556,11 @@ async def run_interactive_app():
 
             if command in ('/chat','/聊天'):
                 conversation_mode=True
-                console.print('已切换普通对话，输入 /任务模式 返回任务与工具路由。')
+                console.print('已切换普通对话，可直接查询公开资料；复杂执行会建议创建任务。输入 /任务模式 返回任务工作流。')
                 continue
             if command in ('/task-mode','/任务模式'):
                 conversation_mode=False
-                console.print('已切换任务模式，工具执行仍需审批。')
+                console.print('已切换任务模式，按权限自动执行低风险步骤，重要操作需确认。')
                 continue
             if conversation_mode and not command.startswith('/'):
                 response=await agent.answer_only(command)

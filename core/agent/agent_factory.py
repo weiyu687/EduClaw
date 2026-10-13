@@ -246,15 +246,19 @@ class EduClawAgent:
             raise
 
     async def answer_only(self, user_text: str) -> str:
-        """No-tool explanation route. No agent graph or MCP tool can run here.
+        """Shared conversational route; only bounded public search may run.
 
-        Explicitly scoped to informational requests by the CLI; the user text
-        is never interpreted as permission to execute code.
+        File/code operations remain proposals requiring the task workflow.
         """
         from core.state.conversation import Conversation
         if self.session_id is None:
             self.set_session_context(str(uuid.uuid4()))
-        return await Conversation(self.state_manager.path).reply(self.session_id,user_text,self.model)
+        conversation=Conversation(self.state_manager.path)
+        answer=await conversation.reply(self.session_id,user_text,self.model)
+        proposal=conversation.history(self.session_id)[-1].get('proposal')
+        if proposal:
+            answer+='\n\n确认创建任务时，可输入 /agent '+proposal['goal']+'\n未自动创建或执行任务。'
+        return answer
 
     async def chat_without_memory(self, user_text: str) -> str:
         old = self.enable_memory

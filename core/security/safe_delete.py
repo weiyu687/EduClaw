@@ -64,7 +64,7 @@ class SafeDelete:
     def _check_activity(self, session):
         with self._db(self.state_db) as db:
             if db.execute("SELECT 1 FROM sqlite_master WHERE name='chat_turns'").fetchone():
-                if db.execute("SELECT 1 FROM chat_turns WHERE session=? AND status='generating' AND created>?",(session,time.time()-120)).fetchone():
+                if db.execute("SELECT 1 FROM chat_turns WHERE session=? AND status='generating' AND created>?",(session,time.time()-240)).fetchone():
                     raise PermissionError('对话正在回复，请完成后再删除。')
         path=self.state_db.with_name('educlaw_multi_checkpoints.sqlite3')
         if path.exists():

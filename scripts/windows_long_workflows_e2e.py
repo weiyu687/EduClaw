@@ -56,6 +56,10 @@ def start_server(work):
 
 def close_server(server,thread):
     server.shutdown();server.server_close();thread.join(timeout=5)
+    # A completed step can be visible before its worker closes SQLite/MCP.
+    # Windows cannot remove the temporary data directory until those handles close.
+    for process in list(server.service.jobs.values()):
+        process.wait(timeout=30)
 
 
 def read_state(work,session,task):

@@ -17,7 +17,7 @@ def main():
             page.get_by_role('button',name='＋ 新建对话',exact=True).click()
             page.get_by_label('任务输入',exact=True).fill('我们讨论的演示项目叫青岚书屋，目标是帮助学生阅读。请记住这个名字，简短回复。')
             page.get_by_role('button',name='发送消息 ↑',exact=True).click()
-            expect(page.locator('.chat-assistant p').last).to_contain_text('青岚',timeout=95000)
+            expect(page.locator('.chat-assistant').last).to_contain_text('青岚',timeout=95000)
             session=server.service.sessions()[0]['id']
             assert server.service.sessions()[0]['label'] not in ('新对话','会话 1')
             output,_=run_cli(work,['/use '+session,'/chat 刚才说的演示项目叫什么？只回复名字。','/rename-session 跨端阅读讨论','exit'],'chat_cross_cli')
@@ -27,7 +27,7 @@ def main():
             page.get_by_label('任务输入',exact=True).fill('围绕刚才的项目提出两条建议，开头写出项目名字。')
             page.get_by_role('button',name='发送消息 ↑',exact=True).click()
             expect(page.locator('.chat-history article')).to_have_count(3,timeout=10000)
-            expect(page.locator('.chat-assistant p').last).to_contain_text('青岚',timeout=95000)
+            expect(page.locator('.chat-assistant').last).to_contain_text('青岚',timeout=95000)
             expect(page.locator('.session-list')).to_contain_text('跨端阅读讨论')
             page.get_by_role('button',name='重命名',exact=True).click()
             page.get_by_label('对话名称',exact=True).fill('阅读计划与建议')
@@ -54,6 +54,7 @@ def main():
             page.set_viewport_size({'width':390,'height':844})
             assert page.evaluate('document.documentElement.scrollWidth <= innerWidth')
             page.screenshot(path=str(ROOT/'logs/gui_chat_mobile.png'),full_page=True)
+            page.get_by_role('button',name='展开侧栏',exact=True).click()
             page.get_by_role('button',name='删除对话',exact=True).click()
             expect(page.get_by_role('group',name='删除对话确认')).to_be_visible()
             page.get_by_role('button',name='确认删除对话',exact=True).click()
@@ -65,7 +66,7 @@ def main():
             report={'platform':'Windows Edge','real_model':True,'gui_cli_multi_turn':True,'summary_title':True,'manual_title_preserved':True,'rename_both_directions':True,'delete_shared':True,'approval_state_immediate':True,'real_docker_result':156,'mobile_no_overflow':True}
             (ROOT/'logs/gui_chat_report.json').write_text(json.dumps(report,indent=2),encoding='utf-8');print(json.dumps(report))
         except Exception:
-            print(ascii(page.locator('body').inner_text()[-5000:]));page.screenshot(path=str(ROOT/'logs/gui_chat_failure.png'),full_page=True);raise
+            print(errors);print(ascii(page.locator('body').inner_text()[-5000:]));page.screenshot(path=str(ROOT/'logs/gui_chat_failure.png'),full_page=True);raise
         finally:browser.close();close_server(server,thread)
 
 if __name__=='__main__':main()

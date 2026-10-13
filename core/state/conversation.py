@@ -1,8 +1,10 @@
-"""Shared durable, tool-free conversations for GUI and CLI."""
+"""Shared durable conversations with bounded public search for GUI and CLI."""
 import asyncio
 import json
 import time
 import uuid
+from pathlib import Path
+from core.state.chat_actions import SYSTEM, decode, resolve
 from core.state.manager import StateManager, now
 
 
@@ -10,9 +12,13 @@ class Conversation:
     def __init__(self, path):
         self.state = StateManager(path)
         with self.state._connection() as db:
+            db.execute('BEGIN IMMEDIATE')
             db.execute('''CREATE TABLE IF NOT EXISTS chat_turns(
                 id TEXT PRIMARY KEY, session TEXT NOT NULL, text TEXT NOT NULL,
                 answer TEXT, status TEXT NOT NULL, created REAL NOT NULL)''')
+            columns={r[1] for r in db.execute('PRAGMA table_info(chat_turns)')}
+            for name in ('proposal','evidence'):
+                if name not in columns:db.execute(f'ALTER TABLE chat_turns ADD COLUMN {name} TEXT')
 
     def _check(self, db, session):
         if not db.execute('SELECT 1 FROM sessions WHERE id=? AND deleted_at IS NULL',(session,)).fetchone():
@@ -21,9 +27,12 @@ class Conversation:
     def history(self, session):
         with self.state._connection() as db:
             self._check(db,session)
-            db.execute("UPDATE chat_turns SET status='interrupted' WHERE status='generating' AND created<?",(time.time()-120,))
+            db.execute("UPDATE chat_turns SET status='interrupted' WHERE status='generating' AND created<?",(time.time()-240,))
             db.row_factory = __import__('sqlite3').Row
-            return [dict(r) for r in db.execute('SELECT * FROM chat_turns WHERE session=? ORDER BY created,id',(session,))]
+            rows=[dict(r) for r in db.execute('SELECT * FROM chat_turns WHERE session=? ORDER BY created,id',(session,))]
+            for row in rows:
+                for key in ('proposal','evidence'):row[key]=json.loads(row[key]) if row[key] else None
+            return rows
 
     def begin(self, session, text, request_id=None):
         if not isinstance(text,str) or not 1 <= len(text.strip()) <= 4000:
@@ -38,10 +47,10 @@ class Conversation:
             if old:
                 if old != (session,text.strip()):raise PermissionError('消息标识已被使用。')
                 return rid,False
-            db.execute("UPDATE chat_turns SET status='interrupted' WHERE status='generating' AND created<?",(time.time()-120,))
+            db.execute("UPDATE chat_turns SET status='interrupted' WHERE status='generating' AND created<?",(time.time()-240,))
             if db.execute("SELECT 1 FROM chat_turns WHERE session=? AND status='generating'",(session,)).fetchone():
                 raise PermissionError('当前对话正在回复，请等待完成。')
-            db.execute('INSERT INTO chat_turns VALUES(?,?,?,NULL,?,?)',(rid,session,text.strip(),'generating',time.time()))
+            db.execute('INSERT INTO chat_turns(id,session,text,answer,status,created) VALUES(?,?,?,NULL,?,?)',(rid,session,text.strip(),'generating',time.time()))
             db.execute("UPDATE sessions SET updated_at=?,title=CASE WHEN title='' THEN ? ELSE title END WHERE id=?",(now(),text.strip()[:24],session))
         return rid,True
 
@@ -50,27 +59,28 @@ class Conversation:
         rows=self.history(session)
         current=next(r for r in rows if r['id']==rid)
         if current['status']!='generating':return current.get('answer') or ''
-        messages=[SystemMessage(content='你是 EduClaw 普通对话助手。根据历史消息自然交流，不调用工具，不创建任务，不声称执行文件或代码。需要执行时说明可以切换任务模式并审批。仅返回 JSON 对象，reply 是本次完整回复，title 是概括本对话主题的简洁中文标题（最多20字）。')]
+        messages=[SystemMessage(content=SYSTEM)]
         for row in [r for r in rows if r['created']<=current['created']][-24:]:
             if row['status']=='completed':messages.extend([HumanMessage(content=row['text']),AIMessage(content=row['answer'])])
         messages.append(HumanMessage(content=current['text']))
         try:
-            async with asyncio.timeout(90):
+            async def respond(active_model):
+                response=await active_model.ainvoke(messages)
+                raw=str(response.content).strip()
+                try:parsed=decode(raw)
+                except (ValueError,TypeError):parsed={'reply':raw}
+                answer,proposal,evidence=await resolve(parsed,directory=Path(self.state.path).parent,session=session,text=current['text'],model=active_model)
+                return answer,parsed.get('title',''),proposal,evidence
+            async with asyncio.timeout(180):
                 if model is None:
                     import httpx
                     from core.llm.llm_factory import get_llm
-                    async with httpx.AsyncClient(timeout=75) as client:
-                        response=await get_llm(False,http_async_client=client).ainvoke(messages)
-                else:response=await model.ainvoke(messages)
-            raw=str(response.content).strip()
-            try:
-                parsed=json.loads(raw.removeprefix('```json').removeprefix('```').removesuffix('```').strip())
-                answer=parsed['reply'];title=parsed.get('title','')
-                if not isinstance(answer,str) or not answer.strip():raise ValueError('Empty answer')
-            except (ValueError,KeyError,TypeError):answer,title=raw,''
+                    async with httpx.AsyncClient(timeout=60) as client:
+                        answer,title,proposal,evidence=await respond(get_llm(False,http_async_client=client))
+                else:answer,title,proposal,evidence=await respond(model)
             with self.state._connection() as db:
                 self._check(db,session)
-                changed=db.execute("UPDATE chat_turns SET answer=?,status='completed' WHERE id=? AND status='generating'",(answer[:64000],rid)).rowcount
+                changed=db.execute("UPDATE chat_turns SET answer=?,proposal=?,evidence=?,status='completed' WHERE id=? AND status='generating'",(answer[:64000],json.dumps(proposal,ensure_ascii=False) if proposal else None,json.dumps(evidence,ensure_ascii=False) if evidence else None,rid)).rowcount
                 if not changed:raise PermissionError('回复已过期，不覆盖现有记录。')
                 if isinstance(title,str) and title.strip():
                     db.execute('UPDATE sessions SET title=?,updated_at=? WHERE id=? AND title_manual=0',(title.strip()[:40],now(),session))
