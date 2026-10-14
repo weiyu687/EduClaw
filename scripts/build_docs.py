@@ -4,6 +4,7 @@ import html
 import json
 from pathlib import Path
 import re
+import shutil
 import sys
 
 ROOT=Path(__file__).resolve().parents[1]
@@ -24,7 +25,7 @@ def sources():
         rows.append(f"| `{item['command']}` | {item['title']} | {'CLI' if item['action']=='cli' else 'GUI'}：{item['description']} |")
     rows+=['','## CLI 兼容命令','', 'CLI 的 `/help advanced` 列出高级与兼容命令。以下为现有帮助原文，GUI 不将其转换为任意终端命令。','', '```text']
     from core.security.cli_ux import ADVANCED_HELP
-    rows += [ADVANCED_HELP,'```','', '授权类、恢复类和重规划类命令需在 CLI 查看当前操作范围并按提示确认。GUI 的挂载不替代这些授权。','']
+    rows += [ADVANCED_HELP,'```','', '高级恢复与重规划以 CLI 预览提示为准。GUI 支持文件与工具审批；技能挂载不授予执行权限。当前对话的审批模式优先于旧帮助中逐步确认的默认描述，工具禁用始终优先。','']
     pages['Commands']='\n'.join(rows)
     return pages
 
@@ -36,13 +37,20 @@ def build(site,wiki=None):
     pages=sources()
     if wiki:
         wiki.mkdir(parents=True,exist_ok=True)
-        for name,source in pages.items(): (wiki/f'{name}.md').write_text(source,encoding='utf-8')
+        for name,source in pages.items():
+            source=source.replace('](../images/','](https://raw.githubusercontent.com/wiki/weiyu687/EduClaw/assets/ui/')
+            (wiki/f'{name}.md').write_text(source,encoding='utf-8')
         (wiki/'_Sidebar.md').write_text('# EduClaw\n\n'+'\n'.join(f'- [{title}]({name})' for name,title in PAGES),encoding='utf-8')
     site.mkdir(parents=True,exist_ok=True)
+    for destination in [site]+([wiki] if wiki else []):
+        asset_dir=destination/'assets'/'ui'
+        asset_dir.mkdir(parents=True,exist_ok=True)
+        for source in (ROOT/'docs'/'images').glob('*.png'):
+            shutil.copy2(source,asset_dir/source.name)
     renderer=MarkdownIt('commonmark',{'html':False}).enable('table')
     search=[]
     for name,title in PAGES:
-        source=pages[name]
+        source=pages[name].replace('](../images/','](assets/ui/')
         for target,_ in PAGES:
             source=source.replace(']('+target+')',']('+filename(target)+')')
         tokens=renderer.parse(source)

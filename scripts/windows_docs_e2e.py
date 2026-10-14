@@ -27,6 +27,10 @@ def main():
             for link in links:
                 assert page.goto(root+link).status==200
                 expect(page.locator('h1')).to_be_visible()
+                for picture in page.locator('article img').all():
+                    expect(picture).to_be_visible()
+                    assert picture.evaluate('(img)=>img.complete && img.naturalWidth>0')
+                    assert picture.evaluate('(img)=>img.getBoundingClientRect().width <= img.parentElement.getBoundingClientRect().width')
                 for anchor in page.locator('.toc a').evaluate_all('(nodes)=>nodes.map(n=>n.getAttribute("href"))'):
                     assert page.locator(anchor).count()==1
             page.goto(root)
@@ -42,7 +46,7 @@ def main():
             browser.close()
     finally:
         server.shutdown();server.server_close();thread.join(timeout=5)
-    print(json.dumps({'browser':'Microsoft Edge','pages':9,'navigation':True,'search':True,'anchors':True,'mobile_overflow':False}))
+    print(json.dumps({'browser':'Microsoft Edge','pages':9,'navigation':True,'search':True,'anchors':True,'images':True,'mobile_overflow':False}))
 
 
 if __name__=='__main__': main()

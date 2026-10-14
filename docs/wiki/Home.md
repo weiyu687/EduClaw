@@ -1,31 +1,34 @@
 # EduClaw 文档
 
-EduClaw 是面向学习、研究与个人工作的 AI Agent。你描述目标、选择技能和工具，系统起草计划；需要执行时，你审阅当前步骤，结果与进度持久保存。
+**从一个问题，到一件完成的事。** EduClaw 是面向学习、研究与日常工作的个人 AI Agent，提供深色本地工作台和 CLI。
 
-当前开发版本使用 **Python + MCP + LangGraph + SQLite**，界面使用 **TypeScript + React**，提供深色本地工作台。
+![普通对话工作台](../images/chat.png)
 
-## 从这里开始
+截图来自当前开发版。对话为文档演示数据；任务与终端画面中的输出来自实际 Windows 执行。
 
-- [安装与启动](Getting-Started)：Windows 环境、模型配置、CLI 与 GUI 启动。
-- [GUI 使用指南](GUI-Guide)：文本输入、会话、技能与工具挂载、代码审批、结果查看。
-- [指令参考](Commands)：GUI 可用指令、需要 CLI 的指令和高级指令入口。
-- [技能与工具](Skills-and-Tools)：挂载的含义、技能格式、工具契约及扩展流程。
-- [架构与安全](Architecture)：任务状态、审批、不可变结果和失败恢复。
-- [多文件长流程](Long-Workflows)：项目对账与学习进度分析，跨工具依赖、暂停重启与证据报告。
-- [测试与开发](Development)：测试命令、Windows 端到端验收和文档发布。
-- [常见问题](Troubleshooting)：连接、模型、Docker、规划中断和重复提交。
+## 选择你的入口
+
+| 你想做什么 | 从这里开始 |
+| --- | --- |
+| 第一次安装 | [安装与启动](Getting-Started) |
+| 聊天、搜索、准备任务、查看结果 | [GUI 使用指南](GUI-Guide) |
+| 少一点审批，或更严格控制 | [架构与安全](Architecture)中的三种审批模式 |
+| 接入工具与工作方法 | [技能与工具](Skills-and-Tools) |
+| 运行一个完整示例 | [多文件长流程](Long-Workflows) |
+| 查命令 | [指令参考](Commands) |
+| 开发与真实测试 | [测试与开发](Development) |
+| 连接或执行异常 | [常见问题](Troubleshooting) |
 
 ## 当前能力
 
-| 功能 | 当前支持 |
-| --- | --- |
-| 文本目标 | GUI 新建会话后输入目标，异步生成最多 12 步待审批计划 |
-| 技能与工具 | 查看内容或契约，按会话勾选、保存、卸载 |
-| Python 执行 | 展示完整代码，输入 EXECUTE，仅执行当前步骤 |
-| 任务控制 | 暂停、解除暂停、取消与结果查看 |
-| 文件授权与重规划 | 通过 CLI 完成 |
-| 文档 | GitHub Wiki 与 GitHub Pages 使用同一套 Markdown 源文件 |
+普通对话支持持续追问、摘要命名、重命名和删除；简单新闻或资料查询直接在对话完成。需要操作文件、执行代码或分阶段交付时，先展示任务建议，用户编辑并提交后生成计划。
 
-GUI 支持普通多轮对话和自动任务，工具按目标选择，低风险操作按策略推进。已接入免密钥 Wikipedia 资料搜索、带日期筛选的公开新闻搜索和官方 Filesystem MCP。文件上传、第三方工具一键安装、桌面安装包尚未交付。
+任务按目标选择已适配工具，保存步骤、依赖与结果证据。持续终端支持本机 PowerShell 输入、交互程序和 Agent 控制。审批程度由用户为当前对话选择，GUI 与 CLI 共用状态和权限。
 
-[GitHub 源码](https://github.com/weiyu687/EduClaw) · [开发分支](https://github.com/weiyu687/EduClaw/tree/codex/roadmap-development) · [GitHub Wiki](https://github.com/weiyu687/EduClaw/wiki) · [文档网站](https://weiyu687.github.io/EduClaw/)
+## 当前版本与范围
+
+当前活跃开发分支为 `codex/roadmap-development`。主要验证 Windows 本机使用，后端 Python + MCP + LangGraph + SQLite，前端 TypeScript + React + Vite。
+
+尚未交付桌面安装包、完整 Python 依赖锁定、多用户服务、任意 MCP 工具一键安装或完整生产安全审计。本机终端的起始目录不是沙箱；公开搜索不保证全网覆盖。
+
+[源代码](https://github.com/weiyu687/EduClaw/tree/codex/roadmap-development) · [GitHub Wiki](https://github.com/weiyu687/EduClaw/wiki) · [文档网站](https://weiyu687.github.io/EduClaw/)
