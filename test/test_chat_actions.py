@@ -69,3 +69,18 @@ def test_old_chat_database_migrates_without_losing_history(tmp_path):
     assert c.history('s')[0]['answer']=='answer'
     asyncio.run(c.reply('s','hello',Model({'reply':'hello'})))
     assert len(c.history('s'))==2
+
+
+@pytest.mark.parametrize('goal',[None,'',42,'x'*4001])
+def test_invalid_task_goal_falls_back_to_original_request(tmp_path,goal):
+    c=chat(tmp_path)
+    asyncio.run(c.reply('s','保留原始目标',Model({'action':'task','task_goal':goal})))
+    assert c.history('s')[0]['proposal']['goal']=='保留原始目标'
+
+
+def test_contextual_task_goal_preserved_without_execution(tmp_path):
+    c=chat(tmp_path)
+    goal='在 D:\\projects\\demo 运行测试，记录错误到报告并核对。不要删除文件。'
+    asyncio.run(c.reply('s','按刚才约定执行',Model({'action':'task','task_goal':goal,'reason':'需要终端与文件操作'})))
+    assert c.history('s')[0]['proposal']['goal']==goal
+    assert not (tmp_path/'educlaw_multi_checkpoints.sqlite3').exists()
