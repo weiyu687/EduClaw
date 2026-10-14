@@ -26,3 +26,4 @@ web/*.tsbuildinfo
 
 integrations/**/node_modules/
 data/workspace/
+data/terminal-broker.*

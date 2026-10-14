@@ -509,6 +509,11 @@ async def run_interactive_app():
                 continue
 
             command = user_input.strip()
+            if command=='/term' or command.startswith('/term '):
+                from core.terminal.service import cli as terminal_cli
+                try:await terminal_cli(Path(agent.state_manager.path).parent,agent.session_id,command,console)
+                except (ValueError,PermissionError,LookupError,IndexError,OSError) as exc:console.print('终端操作未确认完成：'+str(exc),markup=False)
+                continue
             if command.startswith('/terminal '):
                 from core.gui.service import DashboardService
                 try:

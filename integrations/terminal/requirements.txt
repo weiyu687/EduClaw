@@ -1,2 +1,3 @@
 # Windows Job Objects own command processes and their descendants.
 pywin32==311; sys_platform == "win32"
+pywinpty==3.0.2; sys_platform == "win32"

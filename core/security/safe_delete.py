@@ -130,4 +130,7 @@ class SafeDelete:
             if result.rowcount!=1: raise PermissionError('会话状态变化，未删除')
         with self._db(self.task_db) as db:
             db.execute('UPDATE autonomous_tasks SET deleted_at=? WHERE session=? AND deleted_at IS NULL',(_utc(),p['id']))
+        from core.terminal.client import rpc
+        for terminal in rpc(self.state_db.parent,p['id'],'list'):
+            if terminal['alive']:rpc(self.state_db.parent,p['id'],'close',id=terminal['id'])
         return {'kind':'session','id':p['id']}

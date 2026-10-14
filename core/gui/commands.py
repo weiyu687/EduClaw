@@ -1,6 +1,7 @@
 """Shared GUI command descriptions; contains no execution dispatcher."""
 COMMANDS = [
-    ('/终端','终端命令','在指定本机目录准备 PowerShell 命令，核对后逐次执行。','terminal'),
+    ('/term','持续终端','CLI：/term open 目录，/term agent ID 目标；支持 send/read/approve/interrupt/close/trust/revoke。','cli'),
+    ('/终端','终端与 Agent','在指定目录打开持续 PowerShell，直接输入命令或交给 Agent 连续工作；也支持单次审批。','terminal'),
     ('/terminal','CLI 终端','CLI 用法：/terminal {"cwd":"绝对目录","command":"命令","timeout_seconds":60}；再 /tool-approve 编号。','cli'),
     ('/聊天','普通对话','直接对话，按需搜索公开资料；复杂执行可确认创建任务，历史与 CLI 共用。','chat'),
     ('/任务模式','任务模式','自动选择能力；按权限执行低风险步骤，覆盖文件和代码执行需要确认。','task_mode'),

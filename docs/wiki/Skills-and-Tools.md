@@ -127,3 +127,23 @@ EXECUTE
 ```
 
 编号以实际创建结果为准。`/继续 1` 也可审阅终端命令；`/取消任务 1` 请求取消在途执行。GUI/CLI 使用同一任务账本、权限和结果证据。
+## 通用持续终端
+
+持续终端通过应用内终端服务提供，与单次 MCP 工具 run_terminal 并存。Agent 使用真实输入、输出观察、等待和中断构成执行循环，直接调用本机已安装的命令行工具，而非预设少量网络诊断命令。当前入口是 GUI 侧栏“终端”的自然语言目标和 CLI /term agent；原有普通任务规划仍使用单次 run_terminal，不会静默授予持续控制权限。
+
+CLI 示例：
+
+```text
+/term open D:\projects\demo
+OPEN
+/term list
+/term send <终端ID> Get-Location
+/term agent <终端ID> 检查项目并运行测试，根据错误修复，再次测试确认
+/term read <终端ID>
+/term approve <终端ID>
+EXECUTE
+/term interrupt <终端ID>
+/term close <终端ID>
+```
+
+打开时可用 TRUST 替代 OPEN，明确授权 Agent 连续控制；也可 /term trust ID 后输入 TRUST，/term revoke ID 撤销。直接输入是用户自身的命令，Agent 正在工作时先停止，避免抢占交互流。CLI 与 GUI 的权限设置、终端和操作记录共用。

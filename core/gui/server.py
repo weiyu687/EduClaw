@@ -85,6 +85,9 @@ class Handler(BaseHTTPRequestHandler):
             service = self.server.service
             if path.path == '/api/sessions' and not params:
                 result = service.sessions()
+            elif path.path == '/api/terminals' and set(params)=={'session'}:
+                from core.terminal.service import operate
+                result=operate(service.directory,params['session'],'list',{})
             elif path.path == '/api/catalog' and not params:
                 result = self.server.workspace.catalog()
             elif path.path == '/api/mounts' and set(params) == {'session'}:
@@ -138,6 +141,9 @@ class Handler(BaseHTTPRequestHandler):
                 result = service.terminal_task(body['session'],body['arguments'],body['request_id'])
             elif self.path == '/api/session/change' and set(body)=={'session','action','value'}:
                 result = service.session_change(body['session'],body['action'],body['value'])
+            elif self.path == '/api/terminals' and set(body)=={'session','action','arguments'}:
+                from core.terminal.service import operate
+                result=operate(service.directory,body['session'],body['action'],body['arguments'])
             elif self.path == '/api/preview' and set(body) == {'session','number','action'}:
                 result = service.preview(body['session'], body['number'], body['action'])
             elif self.path == '/api/permissions' and set(body) == {'session','kind','value','mode'}:

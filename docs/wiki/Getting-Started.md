@@ -66,3 +66,4 @@ python -m pip install -r integrations/terminal/requirements.txt
 ```
 
 目前验证版本为 pywin32 311。终端工具不要求 Docker；Python 沙箱执行仍要求 Docker。终端子进程使用受限的继承环境变量，并以 GUI/CLI 启动用户身份运行；不自动提权。
+持续终端另需同一依赖文件中的 pywinpty 3.0.2，要求支持 ConPTY 的 Windows 10/11。安装后在 GUI 侧栏“终端”打开持续会话，或在 CLI 使用 `/term` 查看操作说明。服务仅监听本机，通过每次启动的凭据连接；运行数据位于数据目录，不提交 Git。

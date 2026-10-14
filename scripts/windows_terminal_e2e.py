@@ -18,6 +18,7 @@ def main():
         def prepare(command,timeout=20):
             page.get_by_role('button',name='终端',exact=True).click()
             dialog=page.get_by_role('dialog',name='终端',exact=True)
+            dialog.get_by_role('button',name='单次审批命令',exact=True).click()
             dialog.get_by_label('终端工作目录',exact=True).fill(str(cwd))
             dialog.get_by_label('终端命令',exact=True).fill(command)
             dialog.get_by_label('终端超时',exact=True).fill(str(timeout))
@@ -94,6 +95,7 @@ def main():
             mode.select_option('deny');expect(mode).to_have_value('deny');page.keyboard.press('Escape')
             assert not errors,errors
             page.get_by_role('button',name='终端',exact=True).click()
+            page.get_by_role('button',name='单次审批命令',exact=True).click()
             page.get_by_label('终端工作目录',exact=True).fill(str(cwd));page.get_by_label('终端命令',exact=True).fill('Write-Output blocked')
             page.get_by_role('button',name='准备命令并查看审批',exact=True).click()
             expect(page.get_by_role('dialog',name='终端',exact=True)).to_contain_text('终端已禁用')

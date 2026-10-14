@@ -1,6 +1,11 @@
 import {useRef,useState} from 'react';
 import {request} from './api';
-export function Terminal({token,session,onTask}:{token:string;session:string;onTask:(number:number)=>void}){
+import {InteractiveTerminal} from './InteractiveTerminal';
+export function Terminal(props:{token:string;session:string;onTask:(number:number)=>void}){
+  const [tab,setTab]=useState('session');
+  return <><div className="terminal-tabs"><button className={tab==='session'?'primary':'secondary'} onClick={()=>setTab('session')}>持续终端与 Agent</button><button className={tab==='single'?'primary':'secondary'} onClick={()=>setTab('single')}>单次审批命令</button></div>{tab==='session'?<InteractiveTerminal token={props.token} session={props.session}/>:<SingleTerminal {...props}/>}</>;
+}
+function SingleTerminal({token,session,onTask}:{token:string;session:string;onTask:(number:number)=>void}){
   const [cwd,setCwd]=useState('');const [command,setCommand]=useState('');const [timeout,setTimeoutValue]=useState(60);
   const [busy,setBusy]=useState(false);const [error,setError]=useState('');
   const identity=useRef<{key:string;id:string}|undefined>(undefined);

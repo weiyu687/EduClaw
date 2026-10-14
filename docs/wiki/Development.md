@@ -63,3 +63,4 @@ python scripts/build_docs.py --site-dir logs/docs-site --wiki-dir logs/wiki-publ
 `python -m pytest test/test_terminal.py -q` 实际运行 PowerShell，检查中文/空格目录、输出、退出码、超时、子进程清理、取消，以及准确参数一次性审批。
 
 `python scripts/windows_terminal_e2e.py` 使用 Windows Edge、真实 MCP、真实 PowerShell 和模型规划，验证 GUI/CLI 共享、审批前不执行、刷新后结果、终端自动规划后等待确认、在途取消、超时、禁用策略与窄屏显示。使用独立临时目录和数据库，不操作用户项目文件。
+持续终端验收：`python -m pytest test/test_interactive_terminal.py -q` 和 `python scripts/windows_interactive_terminal_e2e.py`。后者使用真实 Edge、ConPTY、CLI、HTTP 服务和模型，验证跨端共享、交互输入、工作目录与变量保留、审批、自动循环，以及项目测试失败→修改→复测通过；不会使用用户项目作为修改样本。
