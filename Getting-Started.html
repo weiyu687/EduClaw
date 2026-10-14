@@ -41,5 +41,6 @@ python -m core.gui.server
 <p>本机 PowerShell 工具需要 Windows 自带的 Windows PowerShell 及 pywin32（用于进程树管理）：</p>
 <pre><code class="language-powershell">python -m pip install -r integrations/terminal/requirements.txt
 </code></pre>
-<p>目前验证版本为 pywin32 311。终端工具不要求 Docker；Python 沙箱执行仍要求 Docker。终端子进程使用受限的继承环境变量，并以 GUI/CLI 启动用户身份运行；不自动提权。</p>
+<p>目前验证版本为 pywin32 311。终端工具不要求 Docker；Python 沙箱执行仍要求 Docker。终端子进程使用受限的继承环境变量，并以 GUI/CLI 启动用户身份运行；不自动提权。
+持续终端另需同一依赖文件中的 pywinpty 3.0.2，要求支持 ConPTY 的 Windows 10/11。安装后在 GUI 侧栏“终端”打开持续会话，或在 CLI 使用 <code>/term</code> 查看操作说明。服务仅监听本机，通过每次启动的凭据连接；运行数据位于数据目录，不提交 Git。</p>
 </article><footer>EduClaw · 当前开发版本 · Markdown 与 GitHub Wiki 同源<br><a href="https://github.com/weiyu687/EduClaw/tree/codex/roadmap-development/docs/wiki">查看文档源文件</a></footer></main><nav class="toc" aria-label="本页目录"><strong>本页内容</strong><a href="#section-1">环境要求</a><a href="#section-2">获取当前开发版本</a><a href="#section-3">启动 GUI</a><a href="#section-4">启动 CLI</a><a href="#section-5">启用文件 MCP</a><a href="#section-6">Windows 终端依赖</a></nav></div></body></html>

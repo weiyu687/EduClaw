@@ -40,5 +40,6 @@ python scripts/build_docs.py --site-dir logs/docs-site --wiki-dir logs/wiki-publ
 <p><code>web</code> 目录下运行 <code>npm test</code> 和 <code>npm run build</code> 验证 Markdown 安全渲染及类型与打包；<code>test/test_chat_actions.py</code> 覆盖权限阻断、未知路由、来源越界、历史数据库迁移及搜索证据保存。</p>
 <h2 id="section-6">终端验收</h2>
 <p><code>python -m pytest test/test_terminal.py -q</code> 实际运行 PowerShell，检查中文/空格目录、输出、退出码、超时、子进程清理、取消，以及准确参数一次性审批。</p>
-<p><code>python scripts/windows_terminal_e2e.py</code> 使用 Windows Edge、真实 MCP、真实 PowerShell 和模型规划，验证 GUI/CLI 共享、审批前不执行、刷新后结果、终端自动规划后等待确认、在途取消、超时、禁用策略与窄屏显示。使用独立临时目录和数据库，不操作用户项目文件。</p>
+<p><code>python scripts/windows_terminal_e2e.py</code> 使用 Windows Edge、真实 MCP、真实 PowerShell 和模型规划，验证 GUI/CLI 共享、审批前不执行、刷新后结果、终端自动规划后等待确认、在途取消、超时、禁用策略与窄屏显示。使用独立临时目录和数据库，不操作用户项目文件。
+持续终端验收：<code>python -m pytest test/test_interactive_terminal.py -q</code> 和 <code>python scripts/windows_interactive_terminal_e2e.py</code>。后者使用真实 Edge、ConPTY、CLI、HTTP 服务和模型，验证跨端共享、交互输入、工作目录与变量保留、审批、自动循环，以及项目测试失败→修改→复测通过；不会使用用户项目作为修改样本。</p>
 </article><footer>EduClaw · 当前开发版本 · Markdown 与 GitHub Wiki 同源<br><a href="https://github.com/weiyu687/EduClaw/tree/codex/roadmap-development/docs/wiki">查看文档源文件</a></footer></main><nav class="toc" aria-label="本页目录"><strong>本页内容</strong><a href="#section-1">前端</a><a href="#section-2">Python 与 Windows 验收</a><a href="#section-3">文档源与发布</a><a href="#section-4">MCP 与自动任务验收</a><a href="#section-5">对话优先与黑灰 UI 验收</a><a href="#section-6">终端验收</a></nav></div></body></html>
