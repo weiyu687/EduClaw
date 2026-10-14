@@ -16,10 +16,13 @@ class ToolStepService:
     def __init__(self,base):self.base=base
     def preview(self,session,task):
         b=self.base;p=b.flow.pending(session,task);i,s=p['index'],p['step']
-        if s['tool'] not in ('public_search','news_search','write_text_file'):raise PermissionError('此步骤不是搜索或写入。')
+        if s['tool'] not in ('public_search','news_search','write_text_file','run_terminal'):raise PermissionError('此步骤不是搜索、写入或终端操作。')
         if b.ledger.control(session,task)!='active' or b.ledger.status(session,task,i) or b.ledger.frozen(session,task) or b.replans.blocking_for(session,task):raise PermissionError('步骤不可执行。')
         b.dags.check(session,task,i,b.results)
         args=dict(s['arguments']);before=''
+        if s['tool']=='run_terminal':
+            from core.security.terminal_policy import terminal_arguments
+            args=terminal_arguments(args)
         if s['tool']=='write_text_file':
             def replace(m):
                 literal=resolve_code(m.group(0),session=session,task=task,current_index=i,result_store=b.results)
@@ -45,10 +48,13 @@ class ToolStepService:
             r=self.preview(session,task)
             if r['digest']!=digest:raise PermissionError('工具参数或文件内容变化，请重新审批。')
             b.ledger.claim(session,task,i,arguments_digest=fingerprint(r['tool'],r['arguments']))
+            b.ledger.event(session,task,i,'tool_approved' if approved else 'tool_policy_authorized',{'tool':r['tool'],'digest':digest})
             try:
                 with session_context(session),(reviewed_write(r['arguments'],r['tool']) if approved else nullcontext()):
-                    result=await controlled_call(lambda:client.use_tool(r['tool'],r['arguments']),b.ledger,session,task)
+                    result=await controlled_call(lambda:client.use_tool(r['tool'],r['arguments']),b.ledger,session,task,timeout=r['arguments'].get('timeout_seconds',30)+10 if r['tool']=='run_terminal' else 30)
                 full=normalize_response(result);outcome={'status':'uncertain' if getattr(result,'isError',False) else 'completed','output':full[:20000]}
+                if r['tool']=='run_terminal' and json.loads(full).get('execution_status')!='completed':
+                    outcome['status']='uncertain'
             except Exception as exc:
                 b.lifecycle.failure(session,task,i,exc);full=str(exc);outcome={'status':'uncertain','output':full[:20000]}
             b.results.put(session,task,i,r['tool'],outcome['status'],full)

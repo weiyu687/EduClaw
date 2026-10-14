@@ -778,5 +778,80 @@
       "type": "object"
     },
     "max_output_bytes": 1000000
+  },
+  {
+    "name": "run_terminal",
+    "description": "在明确指定的现有本机目录执行 Windows PowerShell 命令。每次需审批命令、目录和超时；支持构建、测试、Git及文件操作。目录不是沙箱；不支持交互输入或常驻服务。",
+    "inputSchema": {
+      "type": "object",
+      "properties": {
+        "cwd": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 1024
+        },
+        "command": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 8000
+        },
+        "timeout_seconds": {
+          "type": "integer",
+          "minimum": 1,
+          "maximum": 180,
+          "default": 60
+        }
+      },
+      "required": [
+        "cwd",
+        "command"
+      ],
+      "additionalProperties": false
+    },
+    "version": "1.0.0",
+    "sdk_version": 1,
+    "adapter": "run_terminal",
+    "risk": "code_execute",
+    "resource_argument": "cwd",
+    "plannable": true,
+    "extensions": [],
+    "output_encoding": "json",
+    "output_schema": {
+      "type": "object",
+      "required": [
+        "cwd",
+        "shell",
+        "command",
+        "exit_code",
+        "execution_status",
+        "stdout",
+        "stderr",
+        "truncated",
+        "duration_seconds"
+      ],
+      "properties": {
+        "execution_status": {
+          "enum": [
+            "completed",
+            "nonzero_exit",
+            "timed_out",
+            "cancelled"
+          ]
+        },
+        "exit_code": {
+          "type": "integer"
+        },
+        "stdout": {
+          "type": "string"
+        },
+        "stderr": {
+          "type": "string"
+        },
+        "truncated": {
+          "type": "boolean"
+        }
+      }
+    },
+    "max_output_bytes": 1000000
   }
 ]

@@ -68,6 +68,9 @@ def validate_steps(steps, user_goal):
                 if raw_path.casefold() not in canonical_literals:
                     raise PermissionError('Read path must appear verbatim in user request')
             args = {field: str(Path(raw_path).resolve()) if in_workspace else canonical(raw_path)}
+        elif tool=='run_terminal':
+            from core.security.terminal_policy import terminal_arguments
+            args=terminal_arguments(args)
         elif tool=='write_text_file':
             from core.security.workspace_policy import workspace_path
             builtin_registry().validate_input(tool,args)
@@ -105,6 +108,7 @@ async def draft_plan(model, goal, *, allowed_tools=None, skill_guidance=''):
         SystemMessage(content=('你是仅起草计划的组件，不能调用工具。只返回JSON {"steps":[{"tool":"...","arguments":{...}}]}。'
             f'最多{MAX_PLAN_STEPS}步。按任务需要拆分，不为凑步数添加步骤。工具能力与契约如下（仅可使用这些工具）：' + json.dumps(contracts, ensure_ascii=False) +
             '工作目录内可以创建文件并在后续步骤读取，目录为：'+str(workspace_root())+'。工作目录外读取路径必须从用户消息逐字复制。'
+            '需要本机终端、构建、测试或Git时使用 run_terminal，cwd须为现有本机绝对目录；未提供目录时不能猜测，应要求补充。command为PowerShell语法，每步审批，不支持交互或常驻服务。不要把终端命令放入Python沙箱。'
             '公开资料搜索使用 public_search。保存搜索证据使用 write_text_file，content 内可嵌入 {{step:1:json:}}，无需 Python。'
             '最新资讯、新闻使用 news_search，不能用百科 public_search 替代。昨天用 period=yesterday，今天用 today，最近新闻用 latest，近一周用 week；日期由工具按北京时间计算，不要猜测日期。'
             '新闻查询 query 只写主题词，例如 AI 人工智能，不添加日期操作符。普通新闻总结只需 news_search 一步，结果会在工具完成后基于真实来源自动总结，不需 Python 或写文件。'

@@ -109,3 +109,57 @@ Node.js 需要在 PATH 中。新增受控适配器：
 可直接在任务模式输入“给我最新的AI新闻资讯，昨天的”或“给我最近的AI新闻资讯总结”。系统选择新闻工具，完成后使用保存的标题与摘要生成中文归纳，每条附带真实来源和发布时间。摘要不表示已经阅读全文；无结果会明确说明。公开 RSS 不是稳定的商业 API，可能出现网络限制或无结果，不保证全量覆盖。工具可改成每步确认或禁用。
 
 新闻工具只访问固定的 Google News RSS 地址，查询长度、条数、响应体和超时有界。新闻文本仅为不可信数据，摘要模型不带工具；来源编号必须指向已获得的条目。旧的失败提交保留历史状态，升级后重新提交原文即可。
+
+
+## 本机终端工具
+
+`run_terminal(cwd, command, timeout_seconds=60)` 执行指定目录下的 Windows PowerShell 命令。`cwd` 必须为存在的本机绝对目录；不支持 UNC 网络共享。适用于构建、测试、Git 和本机项目操作。工具属于代码执行级别；平衡模式逐次确认，自主模式可按用户授权自动执行。
+
+执行无用户 Profile、无交互输入，子进程不继承 agent 的 API 密钥环境变量；输出包含 `execution_status`、`exit_code`、`stdout`、`stderr`、`duration_seconds` 和 `truncated`。这不是 Docker 沙箱，不能把指定工作目录当成文件访问边界。普通 Python 计算仍使用原有沙箱工具。
+
+CLI 直接准备示例（将目录换成本机实际目录）：
+
+```text
+/terminal {"cwd":"D:\\projects\\demo","command":"Get-Location; Get-ChildItem","timeout_seconds":60}
+/tool-approve 1
+EXECUTE
+/结果 1
+```
+
+编号以实际创建结果为准。`/继续 1` 也可审阅终端命令；`/取消任务 1` 请求取消在途执行。GUI/CLI 使用同一任务账本、权限和结果证据。
+## 通用持续终端
+
+持续终端通过应用内终端服务提供，与单次 MCP 工具 run_terminal 并存。Agent 使用真实输入、输出观察、等待和中断构成执行循环，直接调用本机已安装的命令行工具，而非预设少量网络诊断命令。当前入口是 GUI 侧栏“终端”的自然语言目标和 CLI /term agent；原有普通任务规划仍使用单次 run_terminal，不会静默授予持续控制权限。
+
+CLI 示例：
+
+```text
+/term open D:\projects\demo
+OPEN
+/term list
+/term send <终端ID> Get-Location
+/term agent <终端ID> 检查项目并运行测试，根据错误修复，再次测试确认
+/term read <终端ID>
+/term approve <终端ID>
+EXECUTE
+/term interrupt <终端ID>
+/term close <终端ID>
+```
+
+打开时可用 TRUST 替代 OPEN，明确授权 Agent 连续控制；也可 /term trust ID 后输入 TRUST，/term revoke ID 撤销。直接输入是用户自身的命令，Agent 正在工作时先停止，避免抢占交互流。CLI 与 GUI 的权限设置、终端和操作记录共用。
+
+## 对话审批模式
+
+在侧栏“工具与文件权限”选择当前对话的审批模式。GUI 与 CLI 共用设置，重启保留，新对话默认平衡模式。
+
+| 模式 | 自动执行范围 |
+| --- | --- |
+| 逐步确认（strict） | 每次工具调用需要确认，持续终端 Agent 每次输入也确认 |
+| 平衡模式（balanced，默认） | 公开查询、已授权的文件读取、工作目录内新建文本文件自动执行；覆盖、代码与终端保留审批规则 |
+| 自主执行（autonomous） | 已启用并适配的工具自动执行，包括本机文件读取、工作目录文件覆盖、Python 与终端；不再逐步询问 |
+
+启用自主执行前需明确确认：终端具有当前 Windows 用户权限，可读写或删除本机文件、联网、安装软件或修改系统；起始目录不是沙箱。它覆盖工具“每步确认”与终端单独的连续控制选项，不覆盖工具禁用、未知工具拒绝、参数校验和任务取消。文件写入专用工具仍限制工作目录和支持类型，通用终端则具有本机用户权限。
+
+可随时切回平衡或逐步确认，后续调用会重新检查策略。已经开始的调用需用停止按钮中断；更改模式不会自动重放已有待审批操作。模式更改和按策略执行的任务步骤分别记录，不会伪装成人工逐步审批。已有文件覆盖仍校验内容摘要，防止覆盖预览后被其他程序修改的版本。
+
+CLI：`/autonomy` 查看；`/autonomy strict` 或 `/autonomy balanced` 降级；`/autonomy autonomous` 后输入 `AUTONOMOUS` 明确授权。持续终端使用 `/term`，自动规划任务使用 `/agent`。自主模式下撤销整个对话的自动权限请使用 `/autonomy balanced`，而不是仅撤销某个终端的独立信任选项。

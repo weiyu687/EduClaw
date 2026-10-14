@@ -35,7 +35,7 @@ class ReadStepService:
             if review['digest'] != digest:
                 raise PermissionError('任务或路径已变化，请重新审批。')
             b.ledger.claim(session, task, index, arguments_digest=fingerprint(review['tool'],review['arguments']))
-            b.ledger.event(session, task, index, 'read_approved', {'path':review['path'], 'digest':digest})
+            b.ledger.event(session, task, index, 'read_approved' if approved else 'read_policy_authorized', {'path':review['path'], 'digest':digest})
             try:
                 from contextlib import nullcontext
                 with session_context(session), (reviewed_read(review['tool'], review['path']) if approved else nullcontext()):

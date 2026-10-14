@@ -49,6 +49,8 @@ def evaluate(tool: str, arguments: Mapping | None) -> Decision:
         return Decision(tool, Risk.READ, True, 'Requires canonical path and authorized read root', key)
     if tool in PUBLIC_READ:
         return Decision(tool, Risk.READ, True, 'Public read-only tool')
+    if tool=='run_terminal':
+        return Decision(tool,Risk.EXECUTE,True,'Requires exact terminal approval','cwd')
     if tool in APPROVAL_EXECUTE:
         if not isinstance(arguments.get('code'), str) or not arguments['code'].strip():
             return Decision(tool, Risk.DENIED, False, 'Python code must be nonempty', 'code')

@@ -34,6 +34,10 @@ def readable_result(payload):
     except (ValueError, TypeError):
         return compact_preview(payload, 1600)
     if isinstance(value, dict):
+        if value.get('shell')=='Windows PowerShell' and 'execution_status' in value:
+            return (f"终端：{value.get('execution_status')} | 退出码：{value.get('exit_code')} | {value.get('duration_seconds')} 秒\n"
+                    f"工作目录：{value.get('cwd')}\n标准输出：\n{value.get('stdout','')[:12000]}\n错误输出：\n{value.get('stderr','')[:12000]}"+
+                    ('\n输出已截断。' if value.get('truncated') or len(value.get('stdout',''))>12000 or len(value.get('stderr',''))>12000 else ''))
         if value.get('provider')=='Google News RSS' and isinstance(value.get('results'),list):
             lines=[value.get('message',''),f"北京时间：{value.get('start','')} 至 {value.get('end_exclusive','')}（不含结束时间）"]
             for item in value['results']:
@@ -182,6 +186,7 @@ class TaskContext:
                                '/确认 或 /取消 重规划' if draft else
                                '重规划提交未完成，需人工核查；不会自动重放。' if blocked else
                                '/允许 查看并授权读取；/拒绝 结束任务' if idx < len(steps) and steps[idx]['tool'] in READ_ARGS else
+                               '/继续 审阅终端命令与工作目录；/拒绝 结束任务' if idx < len(steps) and steps[idx]['tool']=='run_terminal' else
                                '/继续 预览代码并确认；/拒绝 结束任务' if snap.values['status'] == 'running' else '/结果 查看已保存证据')
                 return ContextResponse('\n'.join(lines) + '\n下一步：' + next_action)
             if cmd == '/debug':
