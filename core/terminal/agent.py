@@ -82,7 +82,8 @@ async def loop(runtime,terminal,model=None):
                     text=decision.get('text');approval=decision.get('approval')
                     if not isinstance(text,str) or not 1<=len(text)<=16000 or '\x00' in text or type(approval) is not bool:raise ValueError('Invalid input')
                     reason=str(decision.get('reason',''))[:1000]
-                    if not terminal.trust or approval:
+                    from core.security.autonomy import terminal_requires_approval
+                    if terminal_requires_approval(runtime.directory,terminal.owner,terminal.trust,approval):
                         terminal.agent['pending']={'id':secrets.token_hex(16),'text':text,'reason':reason}
                         terminal.agent['status']='waiting'
                     else:

@@ -25,19 +25,24 @@ def automatic(tool,args,session):
     from core.tool_contracts import builtin_registry
     from core.security.dynamic_permissions import enforcement_mode
     if denied(tool) or enforcement_mode(tool)=='deny':return False
+    from core.security.autonomy import get_mode
+    from core.security.permission_center import CAPABILITIES, get_mode as tool_preference
+    if tool in CAPABILITIES and tool_preference(tool)=='deny':return False
+    profile=get_mode(session)
+    if profile=='strict':return False
     mode=next(x['mode'] for x in tool_modes(db_path().parent) if x['name']==tool)
-    if mode!='auto':return False
+    if mode!='auto' and profile!='autonomous':return False
     contract=builtin_registry().get(tool)
     if contract['risk']=='public_read':return True
     if contract['risk']=='path_read':
         try:
             path=Path(args[contract['resource_argument']]).resolve(strict=True)
-            return path.is_relative_to(workspace_root()) or allowed(path,session)
+            return profile=='autonomous' or path.is_relative_to(workspace_root()) or allowed(path,session)
         except (ValueError,OSError):return False
     if contract['risk']=='path_write':
-        try:return not workspace_path(args['path']).exists()
+        try:return not workspace_path(args['path']).exists() or profile=='autonomous'
         except (ValueError,PermissionError,OSError):return False
-    return False
+    return profile=='autonomous' and tool in ('run_terminal','run_python_code')
 
 def select_capabilities(goal,skills,existing):
     from core.tool_contracts import builtin_registry

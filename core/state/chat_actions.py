@@ -63,8 +63,12 @@ async def resolve(proposal,*,directory,session,text,model):
     except PermissionError:
         from core.gui.permissions import tool_modes
         mode=next(x['mode'] for x in tool_modes(directory) if x['name']==tool)
-        if mode=='ask':
-            return '搜索工具设置为每次确认。可以创建任务后审阅这次搜索；也可以在权限设置中允许只读搜索自动执行。',{'goal':text,'reason':'此搜索需要你确认权限。'},None
+        from core.security.autonomy import get_mode
+        from core.security.read_grants import permission_database
+        with permission_database(Path(directory)/'educlaw_permissions.sqlite3'):
+            strict=get_mode(session)=='strict'
+        if mode=='ask' or strict:
+            return '当前审批模式要求每次确认搜索。可以创建任务后审阅这次搜索；也可以在权限设置中选择平衡模式，并允许只读搜索自动执行。',{'goal':text,'reason':'此搜索需要你确认权限。'},None
         return '当前权限不允许这次搜索。请在侧栏“权限与文件”检查搜索工具设置；未进行联网检索。',None,None
     except Exception:
         return '这次公开资料搜索未成功，暂时无法核实最新信息。请稍后重试；我不会用未核实的内容代替搜索结果。',None,None

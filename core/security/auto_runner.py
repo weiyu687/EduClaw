@@ -12,10 +12,10 @@ async def advance(service,session,number,client):
             step=state['steps'][state['index']]
             if not automatic(step['tool'],step['arguments'],session):return
             base=service.code_service(context,life)
-            handler=ReadStepService(base) if step['tool'] in READ_ARGS else ToolStepService(base)
+            handler=base if step['tool']=='run_python_code' else ReadStepService(base) if step['tool'] in READ_ARGS else ToolStepService(base)
             review=handler.preview(session,state['task_id'])
             # Recheck resolved parameters immediately before obtaining the operation lock.
-            args=review.get('arguments',step['arguments'])
+            args={'code':review['code']} if step['tool']=='run_python_code' else review.get('arguments',step['arguments'])
             if not automatic(step['tool'],args,session):return
             if step['tool'] in READ_ARGS:
                 await handler.execute(session,state['task_id'],review['digest'],client,approved=False)

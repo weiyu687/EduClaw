@@ -509,6 +509,19 @@ async def run_interactive_app():
                 continue
 
             command = user_input.strip()
+            if command=='/autonomy' or command.startswith('/autonomy '):
+                from core.gui.service import DashboardService
+                try:
+                    dashboard=DashboardService(Path(agent.state_manager.path).parent)
+                    parts=command.split()
+                    if len(parts)>1:
+                        confirmation=''
+                        if parts[1]=='autonomous':
+                            confirmation=await asyncio.to_thread(input,'当前对话将自动执行已启用工具，终端可读写本机文件、联网及修改系统；目录不是沙箱。输入 AUTONOMOUS 确认：')
+                        dashboard.permission_change(agent.session_id,'autonomy',parts[1],confirmation)
+                    console.print('当前对话审批模式：'+dashboard.permissions(agent.session_id)['autonomy']+'；可选 strict / balanced / autonomous',markup=False)
+                except (ValueError,PermissionError,LookupError) as exc:console.print(str(exc),markup=False)
+                continue
             if command=='/term' or command.startswith('/term '):
                 from core.terminal.service import cli as terminal_cli
                 try:await terminal_cli(Path(agent.state_manager.path).parent,agent.session_id,command,console)

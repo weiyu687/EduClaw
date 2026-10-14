@@ -5,6 +5,7 @@ No LLM is involved in approval or task selection.
 import re
 
 HELP = '''EduClaw 命令速查
+  /autonomy [模式]             当前对话：strict / balanced / autonomous（需明确确认）
   /term                        持续终端：目录、交互输入、Agent 控制、读取输出和停止
   /terminal <JSON>              指定 cwd、command、timeout_seconds 准备终端命令
   /agent <目标>                 自动规划、选择能力并执行已允许的低风险步骤

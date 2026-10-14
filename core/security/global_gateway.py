@@ -62,11 +62,14 @@ def authorize(tool_name, arguments):
         builtin_registry().validate_input(tool_name, arguments)
     except ValueError as exc:
         raise GlobalToolDenied(str(exc)) from exc
+    from core.security.autonomy import get_mode as autonomy_mode
+    profile=autonomy_mode()
+    autonomous=profile=='autonomous' and bool(current_session())
     if tool_name in NO_FILE_READ:
         from core.gui.permissions import tool_modes
         from core.security.write_approval import consume
         mode=next(x['mode'] for x in tool_modes(db_path().parent) if x['name']==tool_name)
-        if mode=='ask' and not consume(arguments,tool_name):
+        if (profile=='strict' or (mode=='ask' and not autonomous)) and not consume(arguments,tool_name):
             raise GlobalToolDenied('此工具已设置为每步确认。')
         return
     if tool_name=='write_text_file':
@@ -75,18 +78,18 @@ def authorize(tool_name, arguments):
         target=workspace_path(arguments['path'])
         from core.gui.permissions import tool_modes
         mode=next(x['mode'] for x in tool_modes(db_path().parent) if x['name']==tool_name)
-        if (target.exists() or mode=='ask') and not consume(arguments):
+        if (profile=='strict' or ((target.exists() or mode=='ask') and not autonomous)) and not consume(arguments):
             raise GlobalToolDenied('覆盖已有文件必须确认准确内容。')
         return
     if tool_name=='run_terminal':
         from core.security.terminal_policy import terminal_arguments
         from core.security.write_approval import consume
         canonical=terminal_arguments(arguments)
-        if canonical!=arguments or not current_session() or not consume(arguments,tool_name):
+        if canonical!=arguments or not current_session() or (not autonomous and not consume(arguments,tool_name)):
             raise GlobalToolDenied('终端必须审批准确目录、命令及超时，每次仅执行一次。')
         return
     if tool_name == "run_python_code":
-        if authorize_code(tool_name, arguments):
+        if autonomous or authorize_code(tool_name, arguments):
             return
         raise GlobalToolDenied("Python execution requires an exact, one-shot CLI approval")
     arg = FILE_TO_ARG.get(tool_name)
@@ -108,9 +111,9 @@ def authorize(tool_name, arguments):
     from core.gui.permissions import tool_modes
     mode=next(x['mode'] for x in tool_modes(db_path().parent) if x['name']==tool_name)
     reviewed=consume_reviewed_read(tool_name,target)
-    if mode=='ask' and not reviewed:
+    if (profile=='strict' or (mode=='ask' and not autonomous)) and not reviewed:
         raise GlobalToolDenied('此工具已设置为每步确认。')
-    if not target.is_relative_to(workspace_root()) and not reviewed and not any(target.is_relative_to(root) for root in roots) and not dynamic_read_allowed(target, consume=True):
+    if not autonomous and not target.is_relative_to(workspace_root()) and not reviewed and not any(target.is_relative_to(root) for root in roots) and not dynamic_read_allowed(target, consume=True):
         raise GlobalToolDenied(f'File path is outside authorized read roots: {target}')
     if tool_name in ('get_all_files','mcp_list_files'):
         if not target.is_dir():

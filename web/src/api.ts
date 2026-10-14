@@ -31,5 +31,5 @@ export async function request<T>(token:string,path:string,body?:unknown):Promise
 export function query(session:string,number?:number):string {
   return new URLSearchParams({session,...(number===undefined?{}:{number:String(number)})}).toString();
 }
-export const labels:Record<string,string> = {running:'进行中',completed:'已完成',denied:'已结束',uncertain:'需要核查',approved:'已审批，准备执行',executing:'已审批／执行中',waiting:'等待前序步骤',pending:'待审批',active:'可继续',paused:'已暂停',cancelled:'已取消',cancel_requested:'正在取消'};
+export const labels:Record<string,string> = {running:'进行中',completed:'已完成',denied:'已结束',uncertain:'需要核查',approved:'准备执行',executing:'执行中',waiting:'等待前序步骤',pending:'待审批',active:'可继续',paused:'已暂停',cancelled:'已取消',cancel_requested:'正在取消'};
 export const actionLabels:Record<Action,string> = {pause:'暂停任务',resume:'恢复任务',cancel:'取消任务',execute:'审阅并执行',read:'审批文件读取',tool:'审批工具操作'};

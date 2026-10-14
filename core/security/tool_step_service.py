@@ -48,6 +48,7 @@ class ToolStepService:
             r=self.preview(session,task)
             if r['digest']!=digest:raise PermissionError('工具参数或文件内容变化，请重新审批。')
             b.ledger.claim(session,task,i,arguments_digest=fingerprint(r['tool'],r['arguments']))
+            b.ledger.event(session,task,i,'tool_approved' if approved else 'tool_policy_authorized',{'tool':r['tool'],'digest':digest})
             try:
                 with session_context(session),(reviewed_write(r['arguments'],r['tool']) if approved else nullcontext()):
                     result=await controlled_call(lambda:client.use_tool(r['tool'],r['arguments']),b.ledger,session,task,timeout=r['arguments'].get('timeout_seconds',30)+10 if r['tool']=='run_terminal' else 30)

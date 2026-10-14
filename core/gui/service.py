@@ -91,11 +91,15 @@ class DashboardService:
     def permissions(self, session):
         with self.lock, self.stores(session), permission_database(self.directory/'educlaw_permissions.sqlite3'):
             from core.security.workspace_policy import workspace_root
-            return dict(tools=tool_modes(self.directory), files=list_grants(session),workspace=str(workspace_root()))
+            from core.security.autonomy import get_mode
+            return dict(autonomy=get_mode(session),tools=tool_modes(self.directory), files=list_grants(session),workspace=str(workspace_root()))
 
     def permission_change(self, session, kind, value, mode):
         with self.lock, self.stores(session), permission_database(self.directory/'educlaw_permissions.sqlite3'):
-            if kind == 'tool':
+            if kind == 'autonomy':
+                from core.security.autonomy import set_mode
+                set_mode(session,value,mode)
+            elif kind == 'tool':
                 set_tool_mode(self.directory, value, mode)
             elif kind == 'revoke':
                 if type(value) is not int:

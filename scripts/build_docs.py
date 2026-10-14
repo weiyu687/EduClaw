@@ -18,7 +18,7 @@ PAGES=[('Home','项目概览'),('Getting-Started','安装与启动'),('GUI-Guide
 
 def sources():
     pages={name:(ROOT/'docs'/'wiki'/f'{name}.md').read_text(encoding='utf-8') for name,_ in PAGES if name!='Commands'}
-    rows=['# 指令参考','', '在 GUI 输入 `/` 或打开“/ 指令说明”，可以搜索并选择指令。任务操作需要先选中任务；低风险步骤按权限自动推进，覆盖和代码执行仍需确认。', '',
+    rows=['# 指令参考','', '在 GUI 输入 `/` 或打开“/ 指令说明”，可以搜索并选择指令。任务操作需要先选中任务；步骤按当前对话审批模式推进；平衡模式下覆盖和代码执行仍需确认，自主执行需用户明确授权。', '',
           '| 指令 | 用途 | 支持范围与说明 |','| --- | --- | --- |']
     for item in command_catalog():
         rows.append(f"| `{item['command']}` | {item['title']} | {'CLI' if item['action']=='cli' else 'GUI'}：{item['description']} |")
