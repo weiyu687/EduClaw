@@ -5,42 +5,79 @@
 <body><a class="skip" href="#content">跳到正文</a><header><a class="brand" href="index.html">E <strong>EduClaw</strong><span>文档</span></a><div><a href="https://github.com/weiyu687/EduClaw/wiki">Wiki</a><a href="https://github.com/weiyu687/EduClaw">GitHub ↗</a></div></header>
 <div class="layout"><aside><label for="search">搜索文档</label><input id="search" type="search" placeholder="功能、指令、故障…"><nav aria-label="文档目录"><a  href="index.html">项目概览</a><a aria-current="page" href="Getting-Started.html">安装与启动</a><a  href="GUI-Guide.html">GUI 使用指南</a><a  href="Commands.html">指令参考</a><a  href="Skills-and-Tools.html">技能与工具</a><a  href="Architecture.html">架构与安全</a><a  href="Long-Workflows.html">多文件长流程</a><a  href="Development.html">测试与开发</a><a  href="Troubleshooting.html">常见问题</a></nav><p>让每一步，都有据可查。</p></aside>
 <main id="content"><div id="search-results" aria-live="polite"></div><article><h1>安装与启动</h1>
-<h2 id="section-1">环境要求</h2>
-<p>已验证环境为 Windows、Python 3.11（Conda 环境名 educlaw）、Node.js 与 npm、Microsoft Edge，以及可运行 Linux 容器的 Docker。实际工具执行需要 Docker 镜像 <code>python:3.10-slim</code>。</p>
-<p>仓库目前没有完整锁定的 Python 安装清单，因此不能保证全新机器一条命令即可安装。已有 Python 环境需要包含 LangChain、LangGraph、langgraph-checkpoint-sqlite、MCP、python-dotenv、jsonschema、Docker SDK 和对应文档工具依赖；具体依赖以已使用工具为准。</p>
+<h2 id="section-1">环境准备</h2>
+<table>
+<thead>
+<tr>
+<th>组件</th>
+<th>用途</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>Windows 10/11，支持 ConPTY</td>
+<td>本机持续终端；主要验收平台</td>
+</tr>
+<tr>
+<td>Python 3.11</td>
+<td>后端、模型客户端、MCP 与工具</td>
+</tr>
+<tr>
+<td>Node.js 与 npm</td>
+<td>构建界面，运行官方 Filesystem MCP</td>
+</tr>
+<tr>
+<td>Microsoft Edge</td>
+<td>日常浏览与 Windows 浏览器验收</td>
+</tr>
+<tr>
+<td>Docker，可运行 Linux 容器</td>
+<td>Python 代码沙箱；普通聊天和本机终端不依赖 Docker</td>
+</tr>
+<tr>
+<td>模型服务与联网环境</td>
+<td>模型规划、回复、公开查询</td>
+</tr>
+</tbody>
+</table>
+<p><strong>目前没有完整锁定的 Python 安装清单。</strong> 以下不是全新机器的一键安装保证。后端环境需包含 LangChain、langchain-openai、LangGraph、langgraph-checkpoint-sqlite、MCP、python-dotenv、jsonschema、httpx、Docker SDK 及所用文档/检索工具的依赖。工具模块有启动时导入依赖；缺失时按错误中的模块核查。已有开发环境可继续使用；贡献依赖锁定与安装验证很有帮助。</p>
 <h2 id="section-2">获取当前开发版本</h2>
 <pre><code class="language-powershell">git clone --branch codex/roadmap-development https://github.com/weiyu687/EduClaw.git
 cd EduClaw
-conda activate educlaw
 </code></pre>
-<p>在本机 <code>.env</code> 配置模型。下面仅为变量名称，值由你自己的模型服务提供：</p>
-<pre><code class="language-text">EDUCLAW_MODEL_NAME=your-model
+<p>进入你准备好的 Python 3.11 环境，例如 <code>conda activate educlaw</code>；该命令不会自动创建或安装环境。</p>
+<h2 id="section-3">配置模型</h2>
+<p>在仓库根目录的本地 <code>.env</code> 填写：</p>
+<pre><code class="language-dotenv">EDUCLAW_MODEL_NAME=your-model
 EDUCLAW_MODEL_API_URL=https://your-provider.example/v1
 EDUCLAW_MODEL_API_KEY=your-local-key
 </code></pre>
-<p>不要将自己的密钥放入文档、提交记录或截图。模型需兼容当前 LangChain OpenAI 客户端；设置在本地读取，不通过 GUI 编辑。</p>
-<h2 id="section-3">启动 GUI</h2>
-<pre><code class="language-powershell">cd web
-npm ci
-npm run build
-cd ..
-python -m core.gui.server
+<p>使用兼容当前 LangChain OpenAI 客户端的模型服务，具体值由服务商提供。配置保存在本机，不通过 GUI 编辑。搜索免密钥不等于模型服务免密钥。不要提交 <code>.env</code> 或分享带凭据的启动地址。</p>
+<h2 id="section-4">安装界面与工具组件</h2>
+<p>在仓库根目录执行：</p>
+<pre><code class="language-powershell">python -m pip install -r integrations/terminal/requirements.txt
+npm ci --prefix integrations/filesystem
+npm ci --prefix web
+npm run build --prefix web
 </code></pre>
-<p>打开终端显示的本次启动地址。服务只监听 <code>127.0.0.1</code>，凭据由每次启动生成。服务重启后，旧地址中的凭据失效。</p>
+<p>终端依赖文件包含 Windows 的 pywin32 311 与 pywinpty 3.0.2。Filesystem MCP 使用固定版本，Node.js 必须在 PATH 中。</p>
+<p>需要 Python 沙箱时启动 Docker，并准备工具所用镜像：</p>
+<pre><code class="language-powershell">docker pull python:3.10-slim
+</code></pre>
+<h2 id="section-5">启动工作台</h2>
+<pre><code class="language-powershell">python -m core.gui.server
+</code></pre>
+<p>打开终端显示的<strong>完整启动地址</strong>。服务仅监听 <code>127.0.0.1</code>，默认随机端口。浏览器读取凭据后会清除地址栏中的片段，因此后续看到普通本地地址是正常现象。服务重启后需重新打开新的完整地址。</p>
+<p>固定端口与数据目录示例：</p>
 <pre><code class="language-powershell">python -m core.gui.server --port 8765 --data-dir D:\EduClawData
 </code></pre>
-<p>默认数据目录是项目下的 <code>data</code>。自定义目录与 CLI 使用的数据目录应保持一致，避免误以为任务丢失。</p>
-<h2 id="section-4">启动 CLI</h2>
+<p>先新建对话，发送普通问题；再按 <a href="GUI-Guide.html">GUI 使用指南</a> 尝试任务和终端。</p>
+<h2 id="section-6">启动 CLI 与共享数据</h2>
 <pre><code class="language-powershell">python -m core.usr.main
 </code></pre>
-<p><code>/sessions</code> 查看会话，<code>/use &lt;ID&gt;</code> 切换到对应会话，<code>/任务</code> 查看并选择任务。GUI 与 CLI 使用同一数据目录时，任务进度和执行认领共享。</p>
-<p>继续阅读 <a href="GUI-Guide.html">GUI 使用指南</a> 与 <a href="Troubleshooting.html">常见问题</a>。</p>
-<h2 id="section-5">启用文件 MCP</h2>
-<p>在仓库根目录运行 <code>npm ci --prefix integrations/filesystem</code>，安装固定版本的官方 Filesystem MCP。Node.js 需在 PATH 中；更新后重新构建前端并重启 GUI。任务模式自动选用工具，搜索无需服务密钥，模型配置仍沿用本地设置。</p>
-<h2 id="section-6">Windows 终端依赖</h2>
-<p>本机 PowerShell 工具需要 Windows 自带的 Windows PowerShell 及 pywin32（用于进程树管理）：</p>
-<pre><code class="language-powershell">python -m pip install -r integrations/terminal/requirements.txt
-</code></pre>
-<p>目前验证版本为 pywin32 311。终端工具不要求 Docker；Python 沙箱执行仍要求 Docker。终端子进程使用受限的继承环境变量，并以 GUI/CLI 启动用户身份运行；不自动提权。
-持续终端另需同一依赖文件中的 pywinpty 3.0.2，要求支持 ConPTY 的 Windows 10/11。安装后在 GUI 侧栏“终端”打开持续会话，或在 CLI 使用 <code>/term</code> 查看操作说明。服务仅监听本机，通过每次启动的凭据连接；运行数据位于数据目录，不提交 Git。</p>
-</article><footer>EduClaw · 当前开发版本 · Markdown 与 GitHub Wiki 同源<br><a href="https://github.com/weiyu687/EduClaw/tree/codex/roadmap-development/docs/wiki">查看文档源文件</a></footer></main><nav class="toc" aria-label="本页目录"><strong>本页内容</strong><a href="#section-1">环境要求</a><a href="#section-2">获取当前开发版本</a><a href="#section-3">启动 GUI</a><a href="#section-4">启动 CLI</a><a href="#section-5">启用文件 MCP</a><a href="#section-6">Windows 终端依赖</a></nav></div></body></html>
+<p>默认从项目根目录启动时使用 <code>data</code>。GUI 与 CLI 共享记录的前提是使用同一数据目录和会话；CLI 用 <code>/sessions</code> 与 <code>/use ID</code> 选择。自定义 GUI 数据目录不会自动改写另一终端中的 CLI 配置，未完成对应配置前建议两端使用默认目录。</p>
+<p>Agent 默认工作目录为数据目录下的 <code>workspace</code>，可通过 <code>EDUCLAW_WORKSPACE_ROOT</code> 指定。持续终端打开时可单独填写现有目录；它只是初始位置，不限制终端的本机权限。</p>
+<h2 id="section-7">更新与备份</h2>
+<p>更新前完成或停止正在运行的任务，保存本地修改。拉取开发分支后重新构建 <code>web</code> 并重启 GUI；终端服务使用独立进程，更新终端代码前先关闭不再需要的终端。</p>
+<p>数据包含会话、任务、结果、授权和终端记录。备份应在相关进程停止后整体复制数据目录，保持 SQLite 与 WAL 文件一致。不要只复制某一个数据库或把私人数据上传仓库。</p>
+</article><footer>EduClaw · 当前开发版本 · Markdown 与 GitHub Wiki 同源<br><a href="https://github.com/weiyu687/EduClaw/tree/codex/roadmap-development/docs/wiki">查看文档源文件</a></footer></main><nav class="toc" aria-label="本页目录"><strong>本页内容</strong><a href="#section-1">环境准备</a><a href="#section-2">获取当前开发版本</a><a href="#section-3">配置模型</a><a href="#section-4">安装界面与工具组件</a><a href="#section-5">启动工作台</a><a href="#section-6">启动 CLI 与共享数据</a><a href="#section-7">更新与备份</a></nav></div></body></html>

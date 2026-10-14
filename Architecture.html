@@ -5,29 +5,51 @@
 <body><a class="skip" href="#content">跳到正文</a><header><a class="brand" href="index.html">E <strong>EduClaw</strong><span>文档</span></a><div><a href="https://github.com/weiyu687/EduClaw/wiki">Wiki</a><a href="https://github.com/weiyu687/EduClaw">GitHub ↗</a></div></header>
 <div class="layout"><aside><label for="search">搜索文档</label><input id="search" type="search" placeholder="功能、指令、故障…"><nav aria-label="文档目录"><a  href="index.html">项目概览</a><a  href="Getting-Started.html">安装与启动</a><a  href="GUI-Guide.html">GUI 使用指南</a><a  href="Commands.html">指令参考</a><a  href="Skills-and-Tools.html">技能与工具</a><a aria-current="page" href="Architecture.html">架构与安全</a><a  href="Long-Workflows.html">多文件长流程</a><a  href="Development.html">测试与开发</a><a  href="Troubleshooting.html">常见问题</a></nav><p>让每一步，都有据可查。</p></aside>
 <main id="content"><div id="search-results" aria-live="polite"></div><article><h1>架构与安全</h1>
-<h2 id="section-1">数据流</h2>
-<pre><code class="language-text">TypeScript / React
-  → 本机 HTTP API（凭据 + 来源校验）
-  → Workspace（会话挂载、异步规划、提交去重）
-  → LangGraph 待审批检查点 + DAG + 目标标准
-  → AutoRunner + Code/Read/ToolStepService（权限策略与一次性认领）
-  → MCP / Docker
-  → 不可变结果仓库 + 执行账本 + 检查点更新
-</code></pre>
-<p>前端不连接 SQLite，不直接调用 MCP，不保存模型密钥。CLI 与 GUI 共用 Python 执行服务，竞争同一原子认领记录。</p>
-<h2 id="section-2">本地 API</h2>
-<p>默认仅监听 loopback。数据请求必须带当前服务的 Bearer 凭据，POST 还要求准确同源 Origin。服务拒绝跨域、外部 Host、未知接口与额外字段；请求体限制为 32 KiB。</p>
-<p>凭据通过 URL fragment 交给页面后移除，存在当前标签页的 sessionStorage。此模式是本机单用户原型，不是局域网或公网多用户服务。</p>
-<h2 id="section-3">审批与执行</h2>
-<p>需要人工审批的控制与执行先预览再确认，票据有效 120 秒，绑定任务状态并先消耗后执行。Python 的实际代码、引用结果与任务身份绑定到摘要。worker 只接收任务身份与审批摘要，重新读取并校验持久化代码。</p>
-<p>工具执行前写入持久认领。结果保存失败或执行结果不确定时，保留认领，不自动重放。成功结果先写入不可变结果仓库，再推进账本与检查点。结果仓库保存 SHA256，供恢复与证据检查使用。</p>
-<h2 id="section-4">数据文件</h2>
-<p>任务与会话使用现有 SQLite 数据库。新增 <code>educlaw_gui.sqlite3</code> 保存会话挂载与提交记录，包含任务目标和技能快照，应作为本机任务数据对待。</p>
-<p>服务重启后，未完成规划显示中断，不自动调用模型重试；稳定任务身份避免同一提交被静默重复创建。停止服务和备份时应等待在途任务结束，保留所有关联数据库及 SQLite WAL 文件的一致性。</p>
-<h2 id="section-5">尚未实现</h2>
-<p>第三方进程隔离、插件签名、通用副作用补偿、完整 GUI 重规划、多用户鉴权和自动更新安装包。不能将目前的工具注册声明视为通用安全隔离。</p>
-<p>自动任务在每个步骤前检查当前工具策略和路径范围；自动执行不生成一次性人工批准凭据。覆盖已有文本必须绑定原内容摘要，代码必须绑定精确代码。官方文件服务仅接收工作目录作为允许根目录，网关与适配器各自校验范围。文件操作锁协调 EduClaw 进程，不是对其他本地程序的隔离。</p>
-<h2 id="section-6">会话审批策略</h2>
-<p><code>core/security/autonomy.py</code> 保存当前对话的 strict、balanced 或 autonomous 策略及变更记录。只有用户界面和 CLI 控制入口可修改，模型工具中没有设置权限的能力。自主模式启用须明确确认，本机终端权限不是目录隔离；全局工具禁用优先于自主执行。网关每次调用检查当前策略，自动任务和持续终端输入也重新检查。Python 自动执行不伪造人工审批票据，任务事件标记为 policy_authorized。</p>
-<p>默认 balanced 兼容原行为；strict 收紧到逐次确认；autonomous 允许已适配工具在合同约束内自动执行。文件专用写入工具仍限制目录、类型和覆盖摘要；终端具备本机用户权限。模式只作用于当前对话、重启保留，不继承到新对话。更改模式不取消已开始的系统操作，也不重放已有待审批输入。</p>
-</article><footer>EduClaw · 当前开发版本 · Markdown 与 GitHub Wiki 同源<br><a href="https://github.com/weiyu687/EduClaw/tree/codex/roadmap-development/docs/wiki">查看文档源文件</a></footer></main><nav class="toc" aria-label="本页目录"><strong>本页内容</strong><a href="#section-1">数据流</a><a href="#section-2">本地 API</a><a href="#section-3">审批与执行</a><a href="#section-4">数据文件</a><a href="#section-5">尚未实现</a><a href="#section-6">会话审批策略</a></nav></div></body></html>
+<h2 id="section-1">调用链</h2>
+<p>GUI（TypeScript / React）或 CLI 接收用户输入，Python 服务读取会话和权限。普通对话使用共享历史与受限搜索；任务规划器选择已适配工具并生成最多 12 步计划。调用在 MCP 传输前经过权限网关和参数契约校验，结果写入 SQLite 账本及结果仓库。</p>
+<p>持续终端由独立本机服务维护 ConPTY 会话，GUI 与 CLI 共享终端 ID。终端 Agent 观察实际输出，再提出输入、等待或结束；原有任务规划使用单次 <code>run_terminal</code>，两条入口并存。</p>
+<h2 id="section-2">用户控制的审批策略</h2>
+<table>
+<thead>
+<tr>
+<th>层次</th>
+<th>范围</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>对话审批模式</td>
+<td>当前对话的 strict / balanced / autonomous，重启保留，新对话默认 balanced</td>
+</tr>
+<tr>
+<td>工具禁用</td>
+<td>当前数据目录的所有会话，优先于自主执行</td>
+</tr>
+<tr>
+<td>文件读取授权</td>
+<td>指定路径及单次或会话范围</td>
+</tr>
+<tr>
+<td>工具合同与适配器</td>
+<td>限制参数、输入输出、支持的能力和文件范围</td>
+</tr>
+<tr>
+<td>操作系统权限</td>
+<td>本机终端使用启动用户权限，不自动提权</td>
+</tr>
+</tbody>
+</table>
+<p><code>core/security/autonomy.py</code> 保存模式和变更记录。模型工具中没有修改审批模式的入口。逐步确认收紧自动调用；平衡模式保留低风险自动执行；自主执行需用户明确确认后放开已适配工具的逐步审批。</p>
+<p>自主执行可以通过通用终端读写或删除本机文件、联网、安装程序及修改用户有权限修改的系统配置。<strong>目录不是终端沙箱，模型对敏感操作的判断也不是隔离保证。</strong> 选择自主模式即授予这个对话相应本机能力。</p>
+<h2 id="section-3">人工确认与策略授权</h2>
+<p>人工审批先展示真实参数，再签发短期票据；票据绑定会话、任务、步骤和内容摘要，过期或参数变化需重新预览。Python 代码审批与实际解析后的代码绑定。</p>
+<p>自动任务和终端 Agent 在调用前重新检查策略。按策略自动执行记录为策略授权，不伪造人工审批事件。改变模式不会重放已有待审批输入，不撤销已发生的文件或网络效果；已开始的操作需单独停止。</p>
+<h2 id="section-4">防止重复执行</h2>
+<p>任务调用前持久认领。结果不确定或写入结果失败时，保留认领并停止，不通过重试工具来掩盖未知状态。结果保存摘要用于核验；先保存结果，再推进检查点。文件覆盖绑定原内容摘要，避免静默覆盖预览后变化的内容。</p>
+<p>终端输入有请求标识，同一请求重试不重复写入；相同标识换参数会被拒绝。关闭终端使用 Windows Job Object 清理其进程树，但不回滚已产生的外部效果。</p>
+<h2 id="section-5">本机服务与数据</h2>
+<p>GUI 仅监听回环地址，启动凭据通过地址片段交给前端后从地址栏移除。重启会轮换凭据。终端服务同样仅本机连接并验证凭据；它不是远程共享终端。</p>
+<p>数据目录保存会话、规划、任务状态、结果、权限与终端记录。不要把运行数据库或凭据提交 Git。备份需保证整个目录一致；删除会话使用软删除并清理所属终端，历史审计不会物理清空。</p>
+<h2 id="section-6">仍需完善</h2>
+<p>尚无完整生产安全审计、插件签名、多用户鉴权、第三方工具通用进程隔离或副作用自动补偿。任意 MCP 服务器的发现结果、Skill 文本、文件和网页内容都不能作为执行授权。</p>
+</article><footer>EduClaw · 当前开发版本 · Markdown 与 GitHub Wiki 同源<br><a href="https://github.com/weiyu687/EduClaw/tree/codex/roadmap-development/docs/wiki">查看文档源文件</a></footer></main><nav class="toc" aria-label="本页目录"><strong>本页内容</strong><a href="#section-1">调用链</a><a href="#section-2">用户控制的审批策略</a><a href="#section-3">人工确认与策略授权</a><a href="#section-4">防止重复执行</a><a href="#section-5">本机服务与数据</a><a href="#section-6">仍需完善</a></nav></div></body></html>

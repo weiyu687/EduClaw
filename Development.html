@@ -5,41 +5,109 @@
 <body><a class="skip" href="#content">跳到正文</a><header><a class="brand" href="index.html">E <strong>EduClaw</strong><span>文档</span></a><div><a href="https://github.com/weiyu687/EduClaw/wiki">Wiki</a><a href="https://github.com/weiyu687/EduClaw">GitHub ↗</a></div></header>
 <div class="layout"><aside><label for="search">搜索文档</label><input id="search" type="search" placeholder="功能、指令、故障…"><nav aria-label="文档目录"><a  href="index.html">项目概览</a><a  href="Getting-Started.html">安装与启动</a><a  href="GUI-Guide.html">GUI 使用指南</a><a  href="Commands.html">指令参考</a><a  href="Skills-and-Tools.html">技能与工具</a><a  href="Architecture.html">架构与安全</a><a  href="Long-Workflows.html">多文件长流程</a><a aria-current="page" href="Development.html">测试与开发</a><a  href="Troubleshooting.html">常见问题</a></nav><p>让每一步，都有据可查。</p></aside>
 <main id="content"><div id="search-results" aria-live="polite"></div><article><h1>测试与开发</h1>
-<h2 id="section-1">前端</h2>
-<pre><code class="language-powershell">cd web
-npm ci
-npm run typecheck
-npm test
-npm run build
+<h2 id="section-1">代码入口</h2>
+<table>
+<thead>
+<tr>
+<th>目录</th>
+<th>职责</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>web/src</td>
+<td>React / TypeScript 工作台</td>
+</tr>
+<tr>
+<td>core/gui</td>
+<td>本机 HTTP 服务、任务应用服务和 worker</td>
+</tr>
+<tr>
+<td>core/state</td>
+<td>会话、普通对话、任务建议与历史</td>
+</tr>
+<tr>
+<td>core/security</td>
+<td>权限、审批、任务账本与恢复控制</td>
+</tr>
+<tr>
+<td>core/terminal</td>
+<td>ConPTY 服务、CLI/GUI 接口与 Agent 循环</td>
+</tr>
+<tr>
+<td>core/tool_contracts、core/tools</td>
+<td>工具合同和实现</td>
+</tr>
+<tr>
+<td>skills、integrations</td>
+<td>工作方法、文件 MCP 与终端依赖</td>
+</tr>
+<tr>
+<td>test、scripts</td>
+<td>回归测试与 Windows 实际验收</td>
+</tr>
+</tbody>
+</table>
+<h2 id="section-2">前端与回归</h2>
+<pre><code class="language-powershell">npm ci --prefix web
+npm test --prefix web
+npm run build --prefix web
+python -m pytest test --ignore=test/test_agent_memory_e2e.py --ignore=test/test_memory_system.py -q
 </code></pre>
-<p>React + TypeScript + Vite。验收使用生产构建，同源 Python 服务提供静态资源和 API。</p>
-<h2 id="section-2">Python 与 Windows 验收</h2>
-<pre><code class="language-powershell">python -m pytest test/test_phase_gui1.py test/test_phase_gui2.py -q
-python scripts/windows_workspace_e2e.py
-python scripts/windows_long_workflows_e2e.py
-python scripts/windows_gui_e2e.py
-python scripts/windows_registry_e2e.py
-python scripts/windows_recovery_e2e.py --only-cancel
-</code></pre>
-<p>Windows 浏览器验收需要 Playwright、已安装 Microsoft Edge、真实模型配置、MCP 及 Docker。脚本使用隔离临时数据目录，实际调用工具并检查 Windows 文件句柄和资源清理。截图保存在 <code>logs/</code>，不随代码发布。</p>
-<p><code>windows_workspace_e2e.py</code> 从空数据开始，通过 GUI 创建会话、挂载技能工具、提交目标、审阅代码、执行并查看结果，同时验证挂载持久化、会话隔离和重复提交去重。</p>
-<h2 id="section-3">文档源与发布</h2>
-<p>Wiki 和网站的统一来源是 <code>docs/wiki/*.md</code>。构建脚本生成指令参考，并把本地页面链接分别转换为 Wiki 链接和静态 HTML 链接。</p>
+<p>两个排除的旧记忆文件是手动异步集成脚本，不属于上述回归范围；这不是对记忆系统完整验收的声明。生产验收使用构建后的静态文件与同源 Python API，不依赖开发服务器代理权限。</p>
+<h2 id="section-3">Windows 端到端测试</h2>
+<p>需要 Playwright、本机 Edge、当前 Python 环境；按脚本准备真实模型、MCP、Node.js、Docker 和联网。安装浏览器测试库可使用 <code>python -m pip install playwright</code>，脚本使用系统 Edge。</p>
+<table>
+<thead>
+<tr>
+<th>脚本</th>
+<th>主要验收</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>windows_chat_handoff_e2e.py</td>
+<td>长对话滚动恢复、建议目标带入与编辑提交</td>
+</tr>
+<tr>
+<td>windows_autonomy_e2e.py</td>
+<td>三种审批策略、GUI/CLI 同步、真实工具连续执行</td>
+</tr>
+<tr>
+<td>windows_interactive_terminal_e2e.py</td>
+<td>持续终端、交互输入、网络、项目测试与修复</td>
+</tr>
+<tr>
+<td>windows_terminal_e2e.py</td>
+<td>单次终端命令、审批、取消与超时</td>
+</tr>
+<tr>
+<td>windows_conversation_ui_e2e.py</td>
+<td>对话新闻、来源、技能、权限和移动端交互</td>
+</tr>
+<tr>
+<td>windows_long_workflows_e2e.py</td>
+<td>多文件读取、计算、证据、暂停与重启</td>
+</tr>
+<tr>
+<td>windows_mcp_agent_e2e.py</td>
+<td>公开检索、官方 Filesystem MCP 与跨端操作</td>
+</tr>
+</tbody>
+</table>
+<p>在仓库根目录运行，例如 <code>python scripts/windows_autonomy_e2e.py</code>。脚本使用隔离数据目录，日志和报告写入 <code>logs</code>。部分旧验收依赖仓库示例文件，运行前确认输入存在；外部模型或网络故障会导致失败，不能用固定输出冒充真实调用。</p>
+<h2 id="section-4">文档与截图</h2>
+<p>README 是项目入口，Wiki 的统一源为 <code>docs/wiki/*.md</code>。指令页由 <code>core/gui/commands.py</code> 和 CLI 帮助生成。截图源为 <code>docs/images</code>，构建时复制到 Wiki 与网站，避免依赖本机路径。</p>
 <pre><code class="language-powershell">python -m pip install -r docs/requirements.txt
+python scripts/capture_docs_ui.py
 python scripts/build_docs.py --site-dir logs/docs-site --wiki-dir logs/wiki-publish
+python scripts/windows_docs_e2e.py
 </code></pre>
-<p><code>logs/wiki-publish</code> 应先克隆项目的 Wiki Git 仓库。站点产物通过 <code>gh-pages</code> 分支发布到 GitHub Pages，网站为纯静态文档，不部署本机任务 API，也不上传运行数据库、日志或密钥。</p>
-<p>构建后检查页面导航与移动端布局，再将 Wiki 和站点提交到各自 Git 仓库。完整阶段记录见 <a href="https://github.com/weiyu687/EduClaw/blob/codex/roadmap-development/docs/DEVELOPMENT_STATUS.md">开发验收记录</a>。</p>
-<p>会话与状态同步验收：<code>python scripts/windows_gui4_e2e.py</code>（真实模型、Windows Edge、GUI/CLI 往返多轮对话、摘要与手动名称、删除及 Docker 审批状态）。</p>
-<h2 id="section-4">MCP 与自动任务验收</h2>
-<p><code>python scripts/windows_mcp_agent_e2e.py</code> 使用 Windows Edge、真实模型、Wikipedia 和官方 Filesystem MCP，验证 GUI/CLI 搜索、写入、读回和目录列表，覆盖审批，以及 CLI 权限设置与 GUI 确认的一致性。</p>
-<p>阶段回归运行 <code>python -m pytest test --ignore=test/test_agent_memory_e2e.py --ignore=test/test_memory_system.py -q</code>。这两个旧记忆测试文件是手动异步集成脚本，不属于该回归；直接运行全目录 pytest 会因未配置异步插件报错，本阶段未宣称记忆系统通过验收。</p>
-<p><code>python scripts/windows_news_e2e.py</code> 原样重放“最新的AI新闻资讯，昨天的”和“最近的AI新闻资讯总结”，真实检索 RSS、核对日期范围、生成来源绑定摘要，并在 Windows Edge 查看。</p>
-<h2 id="section-5">对话优先与黑灰 UI 验收</h2>
-<p><code>python scripts/windows_conversation_ui_e2e.py</code> 在真实 Windows Edge 中验证 GUI/CLI 联网新闻、来源链接、基于历史追问、复杂目标仅提出任务建议、技能保存、工具搜索、权限面板、中文输入法、剪贴板与移动端焦点。使用真实模型及 MCP，外部服务不可用时会失败，不会用假数据冒充验收。</p>
-<p><code>web</code> 目录下运行 <code>npm test</code> 和 <code>npm run build</code> 验证 Markdown 安全渲染及类型与打包；<code>test/test_chat_actions.py</code> 覆盖权限阻断、未知路由、来源越界、历史数据库迁移及搜索证据保存。</p>
-<h2 id="section-6">终端验收</h2>
-<p><code>python -m pytest test/test_terminal.py -q</code> 实际运行 PowerShell，检查中文/空格目录、输出、退出码、超时、子进程清理、取消，以及准确参数一次性审批。</p>
-<p><code>python scripts/windows_terminal_e2e.py</code> 使用 Windows Edge、真实 MCP、真实 PowerShell 和模型规划，验证 GUI/CLI 共享、审批前不执行、刷新后结果、终端自动规划后等待确认、在途取消、超时、禁用策略与窄屏显示。使用独立临时目录和数据库，不操作用户项目文件。
-持续终端验收：<code>python -m pytest test/test_interactive_terminal.py -q</code> 和 <code>python scripts/windows_interactive_terminal_e2e.py</code>。后者使用真实 Edge、ConPTY、CLI、HTTP 服务和模型，验证跨端共享、交互输入、工作目录与变量保留、审批、自动循环，以及项目测试失败→修改→复测通过；不会使用用户项目作为修改样本。</p>
-</article><footer>EduClaw · 当前开发版本 · Markdown 与 GitHub Wiki 同源<br><a href="https://github.com/weiyu687/EduClaw/tree/codex/roadmap-development/docs/wiki">查看文档源文件</a></footer></main><nav class="toc" aria-label="本页目录"><strong>本页内容</strong><a href="#section-1">前端</a><a href="#section-2">Python 与 Windows 验收</a><a href="#section-3">文档源与发布</a><a href="#section-4">MCP 与自动任务验收</a><a href="#section-5">对话优先与黑灰 UI 验收</a><a href="#section-6">终端验收</a></nav></div></body></html>
+<p>截图脚本使用当前生产 UI 和隔离演示会话；对话内容明确标记为演示，任务与终端输出实际执行。它只运行无害的示例命令，不使用用户历史、文件或密钥。截图后人工检查可读性、隐私、裁切和界面状态。</p>
+<p>文档验收检查九页导航、锚点、搜索、图片加载和窄屏布局。截图更新不是业务功能通过测试的替代品。</p>
+<h2 id="section-5">发布</h2>
+<p>先将文档修改与图片提交开发分支；Wiki 产物推送 Wiki 仓库的 master，站点产物推送项目 gh-pages。发布目录必须指向对应 checkout，不能把临时运行数据库混入提交。</p>
+<p>网站是纯静态文档，不部署本机 API。GitHub Pages 构建完成后检查在线图片与页面。阶段记录见 <a href="https://github.com/weiyu687/EduClaw/blob/codex/roadmap-development/docs/DEVELOPMENT_STATUS.md">开发进度</a>。</p>
+<h2 id="section-6">贡献约定</h2>
+<p>优先提交可复现的问题和真实验收结果。权限变更同时检查网关、GUI、CLI 与持续终端；不只修改提示词。涉及有副作用的执行时，保留认领、审计与结果证据，避免自动重放。提交前排除 <code>.env</code>、访问凭据、运行数据库和私人日志。</p>
+</article><footer>EduClaw · 当前开发版本 · Markdown 与 GitHub Wiki 同源<br><a href="https://github.com/weiyu687/EduClaw/tree/codex/roadmap-development/docs/wiki">查看文档源文件</a></footer></main><nav class="toc" aria-label="本页目录"><strong>本页内容</strong><a href="#section-1">代码入口</a><a href="#section-2">前端与回归</a><a href="#section-3">Windows 端到端测试</a><a href="#section-4">文档与截图</a><a href="#section-5">发布</a><a href="#section-6">贡献约定</a></nav></div></body></html>
