@@ -1,80 +1,39 @@
 # EduClaw TypeScript 工作台
 
-React + TypeScript + Vite。前端只通过本地 API 读取任务和提交确认，不连接 SQLite，
-不运行模型，不直接调用 MCP。界面包含会话/任务列表、步骤依赖、结果证据，以及
-暂停、解除暂停和取消。采用炭黑背景、灰阶面板和清晰焦点的深色界面。
-Python 步骤可在界面审阅完整代码，输入 `EXECUTE` 后执行。支持新建会话、文本创建任务、
-技能偏好、自动工具选择、文件权限和 `/` 指令说明；重规划和证据修复仍在 CLI 完成。
+React + TypeScript + Vite 的本地深色工作台。普通对话、任务、技能与工具、权限和持续终端由同一界面管理；后端负责模型、MCP、持久化和授权，浏览器不直接访问数据库。
 
-任务模式按目标自动选择工具，技能可设置偏好。技能快照仅影响新任务，
-不会授予路径或执行权限。规划异步进行、最多两项并发，重复提交标识会返回同一记录。
-指令菜单明确区分 GUI 可执行操作与 CLI 用法说明，不提供任意终端命令执行。
+用户说明与当前截图见 [GUI 使用指南](../docs/wiki/GUI-Guide.md)，环境要求见 [安装指南](../docs/wiki/Getting-Started.md)。
 
-## Windows 启动
+## 构建与启动
 
-在仓库目录执行：
+在仓库根目录执行：
 
 ```powershell
-cd web
-npm ci
-npm run build
-cd ..
+npm ci --prefix web
+npm run build --prefix web
 python -m core.gui.server
 ```
 
-使用终端输出的本次启动地址打开浏览器。服务仅绑定 `127.0.0.1`，默认使用随机端口。
-可用 `--data-dir D:\path\data` 指向 CLI 的同一数据目录，`--port 8765` 指定本机端口。
-默认目录为当前工作目录下的 `data`；不要对不同环境误用同一个数据目录。
-停止服务用 Ctrl+C。页面关闭不会取消任务；恢复暂停不会启动工具或授予权限。
+打开终端显示的完整启动地址。服务仅监听本机，重启后凭据更新；地址片段由前端读取后移除。默认数据目录为 data，可用 --data-dir 指定，GUI 与 CLI 需指向同一数据目录和会话。
 
-连接凭据通过 URL fragment 交给前端后立即从地址栏移除，仅保存在该标签页的
-sessionStorage 中。它可以访问此数据目录下的会话；请勿分享启动地址。
-服务重启会轮换凭据，需要使用新的启动地址。此原型不是多用户服务。
+## 交互与权限
 
-生产验收使用 Vite 构建后的静态文件，由同一个 Python 服务提供。`npm run dev`
-仅供独立界面开发，不代理带权限的 API；不要为了方便开启任意来源 CORS。
+普通对话支持按需公开检索。任务建议展示完整目标，准备后可编辑提交；切换模式保留对话阅读位置。工具按目标自动选择，技能可设置偏好。
 
-## 测试
+审批模式按对话保存：逐步确认、平衡模式、自主执行。自主执行需要明确确认，工具禁用仍优先。终端面板提供真实 PowerShell 输入与 Agent 控制，当前用户权限和初始目录不构成沙箱。
+
+页面关闭不会取消任务或结束持续终端。已开始的操作需要使用相应停止入口。高级重规划与恢复诊断仍以 CLI 为主。
+
+## 开发与验证
 
 ```powershell
-cd web
-npm run typecheck
-npm test
-npm run build
-cd ..
-python -m pytest test/test_phase_gui1.py -q
-python -m pip install playwright
-python scripts/windows_gui_e2e.py
-python scripts/windows_workspace_e2e.py
-python scripts/windows_gui3_e2e.py
-python scripts/windows_gui4_e2e.py
+npm test --prefix web
+npm run typecheck --prefix web
+npm run build --prefix web
+python scripts/windows_chat_handoff_e2e.py
+python scripts/windows_autonomy_e2e.py
 ```
 
-Windows 浏览器验收使用本机 Microsoft Edge，无需下载 Chromium。需要原项目的
-真实模型、MCP 和 Docker 环境。测试创建隔离数据目录；生成的截图和 CLI 日志在
-`logs/windows_gui_*.png` 与 `logs/windows_e2e_gui_*.log`，默认不上传。
+从 web 目录运行命令时省略 --prefix web。生产验收使用构建后的静态资源和同源 Python API；npm run dev 仅用于界面开发，不自动代理带权限的 API。不要通过开放任意来源 CORS 绕过本机鉴权。
 
-## API 边界
-
-- 每个数据请求必须带 `Authorization: Bearer ...`，URL 参数和 Cookie 不能授权。
-- Host 必须与启动地址完全匹配；拒绝外部 Origin 和跨站请求，不提供 CORS。
-- POST 还必须带精确同源 Origin、JSON 内容类型和有限的请求长度。
-- 操作分为预览与确认；确认票据有效 120 秒、绑定任务版本和状态，先消耗再执行。
-  状态变化、重复确认、重启或过期都要求重新预览。前端失败后不自动重试操作。
-- 仅提供白名单接口，不能执行任意 CLI 命令、任意代码或读取任意文件路径。
-- 工具内容使用 React 文本节点显示，无 HTML 渲染；配置 CSP、禁止框架嵌入和缓存。
-
-本机其他进程或拥有文件系统访问权的用户不在浏览器来源隔离的防护范围内。
-Python 执行与 CLI 共用 `CodeStepService`，重新验证代码摘要并原子认领当前步骤。
-后台进程只接收任务身份和审批摘要，不接收浏览器提交的代码。每个服务最多同时运行
-4 个执行进程，连接和执行整体期限为 90 秒；页面关闭不会取消已提交任务。
-
-`educlaw_gui.sqlite3` 保存会话挂载和提交记录；服务重启后未完成规划显示中断，不自动重试。
-文档见 [GitHub Pages](https://weiyu687.github.io/EduClaw/) 和 [Wiki](https://github.com/weiyu687/EduClaw/wiki)。
-
-不把此原型暴露到局域网或公网。后续仍需完成完整 GUI 旅程、
-可访问性审查、故障恢复界面和目标用户可用性验收。
-
-普通对话默认启用，共用 CLI 多轮记录；任务模式需显式切换。会话名称和软删除同步到 CLI。重启服务以使用新 API，刷新浏览器以加载新界面。
-
-文件读写依赖官方 Filesystem MCP：仓库根目录运行 `npm ci --prefix integrations/filesystem`。搜索使用免密钥 Wikipedia。自动任务按策略推进；覆盖已有文件、执行 Python 仍需确认。CLI 对应 `/agent`、`/tool-approve`、`/tool-modes`，具体说明见文档网站。
+Windows 验收使用系统 Edge 和 Playwright，按脚本准备真实模型、MCP、终端与 Docker。测试使用隔离数据；报告位于 logs。详见 [测试与开发](../docs/wiki/Development.md)。

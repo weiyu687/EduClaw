@@ -1,66 +1,66 @@
 # 测试与开发
 
-## 前端
+## 代码入口
+
+| 目录 | 职责 |
+| --- | --- |
+| web/src | React / TypeScript 工作台 |
+| core/gui | 本机 HTTP 服务、任务应用服务和 worker |
+| core/state | 会话、普通对话、任务建议与历史 |
+| core/security | 权限、审批、任务账本与恢复控制 |
+| core/terminal | ConPTY 服务、CLI/GUI 接口与 Agent 循环 |
+| core/tool_contracts、core/tools | 工具合同和实现 |
+| skills、integrations | 工作方法、文件 MCP 与终端依赖 |
+| test、scripts | 回归测试与 Windows 实际验收 |
+
+## 前端与回归
 
 ```powershell
-cd web
-npm ci
-npm run typecheck
-npm test
-npm run build
+npm ci --prefix web
+npm test --prefix web
+npm run build --prefix web
+python -m pytest test --ignore=test/test_agent_memory_e2e.py --ignore=test/test_memory_system.py -q
 ```
 
-React + TypeScript + Vite。验收使用生产构建，同源 Python 服务提供静态资源和 API。
+两个排除的旧记忆文件是手动异步集成脚本，不属于上述回归范围；这不是对记忆系统完整验收的声明。生产验收使用构建后的静态文件与同源 Python API，不依赖开发服务器代理权限。
 
-## Python 与 Windows 验收
+## Windows 端到端测试
 
-```powershell
-python -m pytest test/test_phase_gui1.py test/test_phase_gui2.py -q
-python scripts/windows_workspace_e2e.py
-python scripts/windows_long_workflows_e2e.py
-python scripts/windows_gui_e2e.py
-python scripts/windows_registry_e2e.py
-python scripts/windows_recovery_e2e.py --only-cancel
-```
+需要 Playwright、本机 Edge、当前 Python 环境；按脚本准备真实模型、MCP、Node.js、Docker 和联网。安装浏览器测试库可使用 `python -m pip install playwright`，脚本使用系统 Edge。
 
-Windows 浏览器验收需要 Playwright、已安装 Microsoft Edge、真实模型配置、MCP 及 Docker。脚本使用隔离临时数据目录，实际调用工具并检查 Windows 文件句柄和资源清理。截图保存在 `logs/`，不随代码发布。
+| 脚本 | 主要验收 |
+| --- | --- |
+| windows_chat_handoff_e2e.py | 长对话滚动恢复、建议目标带入与编辑提交 |
+| windows_autonomy_e2e.py | 三种审批策略、GUI/CLI 同步、真实工具连续执行 |
+| windows_interactive_terminal_e2e.py | 持续终端、交互输入、网络、项目测试与修复 |
+| windows_terminal_e2e.py | 单次终端命令、审批、取消与超时 |
+| windows_conversation_ui_e2e.py | 对话新闻、来源、技能、权限和移动端交互 |
+| windows_long_workflows_e2e.py | 多文件读取、计算、证据、暂停与重启 |
+| windows_mcp_agent_e2e.py | 公开检索、官方 Filesystem MCP 与跨端操作 |
 
-`windows_workspace_e2e.py` 从空数据开始，通过 GUI 创建会话、挂载技能工具、提交目标、审阅代码、执行并查看结果，同时验证挂载持久化、会话隔离和重复提交去重。
+在仓库根目录运行，例如 `python scripts/windows_autonomy_e2e.py`。脚本使用隔离数据目录，日志和报告写入 `logs`。部分旧验收依赖仓库示例文件，运行前确认输入存在；外部模型或网络故障会导致失败，不能用固定输出冒充真实调用。
 
-## 文档源与发布
+## 文档与截图
 
-Wiki 和网站的统一来源是 `docs/wiki/*.md`。构建脚本生成指令参考，并把本地页面链接分别转换为 Wiki 链接和静态 HTML 链接。
+README 是项目入口，Wiki 的统一源为 `docs/wiki/*.md`。指令页由 `core/gui/commands.py` 和 CLI 帮助生成。截图源为 `docs/images`，构建时复制到 Wiki 与网站，避免依赖本机路径。
 
 ```powershell
 python -m pip install -r docs/requirements.txt
+python scripts/capture_docs_ui.py
 python scripts/build_docs.py --site-dir logs/docs-site --wiki-dir logs/wiki-publish
+python scripts/windows_docs_e2e.py
 ```
 
-`logs/wiki-publish` 应先克隆项目的 Wiki Git 仓库。站点产物通过 `gh-pages` 分支发布到 GitHub Pages，网站为纯静态文档，不部署本机任务 API，也不上传运行数据库、日志或密钥。
+截图脚本使用当前生产 UI 和隔离演示会话；对话内容明确标记为演示，任务与终端输出实际执行。它只运行无害的示例命令，不使用用户历史、文件或密钥。截图后人工检查可读性、隐私、裁切和界面状态。
 
-构建后检查页面导航与移动端布局，再将 Wiki 和站点提交到各自 Git 仓库。完整阶段记录见 [开发验收记录](https://github.com/weiyu687/EduClaw/blob/codex/roadmap-development/docs/DEVELOPMENT_STATUS.md)。
+文档验收检查九页导航、锚点、搜索、图片加载和窄屏布局。截图更新不是业务功能通过测试的替代品。
 
-会话与状态同步验收：`python scripts/windows_gui4_e2e.py`（真实模型、Windows Edge、GUI/CLI 往返多轮对话、摘要与手动名称、删除及 Docker 审批状态）。
+## 发布
 
-## MCP 与自动任务验收
+先将文档修改与图片提交开发分支；Wiki 产物推送 Wiki 仓库的 master，站点产物推送项目 gh-pages。发布目录必须指向对应 checkout，不能把临时运行数据库混入提交。
 
-`python scripts/windows_mcp_agent_e2e.py` 使用 Windows Edge、真实模型、Wikipedia 和官方 Filesystem MCP，验证 GUI/CLI 搜索、写入、读回和目录列表，覆盖审批，以及 CLI 权限设置与 GUI 确认的一致性。
+网站是纯静态文档，不部署本机 API。GitHub Pages 构建完成后检查在线图片与页面。阶段记录见 [开发进度](https://github.com/weiyu687/EduClaw/blob/codex/roadmap-development/docs/DEVELOPMENT_STATUS.md)。
 
-阶段回归运行 `python -m pytest test --ignore=test/test_agent_memory_e2e.py --ignore=test/test_memory_system.py -q`。这两个旧记忆测试文件是手动异步集成脚本，不属于该回归；直接运行全目录 pytest 会因未配置异步插件报错，本阶段未宣称记忆系统通过验收。
+## 贡献约定
 
-`python scripts/windows_news_e2e.py` 原样重放“最新的AI新闻资讯，昨天的”和“最近的AI新闻资讯总结”，真实检索 RSS、核对日期范围、生成来源绑定摘要，并在 Windows Edge 查看。
-
-
-## 对话优先与黑灰 UI 验收
-
-`python scripts/windows_conversation_ui_e2e.py` 在真实 Windows Edge 中验证 GUI/CLI 联网新闻、来源链接、基于历史追问、复杂目标仅提出任务建议、技能保存、工具搜索、权限面板、中文输入法、剪贴板与移动端焦点。使用真实模型及 MCP，外部服务不可用时会失败，不会用假数据冒充验收。
-
-`web` 目录下运行 `npm test` 和 `npm run build` 验证 Markdown 安全渲染及类型与打包；`test/test_chat_actions.py` 覆盖权限阻断、未知路由、来源越界、历史数据库迁移及搜索证据保存。
-
-
-## 终端验收
-
-`python -m pytest test/test_terminal.py -q` 实际运行 PowerShell，检查中文/空格目录、输出、退出码、超时、子进程清理、取消，以及准确参数一次性审批。
-
-`python scripts/windows_terminal_e2e.py` 使用 Windows Edge、真实 MCP、真实 PowerShell 和模型规划，验证 GUI/CLI 共享、审批前不执行、刷新后结果、终端自动规划后等待确认、在途取消、超时、禁用策略与窄屏显示。使用独立临时目录和数据库，不操作用户项目文件。
-持续终端验收：`python -m pytest test/test_interactive_terminal.py -q` 和 `python scripts/windows_interactive_terminal_e2e.py`。后者使用真实 Edge、ConPTY、CLI、HTTP 服务和模型，验证跨端共享、交互输入、工作目录与变量保留、审批、自动循环，以及项目测试失败→修改→复测通过；不会使用用户项目作为修改样本。
+优先提交可复现的问题和真实验收结果。权限变更同时检查网关、GUI、CLI 与持续终端；不只修改提示词。涉及有副作用的执行时，保留认领、审计与结果证据，避免自动重放。提交前排除 `.env`、访问凭据、运行数据库和私人日志。
