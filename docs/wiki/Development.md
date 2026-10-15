@@ -37,6 +37,7 @@ python -m pytest test --ignore=test/test_agent_memory_e2e.py --ignore=test/test_
 | windows_conversation_ui_e2e.py | 对话新闻、来源、技能、权限和移动端交互 |
 | windows_long_workflows_e2e.py | 多文件读取、计算、证据、暂停与重启 |
 | windows_mcp_agent_e2e.py | 公开检索、官方 Filesystem MCP 与跨端操作 |
+| windows_memory_library_e2e.py | 36 轮历史召回、摘要、Edge 上传/挂载/检索、真实模型联合回答与 CLI 共用资料 |
 
 在仓库根目录运行，例如 `python scripts/windows_autonomy_e2e.py`。脚本使用隔离数据目录，日志和报告写入 `logs`。部分旧验收依赖仓库示例文件，运行前确认输入存在；外部模型或网络故障会导致失败，不能用固定输出冒充真实调用。
 

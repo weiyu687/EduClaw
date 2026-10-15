@@ -76,6 +76,14 @@ description: 说明适用任务与工作方法
 
 保存为 `skills/example-skill/SKILL.md` 后刷新技能库。技能内容不能扩大用户目标或授予工具权限。
 
+## 统一资料库与旧检索兼容
+
+`doc_retrieve` Skill 已改为统一资料库工作方法，不再维护独立“语料库”。普通对话、GUI 和 CLI 使用同一 SQLite 索引及会话挂载范围。
+
+旧 Python 接口 `process_doc(doc_path)` 将文件导入资料库，`retrieve_knowledge(query, top_k=5)` 查询当前会话已挂载资料。接口必须在可信会话上下文内调用；导入仍校验本地文件读取权限。模块不再在导入时下载嵌入模型或初始化全局 Chroma 集合。
+
+这些是受信任的进程内兼容适配器，并不表示任意 MCP 客户端已获得导入或读取权限；当前任务规划器仍不会直接执行旧 `process_doc` 合同。日常使用请从资料库面板或 `/library` 导入，普通对话会自动检索。旧 Chroma 数据不会静默迁移，请重新添加原文件并选择挂载范围。
+
 ## 标准 MCP 连接与接入
 
 安装官方文件服务：`npm ci --prefix integrations/filesystem`。CLI `/mcp-tools` 检查服务，`/mcp-tools C:\path\mcp.json` 可读取标准 `mcpServers` 配置并发现工具。支持 stdio 和 Streamable HTTP，远程要求 HTTPS，本机允许 HTTP。

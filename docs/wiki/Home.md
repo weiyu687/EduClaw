@@ -27,6 +27,8 @@
 
 ## 当前版本与范围
 
+侧栏新增会话记忆与统一资料库：查看抽取式摘要，检索历史对话，添加并挂载个人资料。普通对话自动获取相关片段，保留原文和引用来源。操作步骤与边界见 [GUI 使用指南](GUI-Guide)。
+
 当前活跃开发分支为 `codex/roadmap-development`。主要验证 Windows 本机使用，后端 Python + MCP + LangGraph + SQLite，前端 TypeScript + React + Vite。
 
 尚未交付桌面安装包、完整 Python 依赖锁定、多用户服务、任意 MCP 工具一键安装或完整生产安全审计。本机终端的起始目录不是沙箱；公开搜索不保证全网覆盖。

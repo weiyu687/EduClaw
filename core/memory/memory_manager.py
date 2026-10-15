@@ -126,8 +126,8 @@ class MemoryManager:
     async def recall_relevant_memories(self, query: str, category: Optional[str] = None, limit: int = 3) -> List[str]:
         """仅召回当前会话记忆，禁止跨会话语义记忆泄漏。
 
-        注意：当前后端的 metadata 查询不是向量相似度排序；这是隔离优先的修复。
-        后续可扩展 ChromaStorageBackend.retrieve(where=...) 做会话内向量检索。
+        先按会话隔离，再使用中英文 BM25 排序，只返回正相关结果。
+        评分不是相似度概率，不保证语义同义词召回。
         """
         if not self.session_id or limit <= 0:
             return []
@@ -135,13 +135,9 @@ class MemoryManager:
             memories = await self.backend.search_by_metadata("session_id", self.session_id)
             if category is not None:
                 memories = [m for m in memories if m.category == category]
-            # 在同一会话内使用简单词项重合排序；不把其他会话数据传给模型。
-            terms = set(query.lower().split())
-            def score(m):
-                content = m.content.lower()
-                return sum(term in content for term in terms)
-            memories.sort(key=score, reverse=True)
-            return [m.content for m in memories[:limit]]
+            from core.state.retrieval import rank
+            rows=[{'id':str(i),'text':m.content} for i,m in enumerate(memories)]
+            return [m['text'] for m in rank(query,rows,limit)]
         except Exception as e:
             logger.error(f"Error recalling session memories: {e}")
             return []

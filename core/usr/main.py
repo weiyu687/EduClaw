@@ -509,6 +509,11 @@ async def run_interactive_app():
                 continue
 
             command = user_input.strip()
+            if command in ('/memory','/library') or command.startswith(('/memory ','/library ')):
+                from core.state.memory_service import cli as memory_cli
+                try:console.print(await asyncio.to_thread(memory_cli,Path(agent.state_manager.path).parent,agent.session_id,command),markup=False)
+                except (ValueError,PermissionError,LookupError,OSError) as exc:console.print('记忆与资料库：'+str(exc),markup=False)
+                continue
             if command=='/autonomy' or command.startswith('/autonomy '):
                 from core.gui.service import DashboardService
                 try:

@@ -13,9 +13,9 @@ export function takeCredential():string {
   if (token) {sessionStorage.setItem('educlaw-token',token);history.replaceState(null,'',location.pathname);}
   return sessionStorage.getItem('educlaw-token') ?? '';
 }
-export async function request<T>(token:string,path:string,body?:unknown):Promise<T> {
+export async function request<T>(token:string,path:string,body?:unknown,timeoutMs=10000):Promise<T> {
   const controller = new AbortController();
-  const timer = setTimeout(()=>controller.abort(),10000);
+  const timer = setTimeout(()=>controller.abort(),timeoutMs);
   try {
   const response = await fetch(path,{method:body===undefined?'GET':'POST',cache:'no-store',credentials:'omit',
     headers:{Authorization:`Bearer ${token}`,...(body===undefined?{}:{'Content-Type':'application/json'})},
