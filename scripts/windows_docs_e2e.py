@@ -23,7 +23,7 @@ def main():
             root=f'http://127.0.0.1:{server.server_port}/'
             assert page.goto(root).status==200
             links=page.get_by_role('navigation',name='文档目录').get_by_role('link').evaluate_all('(nodes)=>nodes.map(n=>n.getAttribute("href"))')
-            assert len(links)==9
+            assert len(links)==10
             for link in links:
                 assert page.goto(root+link).status==200
                 expect(page.locator('h1')).to_be_visible()
@@ -46,7 +46,7 @@ def main():
             browser.close()
     finally:
         server.shutdown();server.server_close();thread.join(timeout=5)
-    print(json.dumps({'browser':'Microsoft Edge','pages':9,'navigation':True,'search':True,'anchors':True,'images':True,'mobile_overflow':False}))
+    print(json.dumps({'browser':'Microsoft Edge','pages':10,'navigation':True,'search':True,'anchors':True,'images':True,'mobile_overflow':False}))
 
 
 if __name__=='__main__': main()

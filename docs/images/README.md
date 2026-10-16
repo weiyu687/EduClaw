@@ -1,5 +1,7 @@
 # 文档界面截图
 
+`experts.png` 来自 `scripts/windows_experts_e2e.py` 的实际 Edge 领域配置验收，使用隔离的项目验收演示配置和资料。
+
 `library.png` 来自 `scripts/windows_memory_library_e2e.py` 的实际 Edge 上传、挂载与检索测试，使用隔离演示文件（星河项目预算 8537 元），不含用户私人资料。截图为视口原图。
 
 截图日期：2026-10-14。界面基于开发提交 `3f7b934`，由 `scripts/capture_docs_ui.py` 在 Windows Microsoft Edge 中拍摄。

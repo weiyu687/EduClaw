@@ -44,7 +44,9 @@ def build(state,session,rows,query):
     # Long recent replies are clipped in the window; their omitted tails must
     # remain searchable as well as older turns.
     recalled=recall(older+[row for row in completed if row['id'] in ids and len(row['answer'] or '')>5000],query)
+    from core.state.semantic import status
+    retrieval=status()
     return {'recent':recent,'summary':summary,'summary_sources':sources,'recall':recalled,
             'stats':{'total_completed':len(completed),'recent_turns':len(recent),'recent_chars':used,
                      'compressed_turns':len(older),'summary_chars':len(summary),'recall_chars':sum(len(r['text']) for r in recalled),
-                     'context_budget_chars':MAX_CONTEXT_CHARS,'summary_method':'extractive','retrieval':'BM25 + 中文双字词'}}
+                     'context_budget_chars':MAX_CONTEXT_CHARS,'summary_method':'extractive','retrieval':retrieval['engine'],'retrieval_notice':retrieval['notice']}}

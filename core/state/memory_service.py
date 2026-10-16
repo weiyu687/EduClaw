@@ -9,7 +9,8 @@ def inspect(directory,session,query=''):
     rows=conversation.history(session)
     current=next((r['text'] for r in reversed(rows) if r['status']=='completed'),'')
     context=build(conversation.state,session,rows,query or current)
-    return {'summary':context['summary'],'summary_sources':context['summary_sources'],'stats':context['stats'],
+    from core.state.semantic import status
+    return {'summary':context['summary'],'summary_sources':context['summary_sources'],'stats':context['stats'],'retrieval':status(),
             'matches':recall([r for r in rows if r['status']=='completed'],query) if query.strip() else [],
             'last_context':next((r.get('context_info') for r in reversed(rows) if r.get('context_info')),None)}
 

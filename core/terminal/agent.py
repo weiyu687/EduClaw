@@ -50,6 +50,10 @@ async def loop(runtime,terminal,model=None):
             from core.llm.llm_factory import get_llm
             model=get_llm(test_connection_test=False,http_async_client=client)
         started=time.monotonic()
+        from core.state.experts import Experts
+        experts=Experts(runtime.directory);selected=experts.active(terminal.owner)
+        expert_guidance=experts.guidance(terminal.owner,selected=selected or {})
+        expert_sources=experts.library.search(terminal.owner,terminal.agent['goal'],expert=selected) if selected else []
         for index in range(30):
             if terminal.cancel.is_set() or terminal.closed:return
             if time.monotonic()-started>900:break
@@ -59,6 +63,8 @@ async def loop(runtime,terminal,model=None):
                      'current_directory_hint':prompts[-1] if prompts else '未知，必要时查询 Get-Location',
                      'recent_actions':snapshot['agent']['history'][-12:],'terminal_output':snapshot['output'][-24000:],
                      'output_truncated':snapshot['truncated'],'decisions_left':30-index}
+            if expert_guidance:context['domain_guidance']=expert_guidance
+            if expert_sources:context['domain_sources']=expert_sources
             for attempt in range(2):
                 try:
                     async with asyncio.timeout(75):

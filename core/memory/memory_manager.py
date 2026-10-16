@@ -126,7 +126,7 @@ class MemoryManager:
     async def recall_relevant_memories(self, query: str, category: Optional[str] = None, limit: int = 3) -> List[str]:
         """仅召回当前会话记忆，禁止跨会话语义记忆泄漏。
 
-        先按会话隔离，再使用中英文 BM25 排序，只返回正相关结果。
+        先按会话隔离，再使用本地语义/关键词排名融合；模型不可用时回退 BM25。
         评分不是相似度概率，不保证语义同义词召回。
         """
         if not self.session_id or limit <= 0:

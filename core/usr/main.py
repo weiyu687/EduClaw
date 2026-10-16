@@ -509,6 +509,11 @@ async def run_interactive_app():
                 continue
 
             command = user_input.strip()
+            if command=='/expert' or command.startswith('/expert '):
+                from core.state.experts import cli as expert_cli
+                try:console.print(await asyncio.to_thread(expert_cli,Path(agent.state_manager.path).parent,agent.session_id,command),markup=False)
+                except (ValueError,PermissionError,LookupError,OSError) as exc:console.print('专家模式：'+str(exc),markup=False)
+                continue
             if command in ('/memory','/library') or command.startswith(('/memory ','/library ')):
                 from core.state.memory_service import cli as memory_cli
                 try:console.print(await asyncio.to_thread(memory_cli,Path(agent.state_manager.path).parent,agent.session_id,command),markup=False)
@@ -1156,7 +1161,9 @@ async def run_interactive_app():
                     policy = explicit_tool_policy(goal)
                     if policy and policy[1] == 'deny':
                         raise PermissionError(f'禁止的指定工具: {policy[0]}')
-                    steps = prepare_plan(goal, await draft_plan(agent.model, goal))
+                    from core.state.experts import planning_context
+                    domain=planning_context(Path(agent.state_manager.path).parent,agent.session_id,goal)
+                    steps = prepare_plan(goal, await draft_plan(agent.model, goal,**domain))
                     # Reject references outside Python-code arguments before creating a task.
                     for position, planned in enumerate(steps):
                         if planned['tool'] == 'run_python_code':
