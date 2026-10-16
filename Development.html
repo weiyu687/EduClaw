@@ -3,7 +3,7 @@
 <meta name="description" content="EduClaw 文档：测试与开发"><title>测试与开发 · EduClaw 文档</title>
 <link rel="stylesheet" href="style.css"><script src="search.js" defer></script></head>
 <body><a class="skip" href="#content">跳到正文</a><header><a class="brand" href="index.html">E <strong>EduClaw</strong><span>文档</span></a><div><a href="https://github.com/weiyu687/EduClaw/wiki">Wiki</a><a href="https://github.com/weiyu687/EduClaw">GitHub ↗</a></div></header>
-<div class="layout"><aside><label for="search">搜索文档</label><input id="search" type="search" placeholder="功能、指令、故障…"><nav aria-label="文档目录"><a  href="index.html">项目概览</a><a  href="Getting-Started.html">安装与启动</a><a  href="GUI-Guide.html">GUI 使用指南</a><a  href="Commands.html">指令参考</a><a  href="Skills-and-Tools.html">技能与工具</a><a  href="Architecture.html">架构与安全</a><a  href="Long-Workflows.html">多文件长流程</a><a aria-current="page" href="Development.html">测试与开发</a><a  href="Troubleshooting.html">常见问题</a></nav><p>让每一步，都有据可查。</p></aside>
+<div class="layout"><aside><label for="search">搜索文档</label><input id="search" type="search" placeholder="功能、指令、故障…"><nav aria-label="文档目录"><a  href="index.html">项目概览</a><a  href="Getting-Started.html">安装与启动</a><a  href="GUI-Guide.html">GUI 使用指南</a><a  href="Expert-Mode.html">专家模式与检索</a><a  href="Commands.html">指令参考</a><a  href="Skills-and-Tools.html">技能与工具</a><a  href="Architecture.html">架构与安全</a><a  href="Long-Workflows.html">多文件长流程</a><a aria-current="page" href="Development.html">测试与开发</a><a  href="Troubleshooting.html">常见问题</a></nav><p>让每一步，都有据可查。</p></aside>
 <main id="content"><div id="search-results" aria-live="polite"></div><article><h1>测试与开发</h1>
 <h2 id="section-1">代码入口</h2>
 <table>
@@ -97,6 +97,14 @@ python -m pytest test --ignore=test/test_agent_memory_e2e.py --ignore=test/test_
 <td>windows_memory_library_e2e.py</td>
 <td>36 轮历史召回、摘要、Edge 上传/挂载/检索、真实模型联合回答与 CLI 共用资料</td>
 </tr>
+<tr>
+<td>windows_experts_e2e.py</td>
+<td>吸顶切换、领域配置、真实模型引用、任务工具范围、CLI 与轻量语义检索</td>
+</tr>
+<tr>
+<td>windows_expert_terminal_e2e.py</td>
+<td>真实 PowerShell 与模型按领域提示词和资料完成验收</td>
+</tr>
 </tbody>
 </table>
 <p>在仓库根目录运行，例如 <code>python scripts/windows_autonomy_e2e.py</code>。脚本使用隔离数据目录，日志和报告写入 <code>logs</code>。部分旧验收依赖仓库示例文件，运行前确认输入存在；外部模型或网络故障会导致失败，不能用固定输出冒充真实调用。</p>
@@ -108,7 +116,7 @@ python scripts/build_docs.py --site-dir logs/docs-site --wiki-dir logs/wiki-publ
 python scripts/windows_docs_e2e.py
 </code></pre>
 <p>截图脚本使用当前生产 UI 和隔离演示会话；对话内容明确标记为演示，任务与终端输出实际执行。它只运行无害的示例命令，不使用用户历史、文件或密钥。截图后人工检查可读性、隐私、裁切和界面状态。</p>
-<p>文档验收检查九页导航、锚点、搜索、图片加载和窄屏布局。截图更新不是业务功能通过测试的替代品。</p>
+<p>文档验收检查十页导航、锚点、搜索、图片加载和窄屏布局。截图更新不是业务功能通过测试的替代品。<code>scripts/benchmark_retrieval.py</code> 是 10 条本地检索校准样例，不是独立公开基准；新领域需增加自己的验收集。</p>
 <h2 id="section-5">发布</h2>
 <p>先将文档修改与图片提交开发分支；Wiki 产物推送 Wiki 仓库的 master，站点产物推送项目 gh-pages。发布目录必须指向对应 checkout，不能把临时运行数据库混入提交。</p>
 <p>网站是纯静态文档，不部署本机 API。GitHub Pages 构建完成后检查在线图片与页面。阶段记录见 <a href="https://github.com/weiyu687/EduClaw/blob/codex/roadmap-development/docs/DEVELOPMENT_STATUS.md">开发进度</a>。</p>
