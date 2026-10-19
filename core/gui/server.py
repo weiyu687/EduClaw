@@ -109,7 +109,7 @@ class Handler(BaseHTTPRequestHandler):
             elif path.path == '/api/submissions' and set(params) == {'session'}:
                 result = self.server.workspace.submissions(params['session'])
             elif path.path == '/api/chat' and set(params)=={'session'}:
-                result = self.server.workspace.conversation.history(params['session'])
+                result = self.server.workspace.chat_history(params['session'])
             elif path.path == '/api/tasks' and set(params) == {'session'}:
                 result = service.tasks(params['session'])
             elif path.path == '/api/task' and set(params) == {'session','number'}:
@@ -154,10 +154,10 @@ class Handler(BaseHTTPRequestHandler):
                 result=operate(service.directory,body['session'],body['action'],body['arguments'])
             elif self.path == '/api/mounts' and set(body) == {'session','skills','tools'}:
                 result = self.server.workspace.save_mounts(body['session'],body['skills'],body['tools'])
-            elif self.path == '/api/submit' and set(body) == {'session','text','request_id'}:
-                result = self.server.workspace.submit(body['session'],body['text'],body['request_id'])
-            elif self.path == '/api/chat' and set(body)=={'session','text','request_id'}:
-                result = self.server.workspace.chat(body['session'],body['text'],body['request_id'])
+            elif self.path == '/api/submit' and set(body) in ({'session','text','request_id'},{'session','text','request_id','expert_id'}):
+                result = self.server.workspace.submit(body['session'],body['text'],body['request_id'],body.get('expert_id'))
+            elif self.path == '/api/chat' and set(body) in ({'session','text','request_id'},{'session','text','request_id','expert_id'}):
+                result = self.server.workspace.chat(body['session'],body['text'],body['request_id'],body.get('expert_id'))
             elif self.path == '/api/terminal' and set(body)=={'session','arguments','request_id'}:
                 result = service.terminal_task(body['session'],body['arguments'],body['request_id'])
             elif self.path == '/api/session/change' and set(body)=={'session','action','value'}:

@@ -7,9 +7,16 @@ from contextlib import contextmanager
 from core.state.library import Library
 from core.skills import SkillRegistry
 from core.tool_contracts import builtin_registry
+from core.state.retrieval import tokens
 
 ROOT=Path(__file__).resolve().parents[2]
 FIELDS={'id','name','description','prompt','workflow','skills','tools','documents'}
+KEYWORDS={
+    'research':('研究','论文','证据','文献','来源','调研','research','paper','evidence'),
+    'software':('软件','代码','程序','开发','测试','调试','修复','仓库','终端','code','software','bug','test'),
+    'learning':('学习','教学','课程','练习','讲解','学生','复习','learning','teach','course'),
+    'data':('数据','表格','统计','指标','分析','报表','csv','json','data','analysis'),
+}
 
 def templates():
     rows=[
@@ -42,6 +49,33 @@ class Experts:
     def profiles(self):
         with self.db() as db:custom=[json.loads(r[0]) for r in db.execute('SELECT body FROM profiles ORDER BY id')]
         return templates()+custom
+
+    def select(self,session,identifier):
+        self.library.check(session)
+        if identifier is None:return None
+        if not isinstance(identifier,str) or not identifier:raise ValueError('专家模式选择无效。')
+        selected=next((p for p in self.profiles() if p['id']==identifier),None)
+        if selected is None:raise LookupError('领域不存在。')
+        self.validate(session,{k:selected[k] for k in FIELDS})
+        return selected
+
+    def recommend(self,text,session=None):
+        """Return a conservative local suggestion; no model call or activation."""
+        if not isinstance(text,str) or not text.strip():return None
+        query=text.lower();query_tokens=set(tokens(query));ranked=[]
+        for profile in self.profiles():
+            if session is not None:
+                try:self.validate(session,{key:profile[key] for key in FIELDS})
+                except (ValueError,LookupError,PermissionError):continue
+            keywords=KEYWORDS.get(profile['id'],())
+            keyword_hits=sum(1 for word in keywords if word in query)
+            profile_text=' '.join(str(profile[key]) for key in ('id','name','description','prompt','workflow')).lower()
+            overlap=len(query_tokens & set(tokens(profile_text)))
+            score=keyword_hits*20+overlap
+            if score>=2:ranked.append((score,keyword_hits,profile['id'],profile))
+        if not ranked:return None
+        selected=max(ranked,key=lambda row:(row[0],row[1],row[2]))[3]
+        return {key:selected[key] for key in ('id','name','description','version')}
 
     def active(self,session):
         self.library.check(session)
@@ -84,10 +118,7 @@ class Experts:
         return data
 
     def use(self,session,identifier):
-        self.library.check(session)
-        selected=next((p for p in self.profiles() if p['id']==identifier),None)
-        if selected is None:raise LookupError('领域不存在。')
-        self.validate(session,{k:selected[k] for k in FIELDS})
+        selected=self.select(session,identifier)
         with self.db() as db:db.execute('INSERT OR REPLACE INTO active VALUES(?,?)',(session,json.dumps(selected,ensure_ascii=False)))
         return selected
 

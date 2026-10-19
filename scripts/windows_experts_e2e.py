@@ -32,7 +32,7 @@ def main():
             page.get_by_role('button',name='普通对话',exact=True).click();page.wait_for_timeout(250)
             assert abs(page.evaluate('scrollY')-before)<5
             page.screenshot(path=str(ROOT/'logs'/'sticky_modes.png'))
-            page.get_by_role('button',name='专家模式',exact=True).click()
+            page.get_by_role('button',name='专家配置',exact=True).click()
             page.get_by_role('button',name='新建领域',exact=True).click()
             page.get_by_label('领域 ID',exact=True).fill('acceptance-expert')
             page.get_by_label('领域名称',exact=True).fill('项目验收专家')
@@ -42,11 +42,10 @@ def main():
             page.get_by_label('tools extract_text',exact=True).check()
             page.get_by_label('documents '+did,exact=True).check()
             page.get_by_role('button',name='保存领域配置',exact=True).click()
-            page.get_by_label('启用领域 acceptance-expert',exact=True).click()
-            expect(page.locator('.expert-card.active')).to_contain_text('项目验收专家')
-            page.locator('.expert-card.active').scroll_into_view_if_needed()
+            expect(page.get_by_role('button',name='用于当前对话',exact=True)).to_have_count(0)
             page.screenshot(path=str(ROOT/'logs'/'experts_ui.png'))
             page.get_by_label('关闭管理面板').click()
+            page.get_by_label('本次对话专家模式',exact=True).select_option('acceptance-expert')
             page.get_by_label('任务输入',exact=True).fill('请核对当前项目的验收编号和审核预算，并提供来源。')
             page.get_by_role('button',name='发送消息 ↑',exact=True).click()
             last=page.locator('.chat-assistant').last
@@ -57,6 +56,7 @@ def main():
             server.service.permission_change('expert-demo','autonomy','strict','')
             source=work/'input.txt';source.write_text('ACTUAL_FILE_42',encoding='utf-8')
             page.get_by_role('button',name='任务模式',exact=True).click()
+            expect(page.get_by_label('本次任务专家模式',exact=True)).to_have_value('acceptance-expert')
             page.get_by_label('任务输入',exact=True).fill(f'使用 extract_text 读取文件 {source}，只需要一个读取步骤。')
             page.get_by_role('button',name='提交任务 ↑',exact=True).click()
             page.get_by_role('button',name='查看任务',exact=True).wait_for(timeout=95000)
@@ -71,13 +71,13 @@ def main():
             page.screenshot(path=str(ROOT/'logs'/'sticky_mobile.png'))
             assert not errors,errors
         finally:browser.close();close_server(server,thread)
-        output,seconds=run_cli(work,['/use expert-demo','/expert show','/library search 验收编号','/expert off','/expert show','exit'],'experts')
+        output,seconds=run_cli(work,['/use expert-demo','/expert list','/library search 验收编号','/expert show','exit'],'experts')
         assert 'acceptance-expert' in output and 'EVAL742' in output
         assert Experts(work).active('expert-demo') is None
-        assert not lib.search('expert-demo','验收编号')
+        assert lib.search('expert-demo','验收编号')
         hits=rank('本周何时交付',[{'id':'due','text':'验收截止日期为星期五下午三点。'},{'id':'garden','text':'花园里种植了番茄，需要浇水施肥。'}])
         assert hits[0]['id']=='due' and hits[0]['retrieval']=='hybrid-static-rrf'
-        report={'windows_edge':True,'sticky_desktop_mobile':True,'scroll_position_preserved':True,'gui_profile_creation':True,'real_model_domain_prompt_and_citations':True,'real_planner_tool_scope':True,'cli_shared_profile':True,'domain_mount_overlay_removed':True,'real_semantic_paraphrase':True,'cli_seconds':seconds}
+        report={'windows_edge':True,'sticky_desktop_mobile':True,'scroll_position_preserved':True,'gui_profile_creation':True,'per_message_expert_selection':True,'per_task_expert_selection':True,'real_model_domain_prompt_and_citations':True,'real_planner_tool_scope':True,'cli_shared_profile':True,'real_semantic_paraphrase':True,'cli_seconds':seconds}
     (ROOT/'logs'/'experts_e2e_report.json').write_text(json.dumps(report,indent=2),encoding='utf-8');print(json.dumps(report,indent=2))
 
 if __name__=='__main__':main()

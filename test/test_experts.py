@@ -56,6 +56,25 @@ def test_chat_receives_domain_guidance_and_preserves_source(tmp_path):
     asyncio.run(c.reply('a','说明研究流程',Model()))
     assert c.history('a')[-1]['context_info']['expert']=={'id':profile['id'],'version':1}
 
+def test_each_chat_turn_can_choose_its_own_expert(tmp_path):
+    c,experts,_=setup(tmp_path)
+    class Model:
+        async def ainvoke(self,messages):return SimpleNamespace(content='{"reply":"ok"}')
+    rid,_=c.begin('a','请检查这段代码','m'*32,expert_id='software')
+    asyncio.run(c.complete('a',rid,Model()))
+    row=c.history('a')[-1]
+    assert row['context_info']['expert']=={'id':'software','version':1}
+    assert row['expert_snapshot']['id']=='software'
+    rid,_=c.begin('a','普通问题','n'*32,expert_id=None)
+    asyncio.run(c.complete('a',rid,Model()))
+    assert c.history('a')[-1]['context_info']['expert'] is None
+
+def test_expert_recommendation_is_local_and_conservative(tmp_path):
+    _,experts,_=setup(tmp_path)
+    assert experts.recommend('修复 TypeScript bug 并运行测试')['id']=='software'
+    assert experts.recommend('分析 CSV 数据并生成指标')['id']=='data'
+    assert experts.recommend('你好，今天天气不错') is None
+
 def test_cli_import_and_task_tool_scope(tmp_path):
     _,experts,profile=setup(tmp_path);profile['tools']=['extract_text']
     path=tmp_path/'domain.json';path.write_text(json.dumps(profile),encoding='utf-8')
