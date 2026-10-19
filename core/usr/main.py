@@ -75,7 +75,8 @@ async def run_interactive_app():
     # Create Agent -> Init MCP Client -> Start MCP Server
     import os
     agent = EduClawAgent(state_db_path=str(db_path().with_name("educlaw_state.sqlite3")),
-                         enable_memory=os.environ.get("EDUCLAW_DISABLE_MEMORY") != "1")
+                         enable_memory=os.environ.get("EDUCLAW_DISABLE_MEMORY") != "1",
+                         test_model_connection=False)
     task_manager = TaskManager(str(db_path().with_name("educlaw_tasks.sqlite3")))
     plan_manager = PlanManager(task_manager)
     executor = StepExecutor(task_manager)

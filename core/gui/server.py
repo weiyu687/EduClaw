@@ -94,6 +94,9 @@ class Handler(BaseHTTPRequestHandler):
             elif path.path == '/api/memory' and set(params)=={'session'}:
                 from core.state.memory_service import inspect
                 result=inspect(service.directory,params['session'])
+            elif path.path == '/api/expert-status' and set(params)=={'session'}:
+                from core.state.experts import Experts
+                result=Experts(service.directory).status(params['session'])
             elif path.path == '/api/experts' and set(params)=={'session'}:
                 from core.state.experts import Experts
                 result=Experts(service.directory).view(params['session'])

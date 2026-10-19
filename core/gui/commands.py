@@ -2,7 +2,7 @@
 COMMANDS = [
     ('/library','资料库','CLI：/library add 文件路径、search 问题、list、mount ID、unmount ID、remove ID；GUI 使用侧栏资料库。','cli'),
     ('/memory','会话记忆','CLI：/memory [检索词] 查看当前对话的摘要、预算和相关记忆。','cli'),
-    ('/expert','专家模式','CLI：/expert list、use ID、off、show、import JSON路径、remove ID；GUI 使用侧栏专家模式。','cli'),
+    ('/expert','专家模式','CLI：/expert list、use ID、off、show、status、import JSON路径、remove ID；GUI 使用侧栏专家模式。','cli'),
     ('/autonomy','审批模式','CLI：/autonomy strict|balanced|autonomous；自主执行需要确认，仅作用于当前对话。','cli'),
     ('/term','持续终端','CLI：/term open 目录，/term agent ID 目标；支持 send/read/approve/interrupt/close/trust/revoke。','cli'),
     ('/终端','终端与 Agent','在指定目录打开持续 PowerShell，直接输入命令或交给 Agent 连续工作；也支持单次审批。','terminal'),

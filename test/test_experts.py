@@ -95,3 +95,22 @@ def test_large_domain_and_escaped_history_respect_hard_budget(tmp_path,monkeypat
             return SimpleNamespace(content='{"reply":"已核查"}')
     asyncio.run(c.reply('a','请继续核查',Model()))
     assert c.history('a')[-1]['context_info']['input_chars']<=32000
+
+
+def test_expert_status_tracks_update_missing_resource_and_deleted_template(tmp_path):
+    _,experts,profile=setup(tmp_path)
+    doc=experts.library.add('a','note.txt',b'project data')['id']
+    profile['documents']=[doc]
+    experts.save('a',profile);experts.use('a',profile['id'])
+    assert experts.status('b')['active'] is None
+    profile['prompt']='Updated requirements'
+    experts.save('a',profile)
+    status=experts.status('a')
+    assert status['update_available'] and status['active']['version']==1 and status['latest_version']==2
+    experts.library.remove('a',doc)
+    assert experts.status('a')['missing']['documents']==[doc]
+    experts.remove('a',profile['id'])
+    assert experts.status('a')['profile_removed']
+    assert json.loads(cli(tmp_path,'a','/expert status'))['active']['version']==1
+    experts.off('a');assert experts.status('a')['active'] is None
+    with pytest.raises(PermissionError):experts.status('missing')

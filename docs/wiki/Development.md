@@ -38,6 +38,7 @@ python -m pytest test --ignore=test/test_agent_memory_e2e.py --ignore=test/test_
 | windows_long_workflows_e2e.py | 多文件读取、计算、证据、暂停与重启 |
 | windows_mcp_agent_e2e.py | 公开检索、官方 Filesystem MCP 与跨端操作 |
 | windows_memory_library_e2e.py | 36 轮历史召回、摘要、Edge 上传/挂载/检索、真实模型联合回答与 CLI 共用资料 |
+| windows_expert_status_e2e.py | 真实 CLI 到 GUI 状态同步、版本更新、失效资料修复和快照导出 |
 | windows_experts_e2e.py | 吸顶切换、领域配置、真实模型引用、任务工具范围、CLI 与轻量语义检索 |
 | windows_expert_terminal_e2e.py | 真实 PowerShell 与模型按领域提示词和资料完成验收 |
 

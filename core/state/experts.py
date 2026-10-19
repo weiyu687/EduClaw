@@ -48,7 +48,19 @@ class Experts:
         with self.db() as db:row=db.execute('SELECT snapshot FROM active WHERE session=?',(session,)).fetchone()
         return json.loads(row[0]) if row else None
 
-    def view(self,session):return {'profiles':self.profiles(),'active':self.active(session),'catalog':self.catalog(session)}
+    def status(self,session):
+        active=self.active(session)
+        if not active:return {'active':None,'update_available':False,'missing':{},'profile_removed':False}
+        latest=next((p for p in self.profiles() if p['id']==active['id']),None)
+        catalog=self.catalog(session)
+        available={'skills':{r['id'] for r in catalog['skills']},'tools':{r['name'] for r in catalog['tools']},'documents':{r['id'] for r in catalog['documents']}}
+        missing={key:[value for value in active[key] if value not in available[key]] for key in available}
+        return {'active':{key:active[key] for key in ('id','name','version')},
+                'latest_version':latest['version'] if latest else None,
+                'update_available':bool(latest and latest['version']>active['version']),
+                'profile_removed':latest is None,'missing':missing}
+
+    def view(self,session):return {'profiles':self.profiles(),'active':self.active(session),'catalog':self.catalog(session),'status':self.status(session)}
 
     def validate(self,session,data):
         if not isinstance(data,dict) or set(data)!=FIELDS:raise ValueError('领域配置字段不完整或包含未知字段。')
@@ -139,6 +151,7 @@ def cli(directory,session,text):
     elif action=='use':experts.use(session,argument)
     elif action=='off':experts.off(session)
     elif action=='remove':experts.remove(session,argument)
+    elif action=='status':return json.dumps(experts.status(session),ensure_ascii=False,indent=2)
     elif action=='show':return json.dumps(experts.active(session),ensure_ascii=False,indent=2)
-    elif action!='list':raise ValueError('/expert list | show | use ID | off | import JSON路径 | remove ID')
+    elif action!='list':raise ValueError('/expert list | show | status | use ID | off | import JSON路径 | remove ID')
     return json.dumps({'profiles':experts.profiles(),'active':experts.active(session)},ensure_ascii=False,indent=2)
