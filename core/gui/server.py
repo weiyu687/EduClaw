@@ -88,6 +88,18 @@ class Handler(BaseHTTPRequestHandler):
             elif path.path == '/api/terminals' and set(params)=={'session'}:
                 from core.terminal.service import operate
                 result=operate(service.directory,params['session'],'list',{})
+            elif path.path == '/api/library' and set(params)=={'session'}:
+                from core.state.library import operate
+                result=operate(service.directory,params['session'],'list',{})
+            elif path.path == '/api/memory' and set(params)=={'session'}:
+                from core.state.memory_service import inspect
+                result=inspect(service.directory,params['session'])
+            elif path.path == '/api/expert-status' and set(params)=={'session'}:
+                from core.state.experts import Experts
+                result=Experts(service.directory).status(params['session'])
+            elif path.path == '/api/experts' and set(params)=={'session'}:
+                from core.state.experts import Experts
+                result=Experts(service.directory).view(params['session'])
             elif path.path == '/api/catalog' and not params:
                 result = self.server.workspace.catalog()
             elif path.path == '/api/mounts' and set(params) == {'session'}:
@@ -123,7 +135,7 @@ class Handler(BaseHTTPRequestHandler):
                     self.headers.get('Content-Type') != 'application/json'):
                 raise ValueError('仅接受定长 JSON 请求。')
             length = int(lengths[0])
-            if not 0 < length <= 32768:
+            if not 0 < length <= (8*1024*1024 if self.path=='/api/library' else 64000 if self.path=='/api/experts' else 32768):
                 raise ValueError('请求长度无效。')
             body = json.loads(self.rfile.read(length))
             if not isinstance(body, dict):
@@ -131,6 +143,15 @@ class Handler(BaseHTTPRequestHandler):
             service = self.server.service
             if self.path == '/api/session' and not body:
                 result = self.server.workspace.new_session()
+            elif self.path == '/api/library' and set(body)=={'session','action','arguments'}:
+                from core.state.library import operate
+                result=operate(service.directory,body['session'],body['action'],body['arguments'])
+            elif self.path == '/api/memory' and set(body)=={'session','query'}:
+                from core.state.memory_service import inspect
+                result=inspect(service.directory,body['session'],body['query'])
+            elif self.path == '/api/experts' and set(body)=={'session','action','arguments'}:
+                from core.state.experts import operate
+                result=operate(service.directory,body['session'],body['action'],body['arguments'])
             elif self.path == '/api/mounts' and set(body) == {'session','skills','tools'}:
                 result = self.server.workspace.save_mounts(body['session'],body['skills'],body['tools'])
             elif self.path == '/api/submit' and set(body) == {'session','text','request_id'}:

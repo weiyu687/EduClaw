@@ -14,6 +14,7 @@
 | 聊天、搜索、准备任务、查看结果 | [GUI 使用指南](GUI-Guide) |
 | 少一点审批，或更严格控制 | [架构与安全](Architecture)中的三种审批模式 |
 | 接入工具与工作方法 | [技能与工具](Skills-and-Tools) |
+| 为一个专业配置提示词、技能、工具和资料 | [专家模式与检索](Expert-Mode) |
 | 运行一个完整示例 | [多文件长流程](Long-Workflows) |
 | 查命令 | [指令参考](Commands) |
 | 开发与真实测试 | [测试与开发](Development) |
@@ -26,6 +27,8 @@
 任务按目标选择已适配工具，保存步骤、依赖与结果证据。持续终端支持本机 PowerShell 输入、交互程序和 Agent 控制。审批程度由用户为当前对话选择，GUI 与 CLI 共用状态和权限。
 
 ## 当前版本与范围
+
+侧栏新增会话记忆与统一资料库：查看抽取式摘要，检索历史对话，添加并挂载个人资料。普通对话自动获取相关片段，保留原文和引用来源。操作步骤与边界见 [GUI 使用指南](GUI-Guide)。
 
 当前活跃开发分支为 `codex/roadmap-development`。主要验证 Windows 本机使用，后端 Python + MCP + LangGraph + SQLite，前端 TypeScript + React + Vite。
 

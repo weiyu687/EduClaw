@@ -30,7 +30,8 @@ logger = getLogger("CLIENT")
 class EduClawAgent:
     def __init__(self, enable_memory: bool = True, memory_persist_dir: str = None,
                  enable_error_handling: bool = True,
-                 state_db_path: str = "data/educlaw_state.sqlite3"):
+                 state_db_path: str = "data/educlaw_state.sqlite3",
+                 test_model_connection: bool = True):
         """
         初始化 EduClaw Agent，集成记忆系统和错误处理
 
@@ -40,7 +41,7 @@ class EduClawAgent:
             enable_error_handling: 是否启用错误处理，默认启用
         """
         self.mcp_client = MCPClient()
-        self.model = get_llm()
+        self.model = get_llm(test_connection_test=test_model_connection)
         self.tools = None
         self.state_manager = StateManager(state_db_path)
         self._checkpoint_path = str(Path(state_db_path).with_name("educlaw_checkpoints.sqlite3"))

@@ -37,6 +37,10 @@ python -m pytest test --ignore=test/test_agent_memory_e2e.py --ignore=test/test_
 | windows_conversation_ui_e2e.py | 对话新闻、来源、技能、权限和移动端交互 |
 | windows_long_workflows_e2e.py | 多文件读取、计算、证据、暂停与重启 |
 | windows_mcp_agent_e2e.py | 公开检索、官方 Filesystem MCP 与跨端操作 |
+| windows_memory_library_e2e.py | 36 轮历史召回、摘要、Edge 上传/挂载/检索、真实模型联合回答与 CLI 共用资料 |
+| windows_expert_status_e2e.py | 真实 CLI 到 GUI 状态同步、版本更新、失效资料修复和快照导出 |
+| windows_experts_e2e.py | 吸顶切换、领域配置、真实模型引用、任务工具范围、CLI 与轻量语义检索 |
+| windows_expert_terminal_e2e.py | 真实 PowerShell 与模型按领域提示词和资料完成验收 |
 
 在仓库根目录运行，例如 `python scripts/windows_autonomy_e2e.py`。脚本使用隔离数据目录，日志和报告写入 `logs`。部分旧验收依赖仓库示例文件，运行前确认输入存在；外部模型或网络故障会导致失败，不能用固定输出冒充真实调用。
 
@@ -53,7 +57,7 @@ python scripts/windows_docs_e2e.py
 
 截图脚本使用当前生产 UI 和隔离演示会话；对话内容明确标记为演示，任务与终端输出实际执行。它只运行无害的示例命令，不使用用户历史、文件或密钥。截图后人工检查可读性、隐私、裁切和界面状态。
 
-文档验收检查九页导航、锚点、搜索、图片加载和窄屏布局。截图更新不是业务功能通过测试的替代品。
+文档验收检查十页导航、锚点、搜索、图片加载和窄屏布局。截图更新不是业务功能通过测试的替代品。`scripts/benchmark_retrieval.py` 是 10 条本地检索校准样例，不是独立公开基准；新领域需增加自己的验收集。
 
 ## 发布
 

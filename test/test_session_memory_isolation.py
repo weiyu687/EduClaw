@@ -18,9 +18,10 @@ class SessionMemoryIsolationTests(unittest.IsolatedAsyncioTestCase):
         backend.search_by_metadata.side_effect = mock_search_by_metadata
         manager = MemoryManager(backend)
         manager.set_session('old')
-        self.assertEqual(await manager.recall_relevant_memories('我的名字'), ['小明正在学习Python'])
+        self.assertEqual(await manager.recall_relevant_memories('小明学习Python'), ['小明正在学习Python'])
+        self.assertEqual(await manager.recall_relevant_memories('完全不相干的天气'), [])
         manager.set_session('new')
-        self.assertEqual(await manager.recall_relevant_memories('我的名字'), [])
+        self.assertEqual(await manager.recall_relevant_memories('小明学习Python'), [])
         backend.retrieve.assert_not_called()
 
 if __name__ == '__main__':
