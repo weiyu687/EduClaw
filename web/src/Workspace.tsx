@@ -145,7 +145,7 @@ export function Workspace({token,session,onSession,onTask,onAction,onView,mode,o
       <button aria-label="资料库" aria-pressed={panel==='library'} onClick={()=>setPanel('library')}><Icon name="book"/><span>资料库</span></button>
       <button aria-label="会话记忆" aria-pressed={panel==='memory'} onClick={()=>setPanel('memory')}><Icon name="chat"/><span>会话记忆</span></button>
       <button aria-label="专家配置" aria-pressed={panel==='experts'} disabled={!session} onClick={()=>setPanel('experts')}><Icon name="spark"/><span>专家配置</span></button>
-      <button aria-label={'◇ 技能管理 · '+saved.skills.length} aria-pressed={panel==='skills'} onClick={()=>setPanel('skills')}><Icon name="spark"/><span>技能库</span><small>{saved.skills.length||'探索'}</small></button>
+      <button aria-label={'◇ 技能管理 · '+saved.skills.length} aria-pressed={panel==='skills'} onClick={()=>setPanel('skills')}><Icon name="spark"/><span>技能库</span><small>{saved.skills.length||'发现'}</small></button>
       <button aria-label="⚒ 工具管理 · 自动" aria-pressed={panel==='tools'} onClick={()=>setPanel('tools')}><Icon name="tools"/><span>工具库</span><small>自动</small></button>
       <button aria-label="终端" aria-pressed={panel==='terminal'} onClick={()=>setPanel('terminal')}><Icon name="command"/><span>终端</span><small>PowerShell</small></button>
       <button aria-label="▣ 工具与文件权限" aria-pressed={panel==='permissions'} onClick={()=>setPanel('permissions')}><Icon name="shield"/><span>权限与文件</span></button>

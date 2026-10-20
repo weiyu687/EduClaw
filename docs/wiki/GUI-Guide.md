@@ -37,7 +37,7 @@ CLI 使用同一数据：
 
 ```text
 /projects
-/project-new 机器学习课程
+/project-new 产品发布计划
 /project-use 1
 /project-show
 /project-instructions 面向本科生，先给结论，再用例子解释。
