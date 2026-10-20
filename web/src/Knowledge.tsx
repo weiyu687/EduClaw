@@ -21,7 +21,7 @@ export function Knowledge({token,session,kind}:{token:string;session:string;kind
   async function retrieve(){if(kind==='library'){await act('search',{query:search});return;}
     setBusy(true);setError('');try{setMemory(await request<Memory>(token,'/api/memory',{session,query:search}));setSearched(true);}catch(e){setError(e instanceof Error?e.message:'检索失败');}finally{setBusy(false);}}
   return <section aria-label={kind==='library'?'资料库管理':'会话记忆管理'}>
-    {kind==='library'?<><p>添加学习资料、项目说明或研究笔记。资料目录在本工作空间共享；当前对话、所属项目或专家模式挂载的资料参与检索。相关片段会发送给已配置的模型用于回答。</p>
+    {kind==='library'?<><p>添加工作资料、项目说明、规范或参考文档。资料目录在本工作空间共享；当前对话、所属项目或专家模式挂载的资料参与检索。相关片段会发送给已配置的模型用于回答。</p>
       <label>添加资料<input aria-label="添加资料文件" type="file" accept=".txt,.md,.csv,.json,.jsonl,.log,.pdf,.docx" disabled={!session||busy} onChange={e=>{const file=e.target.files?.[0];if(file)void upload(file);e.target.value='';}}/></label>
       <p className="muted">UTF-8 文本、PDF、DOCX；每份最多 5 MB / 30 万字，PDF 最多 100 页，不支持扫描件 OCR。添加后自动挂载到当前对话，重复内容不会重复入库。移除只删除资料库副本，不修改原文件。</p>
       {documents.map(doc=><article className="library-document" key={doc.id}><strong>{doc.name}</strong><small>{doc.chars} 字 · {doc.chunks} 个片段</small><label><input type="checkbox" aria-label={'用于当前对话 '+doc.name} checked={!!doc.mounted} disabled={busy||doc.project_mounted} onChange={e=>void act('mount',{id:doc.id,enabled:e.target.checked})}/>用于当前对话</label>

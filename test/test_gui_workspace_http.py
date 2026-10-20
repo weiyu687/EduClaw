@@ -1,5 +1,8 @@
 import json
+import base64
+from urllib.parse import quote
 from test.test_phase_gui1 import server, service, call
+from core.state.conversation import Conversation
 
 
 def test_workspace_http_auth_schema_and_mounts(server):
@@ -41,3 +44,15 @@ def test_chat_and_session_management_http_boundary(server):
     assert any(s['label']=='共同的会话标题' for s in json.loads(body))
     assert call(server,'/api/chat?session=missing',headers=auth)[0]==409
     assert call(server,'/api/session/change',method='POST',body={**rename,'action':'delete_confirm','value':'forged'},headers=auth)[0]==409
+
+def test_chat_attachment_http_is_authenticated_and_session_scoped(server):
+    png=base64.b64decode('iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mNk+A8AAQUBAScY42YAAAAASUVORK5CYII=')
+    chat=Conversation(server.service.directory/'educlaw_state.sqlite3')
+    rid,_=chat.begin('s','图片','z'*32,attachments=[{'name':'pixel.png','mime':'image/png','data':base64.b64encode(png).decode()}])
+    attachment=chat.history('s')[-1]['attachments'][0]
+    path='/api/chat/attachment?session=s&id='+quote(attachment['id'])
+    assert call(server,path)[0]==403
+    status,data,headers=call(server,path,headers={'Authorization':'Bearer '+server.token})
+    assert status==200 and data==png and dict(headers)['Content-Type']=='image/png'
+    other=path.replace('session=s','session=other')
+    assert call(server,other,headers={'Authorization':'Bearer '+server.token})[0]==409

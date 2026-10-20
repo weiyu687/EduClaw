@@ -29,6 +29,11 @@ export async function request<T>(token:string,path:string,body?:unknown,timeoutM
     throw error;
   } finally {clearTimeout(timer);}
 }
+export async function authorizedBlob(token:string,path:string):Promise<Blob>{
+  const response=await fetch(path,{cache:'no-store',credentials:'omit',headers:{Authorization:`Bearer ${token}`}});
+  if(!response.ok)throw new Error('无法读取图片附件。');
+  return response.blob();
+}
 export function query(session:string,number?:number):string {
   return new URLSearchParams({session,...(number===undefined?{}:{number:String(number)})}).toString();
 }

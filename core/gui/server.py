@@ -40,7 +40,7 @@ class Handler(BaseHTTPRequestHandler):
         self.send_header('X-Content-Type-Options', 'nosniff')
         self.send_header('Referrer-Policy', 'no-referrer')
         self.send_header('X-Frame-Options', 'DENY')
-        self.send_header('Content-Security-Policy', "default-src 'self'; script-src 'self'; style-src 'self'; connect-src 'self'; img-src 'self' data:; object-src 'none'; base-uri 'none'; frame-ancestors 'none'; form-action 'none'")
+        self.send_header('Content-Security-Policy', "default-src 'self'; script-src 'self'; style-src 'self'; connect-src 'self'; img-src 'self' data: blob:; object-src 'none'; base-uri 'none'; frame-ancestors 'none'; form-action 'none'")
         self.end_headers()
         self.wfile.write(data)
 
@@ -116,6 +116,9 @@ class Handler(BaseHTTPRequestHandler):
                 result = self.server.workspace.submissions(params['session'])
             elif path.path == '/api/chat' and set(params)=={'session'}:
                 result = self.server.workspace.chat_history(params['session'])
+            elif path.path == '/api/chat/attachment' and set(params)=={'session','id'}:
+                result=self.server.workspace.conversation.attachment(params['session'],params['id'])
+                return self.reply(200,result['data'],result['mime'])
             elif path.path == '/api/tasks' and set(params) == {'session'}:
                 result = service.tasks(params['session'])
             elif path.path == '/api/task' and set(params) == {'session','number'}:
@@ -141,7 +144,7 @@ class Handler(BaseHTTPRequestHandler):
                     self.headers.get('Content-Type') != 'application/json'):
                 raise ValueError('仅接受定长 JSON 请求。')
             length = int(lengths[0])
-            if not 0 < length <= (8*1024*1024 if self.path=='/api/library' else 64000 if self.path=='/api/experts' else 32768):
+            if not 0 < length <= (12*1024*1024 if self.path in ('/api/library','/api/chat') else 64000 if self.path=='/api/experts' else 32768):
                 raise ValueError('请求长度无效。')
             body = json.loads(self.rfile.read(length))
             if not isinstance(body, dict):
@@ -165,8 +168,8 @@ class Handler(BaseHTTPRequestHandler):
                 result = self.server.workspace.save_mounts(body['session'],body['skills'],body['tools'])
             elif self.path == '/api/submit' and set(body) in ({'session','text','request_id'},{'session','text','request_id','expert_id'}):
                 result = self.server.workspace.submit(body['session'],body['text'],body['request_id'],body.get('expert_id'))
-            elif self.path == '/api/chat' and set(body) in ({'session','text','request_id'},{'session','text','request_id','expert_id'}):
-                result = self.server.workspace.chat(body['session'],body['text'],body['request_id'],body.get('expert_id'))
+            elif self.path == '/api/chat' and set(body) in ({'session','text','request_id'},{'session','text','request_id','expert_id'},{'session','text','request_id','attachments'},{'session','text','request_id','expert_id','attachments'}):
+                result = self.server.workspace.chat(body['session'],body['text'],body['request_id'],body.get('expert_id'),body.get('attachments'))
             elif self.path == '/api/terminal' and set(body)=={'session','arguments','request_id'}:
                 result = service.terminal_task(body['session'],body['arguments'],body['request_id'])
             elif self.path == '/api/session/change' and set(body)=={'session','action','value'}:

@@ -4,9 +4,10 @@
 
 `library.png` 来自 `scripts/windows_memory_library_e2e.py` 的实际 Edge 上传、挂载与检索测试，使用隔离演示文件（星河项目预算 8537 元），不含用户私人资料。截图为视口原图。
 
-截图日期：2026-10-14。界面基于开发提交 `3f7b934`，由 `scripts/capture_docs_ui.py` 在 Windows Microsoft Edge 中拍摄。
+截图在 Windows Microsoft Edge 中拍摄。通用 Agent 欢迎页与图片会话由 `scripts/windows_general_agent_e2e.py` 验证和生成，其余页面由对应的 Windows 验收脚本生成。
 
-- `chat.png`：独立演示会话，回答明确标记为文档示例，不声称来自真实模型。
+- `chat.png`：通用 Agent 欢迎页与对话、任务、项目、资料、工具和权限入口。
+- `image-chat.png`：图片作为当前对话视觉输入并在刷新后回显。
 - `permissions.png`：默认平衡模式与工具权限。
 - `tools.png`：实际工具库与契约说明。
 - `task-results.png`：真实 PowerShell 任务执行和保存的结果。

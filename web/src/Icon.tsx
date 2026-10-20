@@ -11,6 +11,6 @@ const paths:Record<string,string>={
   copy:'M8 8h12v12H8V8ZM16 8V4H4v12h4',check:'m5 12 4 4L19 6',
   chevron:'m9 5 7 7-7 7',refresh:'M20 7v5h-5M4 17v-5h5M5 8a8 8 0 0 1 13-3l2 7M4 12l2 7a8 8 0 0 0 13-3',
   globe:'M3 12h18M12 3c5 5 5 13 0 18-5-5-5-13 0-18Zm9 9a9 9 0 1 1-18 0 9 9 0 0 1 18 0Z',
-  file:'M14 3H5v18h14V8l-5-5Zm0 0v6h5M8 13h8M8 17h5',folder:'M3 6h7l2 2h9v11H3V6Z',
+  file:'M14 3H5v18h14V8l-5-5Zm0 0v6h5M8 13h8M8 17h5',folder:'M3 6h7l2 2h9v11H3V6Z',image:'M4 5h16v14H4V5Zm3 10 3-3 3 3 2-2 3 3M9 9h.01',
 };
 export function Icon({name,size=18,style}:{name:string;size?:number;style?:CSSProperties}){return <svg aria-hidden="true" width={size} height={size} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round" style={style}><path d={paths[name]??paths.spark}/></svg>;}

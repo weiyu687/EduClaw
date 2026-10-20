@@ -58,10 +58,10 @@ class Workspace:
             Projects(self.dashboard.directory).assign(session,project_id)
         return {'session':session}
 
-    def chat(self,session,text,request_id,expert_id=None):
+    def chat(self,session,text,request_id,expert_id=None,attachments=None):
         self.validate_session(session)
         with self.dashboard.lock:
-            rid,fresh=self.conversation.begin(session,text,request_id,expert_id)
+            rid,fresh=self.conversation.begin(session,text,request_id,expert_id,attachments)
             if fresh:
                 def reply():
                     try:asyncio.run(self.conversation.complete(session,rid,self.model_factory() if self.model_factory else None))

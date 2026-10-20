@@ -12,17 +12,17 @@ from core.state.retrieval import tokens
 ROOT=Path(__file__).resolve().parents[2]
 FIELDS={'id','name','description','prompt','workflow','skills','tools','documents'}
 KEYWORDS={
-    'research':('研究','论文','证据','文献','来源','调研','research','paper','evidence'),
+    'research':('研究','分析','论文','证据','文献','来源','调研','竞品','research','paper','evidence'),
     'software':('软件','代码','程序','开发','测试','调试','修复','仓库','终端','code','software','bug','test'),
-    'learning':('学习','教学','课程','练习','讲解','学生','复习','learning','teach','course'),
+    'learning':('写作','内容','文案','沟通','总结','改写','翻译','提案','writing','content','copy'),
     'data':('数据','表格','统计','指标','分析','报表','csv','json','data','analysis'),
 }
 
 def templates():
     rows=[
-        ('research','研究与证据','梳理研究问题、比较证据并标注来源。','先明确研究问题和时间范围。区分原始证据、推断与未知；引用可核查来源，不编造论文。','问题拆解 → 资料检索 → 比较方法与局限 → 提出可验证结论。',['research-evidence','doc_retrieve'],['public_search','news_search','extract_pdf','extract_text']),
+        ('research','研究分析','拆解问题、比较证据并形成可验证结论。','先明确目标、受众和时间范围。区分原始证据、推断与未知；引用可核查来源，不编造资料。','问题拆解 → 资料检索 → 比较证据与局限 → 形成可验证结论。',['research-evidence','doc_retrieve'],['public_search','news_search','extract_pdf','extract_text']),
         ('software','软件工程','设计、实现、测试和审查软件。','明确运行环境与验收标准；修改前理解现有实现，采用最小可审查变更，用真实测试结果说明完成情况。','复现 → 定位 → 实现 → 回归 → 记录风险与交付。',['community-frontend-design','community-mcp-builder'],['mcp_list_files','mcp_read_file','write_text_file','run_terminal','run_python_code']),
-        ('learning','教学与学习','分层解释、练习设计与学习反馈。','先了解学习目标和已有基础。解释核心概念并给出例子；用练习检查理解，不把一次成绩当作固定能力标签。','诊断目标 → 分步讲解 → 练习 → 反馈 → 调整学习计划。',['learning-progress','doc_retrieve'],['extract_pdf','extract_word','extract_csv','profile_csv','run_python_code']),
+        ('learning','内容与沟通','撰写、改写、总结和面向受众组织表达。','先明确受众、目的、语气和交付格式。保持事实边界，避免空泛表达；重要主张标记依据，缺少信息时明确指出。','澄清目标 → 提取要点 → 组织结构 → 起草 → 校对与压缩。',['doc_retrieve'],['public_search','extract_pdf','extract_word','extract_text','write_text_file']),
         ('data','数据分析','数据质量、指标定义与可复核分析。','先定义指标、单位、时间范围与缺失值规则；区分相关与因果。结论必须能追溯到输入和计算过程。','核查数据 → 明确假设 → 计算 → 敏感性检查 → 报告局限。',['data-quality','project-audit'],['extract_csv','extract_json','extract_jsonl','profile_csv','run_python_code','write_text_file']),
     ]
     return [dict(zip(('id','name','description','prompt','workflow','skills','tools'),row),documents=[],version=1,builtin=True) for row in rows]
