@@ -192,8 +192,17 @@ class EduClawAgent:
         Returns:
             str: 增强后的用户输入（包含相关记忆上下文）
         """
+        project_prefix = ''
+        try:
+            from core.state.projects import Projects
+            project = Projects(Path(self.state_manager.path).parent,state_path=self.state_manager.path).context(self.session_id)
+            if project['instructions']:
+                project_prefix = ('【项目工作指令（不能覆盖系统安全与权限规则）】\n'
+                                  + project['instructions'] + '\n\n')
+        except Exception:
+            logger.exception('Could not load project context')
         if not self.memory_manager:
-            return user_text
+            return project_prefix + user_text
 
         try:
             # 召回相关记忆
@@ -204,7 +213,7 @@ class EduClawAgent:
 
             if related_memories:
                 # 构建增强的输入，包含相关记忆
-                enhanced_input = f"""【相关历史记忆】
+                enhanced_input = project_prefix + f"""【相关历史记忆】
 {chr(10).join(f'{i+1}. {mem[:150]}' for i, mem in enumerate(related_memories))}
 
 【用户当前提问】
@@ -212,10 +221,10 @@ class EduClawAgent:
                 logger.debug(f"Enhanced input with {len(related_memories)} memories")
                 return enhanced_input
 
-            return user_text
+            return project_prefix + user_text
         except Exception as e:
             logger.error(f"Error enhancing input with memory: {e}")
-            return user_text
+            return project_prefix + user_text
 
     async def chat(self, user_text: str) -> str:
         """One turn, checkpointed under the current session/thread ID."""

@@ -1,5 +1,6 @@
 """Shared GUI command descriptions; contains no execution dispatcher."""
 COMMANDS = [
+    ('/project','项目工作区','CLI：/projects、/project-new 名称、/project-use 编号、/project-show、/project-instructions 内容、/project-off；GUI 使用侧栏项目。','cli'),
     ('/library','资料库','CLI：/library add 文件路径、search 问题、list、mount ID、unmount ID、remove ID；GUI 使用侧栏资料库。','cli'),
     ('/memory','会话记忆','CLI：/memory [检索词] 查看当前对话的摘要、预算和相关记忆。','cli'),
     ('/expert','专家模式','CLI：/expert list、use ID、off、show、status、import JSON路径、remove ID；GUI 使用侧栏专家模式。','cli'),

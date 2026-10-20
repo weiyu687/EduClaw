@@ -2,7 +2,7 @@ import './compat';
 import React, {useEffect,useRef,useState} from 'react';
 import {createRoot} from 'react-dom/client';
 import {request,takeCredential,query,labels,actionLabels} from './api';
-import type {Session,Task,Detail,Preview,Action} from './api';
+import type {Session,Project,Task,Detail,Preview,Action} from './api';
 import './style.css';
 import {SessionActions} from './SessionActions';
 import {Workspace} from './Workspace';
@@ -21,6 +21,7 @@ function App(){
   const [mode,setMode]=useState<'chat'|'task'>('chat');
   const [token] = useState(takeCredential);
   const [sessions,setSessions] = useState<Session[]>([]);
+  const [projects,setProjects] = useState<Project[]>([]);
   const [session,setSession] = useState('');
   const [tasks,setTasks] = useState<Task[]>([]);
   const [selected,setSelected] = useState<number>();
@@ -37,9 +38,9 @@ function App(){
   useEffect(()=>{
     let cancelled=false;
     if(!token){setLoading(false);setError('请使用终端显示的本次启动地址打开工作台。');return;}
-    request<Session[]>(token,'/api/sessions').then(rows=>{if(!cancelled){setSessions(rows);setSession(current=>rows.some(s=>s.id===current)?current:(rows[0]?.id??''));setLoading(false);}})
+    Promise.all([request<Session[]>(token,'/api/sessions'),request<Project[]>(token,'/api/projects')]).then(([rows,groups])=>{if(!cancelled){setSessions(rows);setProjects(groups);setSession(current=>rows.some(s=>s.id===current)?current:(rows[0]?.id??''));setLoading(false);}})
       .catch(e=>{if(!cancelled){setError(String(e.message));setLoading(false);}});
-    const timer=window.setInterval(()=>{request<Session[]>(token,'/api/sessions').then(rows=>{if(!cancelled){setSessions(rows);setSession(current=>rows.some(s=>s.id===current)?current:(rows[0]?.id??''));}}).catch(()=>{});},3000);
+    const timer=window.setInterval(()=>{Promise.all([request<Session[]>(token,'/api/sessions'),request<Project[]>(token,'/api/projects')]).then(([rows,groups])=>{if(!cancelled){setSessions(rows);setProjects(groups);setSession(current=>rows.some(s=>s.id===current)?current:(rows[0]?.id??''));}}).catch(()=>{});},3000);
     return ()=>{cancelled=true;window.clearInterval(timer);};
   },[token,tick]);
   useEffect(()=>{setSelected(undefined);setDetail(undefined);setPreview(undefined);},[session]);
@@ -76,10 +77,10 @@ function App(){
     {mobile&&navOpen&&<button className="nav-backdrop" aria-label="关闭侧栏" onClick={closeNav}/>}
     <aside className="sidebar" ref={sidebar} aria-label="主导航" onKeyDown={e=>{if(!mobile)return;if(e.key==='Escape')closeNav();if(e.key==='Tab'){const nodes=Array.from(sidebar.current?.querySelectorAll<HTMLElement>('a,button,input,select')??[]).filter(n=>n.offsetParent!==null&&!n.hasAttribute('disabled'));const first=nodes[0],last=nodes[nodes.length-1];if(e.shiftKey&&document.activeElement===first){e.preventDefault();last?.focus();}else if(!e.shiftKey&&document.activeElement===last){e.preventDefault();first?.focus();}}}}><div className="sidebar-brand"><a className="brand" href="/" aria-label="EduClaw 工作台"><span className="brand-mark"><Icon name="book" size={22}/></span><span>EduClaw<small>你的探索伙伴</small></span></a><button className="icon-button" aria-label="收起侧栏" onClick={closeNav}><Icon name="menu" size={17}/></button></div>
       <div id="sidebar-controls"/>
-      <div className="workspace-label">最近对话 <span>{sessions.length}</span></div><div className="session-search"><Icon name="search" size={15}/><input aria-label="搜索对话" placeholder="搜索对话…" value={sessionSearch} onChange={e=>setSessionSearch(e.target.value)}/></div>
+      <div className="workspace-label">对话 <span>{sessions.length}</span></div><div className="session-search"><Icon name="search" size={15}/><input aria-label="搜索对话" placeholder="搜索对话…" value={sessionSearch} onChange={e=>setSessionSearch(e.target.value)}/></div>
       <label className="session-picker sr-only">选择会话<select aria-label="选择会话" value={session} onChange={e=>{setSession(e.target.value);setSelected(undefined);setDetail(undefined);setTasks([]);setPreview(undefined);}}>{sessions.map(s=><option key={s.id} value={s.id}>{s.label} · {s.updated_at.slice(0,10)}</option>)}</select></label>
       <SessionActions key={session} token={token} session={session} title={sessions.find(s=>s.id===session)?.label??''} onChange={()=>{setTick(x=>x+1);}} onDeleted={()=>{setSession('');setSelected(undefined);setDetail(undefined);setTick(x=>x+1);}}/>
-      <nav className="session-list" aria-label="历史对话">{sessions.filter(s=>s.label.toLowerCase().includes(sessionSearch.toLowerCase())).map(s=><button key={s.id} aria-current={session===s.id?'page':undefined} onClick={()=>{if(mobile)closeNav();setSession(s.id);setSelected(undefined);setDetail(undefined);setTasks([]);setPreview(undefined);}}><Icon name="chat" size={15}/><span>{s.label}<small>{s.updated_at.slice(0,10)}</small></span></button>)}</nav>
+      <nav className="session-list" aria-label="历史对话">{[...projects.map(p=>({id:p.id,name:p.name})),{id:'',name:'其他对话'}].map(group=>{const rows=sessions.filter(s=>(s.project_id??'')===group.id&&s.label.toLowerCase().includes(sessionSearch.toLowerCase()));return rows.length?<section className="session-group" key={group.id||'other'}><h2><Icon name={group.id?'folder':'chat'} size={13}/>{group.name}<small>{rows.length}</small></h2>{rows.map(s=><button key={s.id} aria-current={session===s.id?'page':undefined} onClick={()=>{if(mobile)closeNav();setSession(s.id);setSelected(undefined);setDetail(undefined);setTasks([]);setPreview(undefined);}}><Icon name="chat" size={15}/><span>{s.label}<small>{s.updated_at.slice(0,10)}</small></span></button>)}</section>:null})}</nav>
       {sessionSearch&&!sessions.some(s=>s.label.toLowerCase().includes(sessionSearch.toLowerCase()))&&<p className="search-empty">没有找到匹配的对话</p>}
       <div className="side-footer"><span className="online-dot"/> 本地工作台<div>由你掌控，为好奇心而生</div></div>
     </aside>

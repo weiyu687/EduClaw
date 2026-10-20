@@ -6,6 +6,7 @@ import {Icon} from './Icon';
 import {RichText,CopyButton} from './RichText';
 import {PanelDialog} from './PanelDialog';
 import {Permissions} from './Permissions';
+import {Projects} from './Projects';
 import {useEffect,useLayoutEffect,useRef,useState} from 'react';
 import {request,query} from './api';
 import type {Action} from './api';
@@ -30,7 +31,8 @@ export function Workspace({token,session,onSession,onTask,onAction,onView,mode,o
   const [catalog,setCatalog]=useState<Catalog>();
   const [mounts,setMounts]=useState<Mounts>({skills:[],tools:[]});
   const [saved,setSaved]=useState<Mounts>({skills:[],tools:[]});
-  const [panel,setPanel]=useState<'skills'|'tools'|'help'|'permissions'|'terminal'|'library'|'memory'|'experts'|'none'>('none');
+  const [panel,setPanel]=useState<'projects'|'skills'|'tools'|'help'|'permissions'|'terminal'|'library'|'memory'|'experts'|'none'>('none');
+  const [project,setProject]=useState<{id:string;name:string}|null>(null);
   const [text,setText]=useState('');
   const [error,setError]=useState('');
   const [notice,setNotice]=useState('');
@@ -58,15 +60,16 @@ export function Workspace({token,session,onSession,onTask,onAction,onView,mode,o
   useEffect(()=>{let live=true;if(token)request<Catalog>(token,'/api/catalog').then(x=>{if(live)setCatalog(x);}).catch(e=>{if(live)setError(e.message);});return()=>{live=false;};},[token]);
   useEffect(()=>{
     let live=true;setSelectedExpert('');setExperts([]);setReady(false);setSubmissions([]);setError('');setNotice('');
-    if(!session){setMounts({skills:[],tools:[]});setSaved({skills:[],tools:[]});return;}
+    if(!session){setProject(null);setMounts({skills:[],tools:[]});setSaved({skills:[],tools:[]});return;}
     request<Mounts>(token,'/api/mounts?'+query(session)).then(x=>{if(live){setMounts(x);setSaved(x);setReady(true);}}).catch(e=>{if(live)setError(e.message);});
+    request<{current:{id:string;name:string}|null}>(token,'/api/projects?'+query(session)).then(x=>{if(live)setProject(x.current);}).catch(e=>{if(live)setError(e.message);});
     request<ExpertView>(token,'/api/experts?'+query(session)).then(x=>{if(live)setExperts(x.profiles);}).catch(e=>{if(live)setError(e.message);});
     async function poll(){try{const [rows,history]=await Promise.all([request<Submission[]>(token,'/api/submissions?'+query(session)),request<Turn[]>(token,'/api/chat?'+query(session))]);if(live){setSubmissions(rows);setTurns(history);}}catch(e){if(live)setError(e instanceof Error?e.message:'无法读取提交记录');}}
     void poll();const timer=setInterval(poll,2000);
     return()=>{live=false;clearInterval(timer);};
   },[session,token]);
   async function run(action:()=>Promise<void>){setBusy(true);setError('');setNotice('');try{await action();}catch(e){setError(e instanceof Error?e.message:'操作失败，请核查状态。');}finally{setBusy(false);}}
-  async function newSession(){await run(async()=>{const row=await request<{session:string}>(token,'/api/session',{});onSession(row.session);});}
+  async function newSession(){await run(async()=>{const row=await request<{session:string}>(token,'/api/session',{project_id:project?.id??null});onSession(row.session);});}
   async function refreshExperts(){const row=await request<ExpertView>(token,'/api/experts?'+query(session));setExperts(row.profiles);if(selectedExpert&&!row.profiles.some(x=>x.id===selectedExpert))setSelectedExpert('');onRefresh();}
   async function save(){await run(async()=>{const row=await request<Mounts>(token,'/api/mounts',{session,...mounts});setSaved(row);setNotice('挂载已保存，应用于之后提交的新任务。');});}
   function toggle(kind:'skills'|'tools',id:string){setMounts(m=>({...m,[kind]:m[kind].includes(id)?m[kind].filter(x=>x!==id):[...m[kind],id]}));}
@@ -115,6 +118,7 @@ export function Workspace({token,session,onSession,onTask,onAction,onView,mode,o
       <button className="new-chat" aria-label="＋ 新建对话" disabled={busy} onClick={()=>void newSession()}><Icon name="plus"/><span>新建对话</span><kbd>NEW</kbd></button>
       <button aria-label="◯ 对话与任务" aria-pressed={panel==='none'} onClick={()=>setPanel('none')}><Icon name="chat"/><span>对话与任务</span></button>
       <div className="nav-section-label">工作空间</div>
+      <button aria-label="项目工作区" aria-pressed={panel==='projects'} onClick={()=>setPanel('projects')}><Icon name="folder"/><span>项目</span><small>{project?.name??'未加入'}</small></button>
       <button aria-label="资料库" aria-pressed={panel==='library'} onClick={()=>setPanel('library')}><Icon name="book"/><span>资料库</span></button>
       <button aria-label="会话记忆" aria-pressed={panel==='memory'} onClick={()=>setPanel('memory')}><Icon name="chat"/><span>会话记忆</span></button>
       <button aria-label="专家配置" aria-pressed={panel==='experts'} disabled={!session} onClick={()=>setPanel('experts')}><Icon name="spark"/><span>专家配置</span></button>
@@ -126,15 +130,17 @@ export function Workspace({token,session,onSession,onTask,onAction,onView,mode,o
     </nav>,document.getElementById('sidebar-controls')!)}
     {mode==='chat'&&<section className="chat-history" aria-label="对话记录">{!turns.length&&<div className="chat-welcome"><div className="welcome-emblem"><Icon name="book" size={30}/></div><span className="eyebrow">THINK. EXPLORE. CREATE.</span><h2>让好奇心，走得更远。</h2><p>从一个问题开始，和 EduClaw 一起探索、理解与创造。</p><div className="starter-grid">{prompts.map(p=><button key={p.title} disabled={!session} onClick={()=>{setText(p.text);onMode(p.mode as 'chat'|'task');input.current?.focus();}}><Icon name={p.icon}/><strong>{p.title}</strong><span>{p.description}</span><Icon name="chevron" size={15}/></button>)}</div></div>}{turns.map(t=><article key={t.id}><div className="chat-user"><strong className="sr-only">你</strong><p>{t.text}</p></div><div className="chat-assistant"><div className="assistant-identity"><span><Icon name="book" size={18}/></span><strong>EduClaw</strong><small>与你一起思考</small></div>{t.answer?<>{t.evidence&&<span className="search-badge"><Icon name="globe" size={14}/>{t.evidence.tool==='library_search'?'已检索资料库':'已检索公开资料'}</span>}<RichText text={t.answer}/>{t.proposal&&<div className="task-proposal"><strong>建议创建任务</strong><p>{t.proposal.reason}</p><pre className="proposal-goal" aria-label="建议任务内容">{t.proposal.goal}</pre><div className="proposal-actions">{t.proposal.expert&&<button className="primary" onClick={()=>prepareTask(t.proposal!,t.proposal!.expert!.id)}>使用{t.proposal.expert.name}开始任务</button>}<button className="secondary" onClick={()=>prepareTask(t.proposal!)}>以通用模式准备任务</button></div>{t.proposal.expert&&<small>推荐专家：{t.proposal.expert.description}</small>}<small>不会自动执行，你可以先修改目标和专家模式。</small></div>}<CopyButton text={t.answer} label="复制回复"/></>:<p className={t.status==='generating'?'thinking':''} role="status">{t.status==='generating'?'正在回复…':t.status==='interrupted'?'回复已中断，请重新发送消息。':'回复失败，请检查连接后重新发送。'}</p>}</div></article>)}</section>}
     {mode==='task'&&<div className="task-intro"><span className="eyebrow">FROM IDEA TO DONE</span><h2>把想法，变成成果。</h2><p>描述你的目标，EduClaw 会选择工具、推进步骤，并在需要时请你确认。</p></div>}
+    {project&&<div className="project-context"><Icon name="folder" size={14}/><span>{project.name}</span><button onClick={()=>setPanel('projects')}>项目设置</button></div>}
     <label className="expert-picker"><span>专家模式</span><select aria-label={mode==='chat'?'本次对话专家模式':'本次任务专家模式'} disabled={!session||busy} value={selectedExpert} onChange={e=>{setSelectedExpert(e.target.value);identity.current=undefined;}}><option value="">通用模式</option>{experts.map(profile=><option key={profile.id} value={profile.id}>{profile.name} · v{profile.version}</option>)}</select><button type="button" className="secondary" onClick={()=>setPanel('experts')}>管理配置</button></label>
     <div className="composer"><div className="composer-heading"><span><Icon name={mode==='chat'?'chat':'spark'} size={15}/>{mode==='chat'?'有什么想一起探索的？':'你希望完成什么？'}</span><span className="composer-count">{text.length?text.length+' / 4000':''}</span></div>
     <textarea ref={input} aria-label="任务输入" value={text} maxLength={4000} rows={2} placeholder={session?(mode==='chat'?'问一个问题，或分享你的想法…':'例如：整理昨天的 AI 新闻，附上来源…'):'点击“新建对话”，开始探索…'} disabled={!session||busy} onChange={e=>setText(e.target.value)} onKeyDown={e=>{if(e.key==='Enter'&&!e.shiftKey&&!e.nativeEvent.isComposing&&e.keyCode!==229){e.preventDefault();if(!sendDisabled)void submit();}}}/>
     <div className="composer-toolbar"><div className="capability-buttons" aria-label="快捷挂载"><button className="composer-chip" aria-label={'技能 · '+saved.skills.length} onClick={()=>setPanel('skills')}><Icon name="spark" size={15}/>技能{saved.skills.length>0&&<small>{saved.skills.length}</small>}</button><button className="composer-chip" aria-label="工具 · 自动" onClick={()=>setPanel('tools')}><Icon name="tools" size={15}/>自动工具</button><button className="composer-chip slash-chip" aria-label="/ 指令说明" onClick={()=>setPanel('help')}>/</button></div><button className="send-button" aria-label={busy?'提交中…':text.startsWith('/')?'选择指令':mode==='chat'?'发送消息 ↑':'提交任务 ↑'} disabled={sendDisabled} onClick={()=>void submit()}><Icon name="arrow" size={20}/></button></div></div>
     <div className="composer-note"><span>{mode==='chat'?'直接提问 · 按需搜索公开资料':'低风险自动执行 · 重要操作由你确认'}</span><span>Enter 发送 · Shift + Enter 换行</span></div>
     {error&&<p role="alert" className="alert">{error}</p>}{notice&&panel==='none'&&<p role="status" className="notice">{notice}</p>}
-    <PanelDialog open={panel!=='none'} title={({skills:'技能库',tools:'工具库',permissions:'权限与文件',terminal:'终端',library:'资料库',memory:'会话记忆',experts:'专家模式',help:'指令指南',none:''})[panel]} onClose={()=>setPanel('none')}>
+    <PanelDialog open={panel!=='none'} title={({projects:'项目工作区',skills:'技能库',tools:'工具库',permissions:'权限与文件',terminal:'终端',library:'资料库',memory:'会话记忆',experts:'专家模式',help:'指令指南',none:''})[panel]} onClose={()=>setPanel('none')}>
       {error&&<p role="alert" className="alert">{error}</p>}{notice&&<p role="status" className="notice">{notice}</p>}
       {(panel==='library'||panel==='memory')&&<Knowledge key={session+panel} token={token} session={session} kind={panel}/> }
+      {panel==='projects'&&<Projects key={session} token={token} session={session} onChange={value=>{setProject(value);onRefresh();}}/>}
       {panel==='experts'&&<Experts key={session} token={token} session={session} onChange={()=>void refreshExperts()}/>}
       {panel==='terminal'&&<Terminal token={token} session={session} onTask={n=>{setPanel('none');onTask(n);}}/>}
       {panel==='permissions'&&<Permissions token={token} session={session}/>}

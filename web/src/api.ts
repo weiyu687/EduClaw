@@ -1,4 +1,5 @@
-export interface Session {id:string;label:string;updated_at:string}
+export interface Session {id:string;label:string;updated_at:string;project_id:string|null}
+export interface Project {id:string;name:string;instructions:string;created:number;updated:number;sessions_count:number;documents_count:number}
 export type Action = 'pause' | 'resume' | 'cancel' | 'execute' | 'read' | 'tool';
 export interface Task {number:number;goal:string;status:string;control:string;completed:number;total:number}
 export interface Detail extends Task {

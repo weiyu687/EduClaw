@@ -85,6 +85,12 @@ class Handler(BaseHTTPRequestHandler):
             service = self.server.service
             if path.path == '/api/sessions' and not params:
                 result = service.sessions()
+            elif path.path == '/api/projects' and not params:
+                from core.state.projects import Projects
+                result=Projects(service.directory).list()
+            elif path.path == '/api/projects' and set(params)=={'session'}:
+                from core.state.projects import Projects
+                result=Projects(service.directory).view(params['session'])
             elif path.path == '/api/terminals' and set(params)=={'session'}:
                 from core.terminal.service import operate
                 result=operate(service.directory,params['session'],'list',{})
@@ -141,8 +147,11 @@ class Handler(BaseHTTPRequestHandler):
             if not isinstance(body, dict):
                 raise ValueError('请求必须为对象。')
             service = self.server.service
-            if self.path == '/api/session' and not body:
-                result = self.server.workspace.new_session()
+            if self.path == '/api/session' and (not body or set(body)=={'project_id'}):
+                result = self.server.workspace.new_session(body.get('project_id'))
+            elif self.path == '/api/projects' and set(body)=={'session','action','arguments'}:
+                from core.state.projects import operate
+                result=operate(service.directory,body['session'],body['action'],body['arguments'])
             elif self.path == '/api/library' and set(body)=={'session','action','arguments'}:
                 from core.state.library import operate
                 result=operate(service.directory,body['session'],body['action'],body['arguments'])
