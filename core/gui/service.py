@@ -34,6 +34,8 @@ class DashboardService:
         self.jobs = {}
         from core.state.manager import StateManager
         StateManager(self.directory/'educlaw_state.sqlite3')
+        from core.state.projects import Projects
+        Projects(self.directory)
         self.deletions = {}
 
     def code_service(self, context, life):
@@ -131,8 +133,10 @@ class DashboardService:
         if not path.exists():
             return []
         with closing(sqlite3.connect(path.as_uri() + '?mode=ro', uri=True)) as db:
-            rows = db.execute("SELECT id,updated_at,title FROM sessions WHERE deleted_at IS NULL ORDER BY updated_at DESC LIMIT 200").fetchall()
-        return [dict(id=r[0], updated_at=r[1], label=r[2] or '新对话') for r in rows]
+            columns={r[1] for r in db.execute('PRAGMA table_info(sessions)')}
+            project='project_id' if 'project_id' in columns else 'NULL'
+            rows = db.execute(f"SELECT id,updated_at,title,{project} FROM sessions WHERE deleted_at IS NULL ORDER BY updated_at DESC LIMIT 200").fetchall()
+        return [dict(id=r[0], updated_at=r[1], label=r[2] or '新对话',project_id=r[3]) for r in rows]
 
     def session_change(self, session, action, value):
         from core.security.task_catalog import TaskCatalog

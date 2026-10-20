@@ -76,10 +76,12 @@ class Library:
     def list(self,session):
         self.check(session)
         from core.state.experts import snapshot
+        from core.state.projects import Projects
         selected=snapshot(self.directory,session)
         domain_docs=set(selected['documents']) if selected else set()
+        project_docs=set(Projects(self.directory,state_path=self.state.path).context(session)['documents'])
         with self.db() as db:
-            return [{**dict(r),'expert_mounted':r['id'] in domain_docs} for r in db.execute('SELECT d.*,EXISTS(SELECT 1 FROM mounts m WHERE m.document=d.id AND m.session=?) AS mounted,(SELECT count(*) FROM chunks c WHERE c.document=d.id) AS chunks FROM documents d ORDER BY created DESC',(session,))]
+            return [{**dict(r),'expert_mounted':r['id'] in domain_docs,'project_mounted':r['id'] in project_docs,'mounted':bool(r['mounted'] or r['id'] in project_docs)} for r in db.execute('SELECT d.*,EXISTS(SELECT 1 FROM mounts m WHERE m.document=d.id AND m.session=?) AS mounted,(SELECT count(*) FROM chunks c WHERE c.document=d.id) AS chunks FROM documents d ORDER BY created DESC',(session,))]
 
     def add(self,session,name,data):
         self.check(session);text=extract(name,data);digest=hashlib.sha256(data).hexdigest();did=digest[:32]
@@ -106,13 +108,18 @@ class Library:
         self.check(session)
         with self.db() as db:
             db.execute('DELETE FROM mounts WHERE document=?',(did,));db.execute('DELETE FROM chunks WHERE document=?',(did,));db.execute('DELETE FROM documents WHERE id=?',(did,))
+        with self.state._connection() as db:
+            if db.execute("SELECT 1 FROM sqlite_master WHERE type='table' AND name='project_documents'").fetchone():
+                db.execute('DELETE FROM project_documents WHERE document=?',(did,))
 
     def search(self,session,query,limit=5,*,expert=None):
         self.check(session)
         if not isinstance(query,str) or not 1<=len(query.strip())<=4000:raise ValueError('检索词须为 1–4000 字。')
         if type(limit) is not int or not 1<=limit<=10:raise ValueError('检索条数须为 1–10。')
         from core.state.experts import snapshot
+        from core.state.projects import Projects
         selected=snapshot(self.directory,session) if expert is None else expert;documents=selected['documents'] if selected else []
+        documents=list(dict.fromkeys(documents+Projects(self.directory,state_path=self.state.path).context(session)['documents']))
         with self.db() as db:
             rows=[dict(r) for r in db.execute('SELECT c.*,d.name FROM chunks c JOIN documents d ON c.document=d.id WHERE EXISTS(SELECT 1 FROM mounts m WHERE m.document=d.id AND m.session=?) OR d.id IN ('+','.join('?' for _ in documents)+')',(session,*documents))]
         return rank(query,rows,limit)

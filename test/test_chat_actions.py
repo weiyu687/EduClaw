@@ -33,6 +33,14 @@ def test_complex_request_only_proposes(tmp_path,monkeypatch):
     assert c.history('s')[0]['proposal']['goal']=='搜索后写入文件并核对'
     assert not (tmp_path/'educlaw_multi_checkpoints.sqlite3').exists()
 
+def test_task_proposal_includes_suitable_expert_without_activating_it(tmp_path):
+    c=chat(tmp_path)
+    asyncio.run(c.reply('s','修复代码 bug 并运行测试',Model({'action':'task','reason':'需要修改和验证代码','reply':'建议创建任务'})))
+    proposal=c.history('s')[0]['proposal']
+    assert proposal['expert']['id']=='software'
+    from core.state.experts import Experts
+    assert Experts(tmp_path).active('s') is None
+
 @pytest.mark.parametrize('mode',['ask','deny'])
 def test_gateway_blocks_chat_search_before_transport(tmp_path,mode,monkeypatch):
     c=chat(tmp_path);set_tool_mode(tmp_path,'news_search',mode)

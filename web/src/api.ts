@@ -1,4 +1,5 @@
-export interface Session {id:string;label:string;updated_at:string}
+export interface Session {id:string;label:string;updated_at:string;project_id:string|null}
+export interface Project {id:string;name:string;instructions:string;created:number;updated:number;sessions_count:number;documents_count:number}
 export type Action = 'pause' | 'resume' | 'cancel' | 'execute' | 'read' | 'tool';
 export interface Task {number:number;goal:string;status:string;control:string;completed:number;total:number}
 export interface Detail extends Task {
@@ -27,6 +28,11 @@ export async function request<T>(token:string,path:string,body?:unknown,timeoutM
     if(controller.signal.aborted) throw new Error('连接超时，请刷新核查状态。');
     throw error;
   } finally {clearTimeout(timer);}
+}
+export async function authorizedBlob(token:string,path:string):Promise<Blob>{
+  const response=await fetch(path,{cache:'no-store',credentials:'omit',headers:{Authorization:`Bearer ${token}`}});
+  if(!response.ok)throw new Error('无法读取图片附件。');
+  return response.blob();
 }
 export function query(session:string,number?:number):string {
   return new URLSearchParams({session,...(number===undefined?{}:{number:String(number)})}).toString();

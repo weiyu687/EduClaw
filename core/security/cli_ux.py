@@ -33,6 +33,11 @@ HELP = '''EduClaw 命令速查
   /task-continue <ID>            恢复指定任务
   /approve <ID> / /deny <ID>      审批指定任务
   /sessions / /use <ID>          列出与切换会话
+  /projects / /project-show      列出项目或查看当前项目
+  /project-new <名称>            创建项目并加入当前会话
+  /project-use <编号或名称>       把当前会话加入项目
+  /project-off                   把当前会话移出项目
+  /project-instructions <内容>    设置项目工作指令
   /help advanced                 查看开发者及兼容命令
   exit                           退出
 安全说明：不自动批准工具调用；代码和文件操作继续由网关审查。'''

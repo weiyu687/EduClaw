@@ -18,24 +18,23 @@ def main():
         browser=p.chromium.launch(channel='msedge',headless=True)
         page=browser.new_page(viewport={'width':1440,'height':1000},device_scale_factor=1)
         c=Conversation(work/'educlaw_state.sqlite3');session=c.state.ensure_session('docs-demo')
-        rid,_=c.begin(session,'我想做一个两周的 AI 学习计划，每天有一小时，应该怎么开始？')
-        answer='''## 从一个小目标开始
+        rid,_=c.begin(session,'请帮我评估这个产品改版需求，并整理成可执行的下一步。')
+        answer='''## 先明确目标与验收方式
 
-两周内先理解基本概念，再完成一个能解释清楚的小练习。
+这次改版可以按用户价值、实现成本和验证风险拆成三个阶段。
 
-| 阶段 | 学习重点 | 每天的一小时 |
+| 阶段 | 重点 | 可验证结果 |
 | --- | --- | --- |
-| 第 1–3 天 | 机器学习、训练与推理 | 30 分钟阅读，30 分钟做笔记 |
-| 第 4–7 天 | 数据与评估 | 读示例，比较结果，记录疑问 |
-| 第 8–11 天 | 一个小型实践 | 每天实现和测试一个小步骤 |
-| 第 12–14 天 | 总结与复盘 | 整理成果，说明局限与下一步 |
+| 1 | 核对真实使用问题 | 明确场景、约束与验收标准 |
+| 2 | 完成最小改动 | 自动测试与界面回归通过 |
+| 3 | 小范围验证 | 记录反馈、风险与后续迭代 |
 
-你更想从**理解概念**开始，还是已经有一个想做的项目？我们可以接着把计划细化。
+如果你提供现有页面或仓库目录，我可以继续检查并形成具体任务。
 
 *文档演示对话，用于展示界面。*'''
         with c.state._connection() as db:
             db.execute("UPDATE chat_turns SET status='completed',answer=? WHERE id=?",(answer,rid))
-            db.execute("UPDATE sessions SET title='两周 AI 学习计划 · 示例',title_manual=1 WHERE id=?",(session,))
+            db.execute("UPDATE sessions SET title='产品改版评估 · 示例',title_manual=1 WHERE id=?",(session,))
         def shot(name):
             page.screenshot(path=str(images/name),animations='disabled')
         try:

@@ -51,7 +51,7 @@ from core.skills import SkillRegistry
 
 KNOWN_COMMANDS = frozenset(['/help', '/?', '/task-continue', '/task-replan', '/task-status', '/approve', '/deny', '/task-list', '/multi', '/multi-status', '/multi-approve', '/multi-deny', '/flow-code', '/flow-status', '/flow-approve', '/flow-deny', '/auto', '/auto-status', '/code-propose', '/code-approve', '/code-deny', '/code-status', '/permissions', '/permit', '/deny-read', '/allow-read', '/revoke-read', '/skills', '/agent-step-run', '/agent-step-approve', '/agent-step-result', '/step-run', '/step-approve', '/step-result', '/plan-new', '/plans', '/plan', '/plan-approve', '/plan-reject', '/task-new', '/tasks', '/task', '/step', '/task-events', '/task-cancel', '/new', '/use', '/sessions', '/runs', '/events', '/status', '/interrupted', '/resume', '/approve-resume', '/rename-session', '/rename-task', '/task-catalog', '/delete-session', '/delete-task', '/delete-confirm', '/delete-cancel', '/permission-set', '/tool-inbox', '/tool-review', '/tool-sync', '/tool-info', '/permission-info', '/permission-reset', '/permission-requests', '/permission-request', '/permission-confirm', '/permission-cancel', '/agent-pending', '/agent-cancel', '/recovery-status', '/recovery-check', '/multi-result', '/multi-results', '/goal-status', '/goal-spec', '/multi-dag', '/multi-replan', '/multi-replan-status', '/multi-replan-approve', '/multi-replan-deny', '/任务', '/当前', '/结果', '/允许', '/继续', '/拒绝'])
 
-KNOWN_COMMANDS = KNOWN_COMMANDS | CONTEXT_COMMANDS | {'/multi-pause', '/multi-recover', '/multi-cancel', '/multi-diagnose', '/tool-contracts'}
+KNOWN_COMMANDS = KNOWN_COMMANDS | CONTEXT_COMMANDS | {'/multi-pause', '/multi-recover', '/multi-cancel', '/multi-diagnose', '/tool-contracts', '/projects', '/project-new', '/project-use', '/project-off', '/project-show', '/project-instructions'}
 
 logging.getLogger("httpx").setLevel(logging.WARNING)
 logger = get_logger("USER")
@@ -120,6 +120,9 @@ async def run_interactive_app():
         code_steps = CodeStepService(multi_flow, multi_ledger, result_store, dag_store, replan_store, lifecycle)
         task_context = TaskContext(focus_store, multi_flow, replan_store, multi_ledger, result_store)
         catalog = TaskCatalog(agent.state_manager.path, autonomous_store.path)
+        from core.state.projects import Projects
+        project_store = Projects(Path(agent.state_manager.path).parent)
+        project_snapshot = None
         auto_mode = True
         console.print(f"[cyan]当前会话: {agent.session_id}[/cyan]")
         console.print('[green]自然语言任务已就绪。输入 /help 查看命令；输入 exit 退出。[/green]')
@@ -1739,9 +1742,49 @@ async def run_interactive_app():
                 except (LookupError, ValueError) as exc:
                     console.print(f'[yellow]{exc}[/yellow]')
                 continue
+            if command == '/projects':
+                project_snapshot=project_store.list()
+                if not project_snapshot:console.print('[dim]暂无项目。使用 /project-new <名称> 创建。[/dim]')
+                for n,item in enumerate(project_snapshot,1):
+                    console.print(f"{n}. {item['name']} | {item['sessions_count']} 个会话 | {item['documents_count']} 份资料")
+                continue
+            if command.startswith('/project-new '):
+                try:
+                    item=project_store.create(command.split(maxsplit=1)[1]);project_store.assign(agent.session_id,item['id'])
+                    console.print(f"[green]已创建并加入项目：{item['name']}[/green]")
+                except ValueError as exc:console.print(f'[yellow]{exc}[/yellow]')
+                continue
+            if command.startswith('/project-use '):
+                try:
+                    selection=command.split(maxsplit=1)[1].strip();items=project_snapshot if selection.isdecimal() and project_snapshot is not None else project_store.list()
+                    if selection.isdecimal() and project_snapshot is None:raise ValueError('请先使用 /projects 查看项目编号。')
+                    matches=[x for n,x in enumerate(items,1) if selection in (str(n),x['id'],x['name'])]
+                    if len(matches)!=1:raise LookupError('未找到唯一项目，请使用 /projects 后按编号或完整名称选择。')
+                    project_store.assign(agent.session_id,matches[0]['id']);console.print(f"[green]当前会话已加入项目：{matches[0]['name']}[/green]")
+                except (ValueError,LookupError) as exc:console.print(f'[yellow]{exc}[/yellow]')
+                continue
+            if command == '/project-off':
+                project_store.assign(agent.session_id,None);console.print('[green]当前会话已移出项目。[/green]');continue
+            if command == '/project-show':
+                current=project_store.current(agent.session_id)
+                if current:console.print(f"项目：{current['name']}\n指令：{current['instructions'] or '（未设置）'}\n共享资料：{len(current['documents'])} 份")
+                else:console.print('[dim]当前会话未加入项目。[/dim]')
+                continue
+            if command.startswith('/project-instructions '):
+                try:
+                    current=project_store.current(agent.session_id)
+                    if not current:raise LookupError('当前会话未加入项目。')
+                    project_store.update(current['id'],instructions=command.split(maxsplit=1)[1])
+                    console.print('[green]项目工作指令已更新。[/green]')
+                except (ValueError,LookupError) as exc:console.print(f'[yellow]{exc}[/yellow]')
+                continue
+            if command in ('/project-new','/project-use','/project-instructions'):
+                console.print('[yellow]用法：/project-new <名称>；/project-use <编号、ID或名称>；/project-instructions <内容>[/yellow]');continue
             if command == '/new':
                 import uuid
+                current_project=project_store.current(agent.session_id)
                 agent.set_session_context(str(uuid.uuid4()))
+                if current_project:project_store.assign(agent.session_id,current_project['id'])
                 console.print(f'已创建新会话：未命名会话（{agent.session_id[:8]}…）')
                 continue
             if command == '/sessions':

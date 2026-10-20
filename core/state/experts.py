@@ -7,15 +7,22 @@ from contextlib import contextmanager
 from core.state.library import Library
 from core.skills import SkillRegistry
 from core.tool_contracts import builtin_registry
+from core.state.retrieval import tokens
 
 ROOT=Path(__file__).resolve().parents[2]
 FIELDS={'id','name','description','prompt','workflow','skills','tools','documents'}
+KEYWORDS={
+    'research':('研究','分析','论文','证据','文献','来源','调研','竞品','research','paper','evidence'),
+    'software':('软件','代码','程序','开发','测试','调试','修复','仓库','终端','code','software','bug','test'),
+    'learning':('写作','内容','文案','沟通','总结','改写','翻译','提案','writing','content','copy'),
+    'data':('数据','表格','统计','指标','分析','报表','csv','json','data','analysis'),
+}
 
 def templates():
     rows=[
-        ('research','研究与证据','梳理研究问题、比较证据并标注来源。','先明确研究问题和时间范围。区分原始证据、推断与未知；引用可核查来源，不编造论文。','问题拆解 → 资料检索 → 比较方法与局限 → 提出可验证结论。',['research-evidence','doc_retrieve'],['public_search','news_search','extract_pdf','extract_text']),
+        ('research','研究分析','拆解问题、比较证据并形成可验证结论。','先明确目标、受众和时间范围。区分原始证据、推断与未知；引用可核查来源，不编造资料。','问题拆解 → 资料检索 → 比较证据与局限 → 形成可验证结论。',['research-evidence','doc_retrieve'],['public_search','news_search','extract_pdf','extract_text']),
         ('software','软件工程','设计、实现、测试和审查软件。','明确运行环境与验收标准；修改前理解现有实现，采用最小可审查变更，用真实测试结果说明完成情况。','复现 → 定位 → 实现 → 回归 → 记录风险与交付。',['community-frontend-design','community-mcp-builder'],['mcp_list_files','mcp_read_file','write_text_file','run_terminal','run_python_code']),
-        ('learning','教学与学习','分层解释、练习设计与学习反馈。','先了解学习目标和已有基础。解释核心概念并给出例子；用练习检查理解，不把一次成绩当作固定能力标签。','诊断目标 → 分步讲解 → 练习 → 反馈 → 调整学习计划。',['learning-progress','doc_retrieve'],['extract_pdf','extract_word','extract_csv','profile_csv','run_python_code']),
+        ('learning','内容与沟通','撰写、改写、总结和面向受众组织表达。','先明确受众、目的、语气和交付格式。保持事实边界，避免空泛表达；重要主张标记依据，缺少信息时明确指出。','澄清目标 → 提取要点 → 组织结构 → 起草 → 校对与压缩。',['doc_retrieve'],['public_search','extract_pdf','extract_word','extract_text','write_text_file']),
         ('data','数据分析','数据质量、指标定义与可复核分析。','先定义指标、单位、时间范围与缺失值规则；区分相关与因果。结论必须能追溯到输入和计算过程。','核查数据 → 明确假设 → 计算 → 敏感性检查 → 报告局限。',['data-quality','project-audit'],['extract_csv','extract_json','extract_jsonl','profile_csv','run_python_code','write_text_file']),
     ]
     return [dict(zip(('id','name','description','prompt','workflow','skills','tools'),row),documents=[],version=1,builtin=True) for row in rows]
@@ -42,6 +49,33 @@ class Experts:
     def profiles(self):
         with self.db() as db:custom=[json.loads(r[0]) for r in db.execute('SELECT body FROM profiles ORDER BY id')]
         return templates()+custom
+
+    def select(self,session,identifier):
+        self.library.check(session)
+        if identifier is None:return None
+        if not isinstance(identifier,str) or not identifier:raise ValueError('专家模式选择无效。')
+        selected=next((p for p in self.profiles() if p['id']==identifier),None)
+        if selected is None:raise LookupError('领域不存在。')
+        self.validate(session,{k:selected[k] for k in FIELDS})
+        return selected
+
+    def recommend(self,text,session=None):
+        """Return a conservative local suggestion; no model call or activation."""
+        if not isinstance(text,str) or not text.strip():return None
+        query=text.lower();query_tokens=set(tokens(query));ranked=[]
+        for profile in self.profiles():
+            if session is not None:
+                try:self.validate(session,{key:profile[key] for key in FIELDS})
+                except (ValueError,LookupError,PermissionError):continue
+            keywords=KEYWORDS.get(profile['id'],())
+            keyword_hits=sum(1 for word in keywords if word in query)
+            profile_text=' '.join(str(profile[key]) for key in ('id','name','description','prompt','workflow')).lower()
+            overlap=len(query_tokens & set(tokens(profile_text)))
+            score=keyword_hits*20+overlap
+            if score>=2:ranked.append((score,keyword_hits,profile['id'],profile))
+        if not ranked:return None
+        selected=max(ranked,key=lambda row:(row[0],row[1],row[2]))[3]
+        return {key:selected[key] for key in ('id','name','description','version')}
 
     def active(self,session):
         self.library.check(session)
@@ -84,10 +118,7 @@ class Experts:
         return data
 
     def use(self,session,identifier):
-        self.library.check(session)
-        selected=next((p for p in self.profiles() if p['id']==identifier),None)
-        if selected is None:raise LookupError('领域不存在。')
-        self.validate(session,{k:selected[k] for k in FIELDS})
+        selected=self.select(session,identifier)
         with self.db() as db:db.execute('INSERT OR REPLACE INTO active VALUES(?,?)',(session,json.dumps(selected,ensure_ascii=False)))
         return selected
 

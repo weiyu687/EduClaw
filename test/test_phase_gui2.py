@@ -61,6 +61,16 @@ def test_submission_uses_mounts_never_executes_and_is_idempotent(workspace):
     other=w.new_session()['session']
     with pytest.raises(LookupError): w.submission(other,'a'*32)
 
+def test_each_submission_captures_selected_expert(workspace):
+    w,s,_=workspace
+    key='q'*32
+    w.submit(s,'计算 6*7 并验证代码',key,'software')
+    assert finished(w,s,key)['status']=='ready'
+    with w.db() as db:config=json.loads(db.execute('SELECT config FROM submissions WHERE id=?',(key,)).fetchone()[0])
+    assert config['expert']=={'id':'software','version':1}
+    assert '软件工程' in config['guidance']
+    with pytest.raises(PermissionError):w.submit(s,'计算 6*7 并验证代码',key,None)
+
 
 def test_disabled_tool_rejected_and_failure_redacted(workspace):
     w,s,model=workspace
