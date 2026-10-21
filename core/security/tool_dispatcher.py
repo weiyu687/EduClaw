@@ -8,6 +8,7 @@ import re
 from dataclasses import dataclass
 
 from core.tool_contracts import builtin_registry
+from core.security.policy_engine import PUBLIC_READ
 READ_TOOLS = {ext:x['name'] for x in builtin_registry().items() if x['risk'] == 'path_read'
               for ext in x['extensions']}
 READ_TOOL_NAMES = {x['name'] for x in builtin_registry().items() if x['risk'] == 'path_read'}
@@ -40,7 +41,7 @@ def explicit_tool_policy(message):
         tool = found.group(0).lower()
         if tool == 'run_python_code':
             return (tool, 'python', 'Only draft code; execution still needs exact approval')
-        if tool in ('public_search','news_search','write_text_file','run_terminal'):
+        if tool in PUBLIC_READ|{'write_text_file','run_terminal'}:
             return (tool,'read','规划后按工具风险策略处理')
         if tool in READ_TOOL_NAMES:
             return (tool, 'read', 'Read tool remains subject to file authorization')

@@ -47,11 +47,12 @@ from core.tasks import TaskManager
 from core.tasks.planning import PlanManager
 from core.tasks.execution import StepExecutor
 from core.tasks.agent_executor import AgentStepExecutor
-from core.skills import SkillRegistry
+from core.skills import registry_for
+from core.skills.marketplace import SkillMarketplace
 
 KNOWN_COMMANDS = frozenset(['/help', '/?', '/task-continue', '/task-replan', '/task-status', '/approve', '/deny', '/task-list', '/multi', '/multi-status', '/multi-approve', '/multi-deny', '/flow-code', '/flow-status', '/flow-approve', '/flow-deny', '/auto', '/auto-status', '/code-propose', '/code-approve', '/code-deny', '/code-status', '/permissions', '/permit', '/deny-read', '/allow-read', '/revoke-read', '/skills', '/agent-step-run', '/agent-step-approve', '/agent-step-result', '/step-run', '/step-approve', '/step-result', '/plan-new', '/plans', '/plan', '/plan-approve', '/plan-reject', '/task-new', '/tasks', '/task', '/step', '/task-events', '/task-cancel', '/new', '/use', '/sessions', '/runs', '/events', '/status', '/interrupted', '/resume', '/approve-resume', '/rename-session', '/rename-task', '/task-catalog', '/delete-session', '/delete-task', '/delete-confirm', '/delete-cancel', '/permission-set', '/tool-inbox', '/tool-review', '/tool-sync', '/tool-info', '/permission-info', '/permission-reset', '/permission-requests', '/permission-request', '/permission-confirm', '/permission-cancel', '/agent-pending', '/agent-cancel', '/recovery-status', '/recovery-check', '/multi-result', '/multi-results', '/goal-status', '/goal-spec', '/multi-dag', '/multi-replan', '/multi-replan-status', '/multi-replan-approve', '/multi-replan-deny', '/任务', '/当前', '/结果', '/允许', '/继续', '/拒绝'])
 
-KNOWN_COMMANDS = KNOWN_COMMANDS | CONTEXT_COMMANDS | {'/multi-pause', '/multi-recover', '/multi-cancel', '/multi-diagnose', '/tool-contracts', '/projects', '/project-new', '/project-use', '/project-off', '/project-show', '/project-instructions'}
+KNOWN_COMMANDS = KNOWN_COMMANDS | CONTEXT_COMMANDS | {'/multi-pause', '/multi-recover', '/multi-cancel', '/multi-diagnose', '/tool-contracts', '/projects', '/project-new', '/project-use', '/project-off', '/project-show', '/project-instructions', '/skill-search', '/skill-install'}
 
 logging.getLogger("httpx").setLevel(logging.WARNING)
 logger = get_logger("USER")
@@ -80,7 +81,7 @@ async def run_interactive_app():
     task_manager = TaskManager(str(db_path().with_name("educlaw_tasks.sqlite3")))
     plan_manager = PlanManager(task_manager)
     executor = StepExecutor(task_manager)
-    agent_executor = AgentStepExecutor(task_manager)
+    agent_executor = AgentStepExecutor(task_manager,registry=registry_for(db_path().parent))
 
     pending_read = None
     agent_resume = ResumeCoordinator()
@@ -1588,8 +1589,25 @@ async def run_interactive_app():
                     console.print(f'[yellow]授权或执行失败: {exc}[/yellow]')
                 continue
             if command == '/skills':
-                for skill in SkillRegistry().list():
+                for skill in registry_for(db_path().parent).list():
                     console.print(f"{skill['id']}  {skill['name']}  {skill['description']}")
+                continue
+            if command == '/skill-search' or command.startswith('/skill-search '):
+                try:
+                    for skill in SkillMarketplace(db_path().parent).search(command[len('/skill-search'):].strip()):
+                        console.print(f"{skill['id']}  {skill['name']}  {'已安装' if skill['installed'] else skill['description']}")
+                except Exception as exc:
+                    console.print(f'[yellow]在线技能检索失败: {exc}[/yellow]')
+                continue
+            if command.startswith('/skill-install '):
+                try:
+                    from core.gui.service import DashboardService
+                    from core.gui.workspace import Workspace
+                    workspace=Workspace(DashboardService(Path(agent.state_manager.path).parent))
+                    result=workspace.install_skill(agent.session_id,command.split(maxsplit=1)[1].strip())
+                    console.print(f"[green]已安装并挂载 {result['skill']['id']} 到当前会话，后续任务可使用。[/green]")
+                except Exception as exc:
+                    console.print(f'[yellow]在线技能安装失败: {exc}[/yellow]')
                 continue
             if command.startswith('/agent-step-run '):
                 try:

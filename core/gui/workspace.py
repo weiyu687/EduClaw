@@ -9,7 +9,8 @@ import sqlite3
 import threading
 import uuid
 
-from core.skills import SkillRegistry
+from core.skills import registry_for
+from core.skills.marketplace import SkillMarketplace
 from core.state.manager import StateManager
 from core.tool_contracts import builtin_registry
 from core.security.multi_step_graph import draft_plan
@@ -24,7 +25,7 @@ class Workspace:
     def __init__(self, dashboard, model_factory=None):
         self.dashboard = dashboard
         self.path = dashboard.directory/'educlaw_gui.sqlite3'
-        self.skills = SkillRegistry(Path(__file__).resolve().parents[2]/'skills')
+        self.skills = registry_for(dashboard.directory)
         self.owner = uuid.uuid4().hex
         self.slots = threading.BoundedSemaphore(2)
         self.model_factory = model_factory
@@ -82,6 +83,17 @@ class Workspace:
             content=self.skills.load(item['id'])
             skills.append({**item,'content':content[:16000], 'truncated':len(content)>16000})
         return {'skills':skills,'tools':builtin_registry().items(),'commands':command_catalog()}
+
+    def skill_market(self,session,query='',refresh=False):
+        self.validate_session(session)
+        return {'source':'anthropics/skills','items':SkillMarketplace(self.dashboard.directory).search(query,refresh)}
+
+    def install_skill(self,session,identifier):
+        self.validate_session(session)
+        skill=SkillMarketplace(self.dashboard.directory).install(identifier)
+        mounts=self.mounts(session)
+        mounts=self.save_mounts(session,[*mounts['skills'],identifier],mounts['tools'])
+        return {'skill':skill,'mounts':mounts,'catalog':self.catalog()}
 
     def mounts(self,session):
         self.validate_session(session)

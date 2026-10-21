@@ -5,7 +5,7 @@ import re
 import sqlite3
 from contextlib import contextmanager
 from core.state.library import Library
-from core.skills import SkillRegistry
+from core.skills import registry_for
 from core.tool_contracts import builtin_registry
 from core.state.retrieval import tokens
 
@@ -20,9 +20,9 @@ KEYWORDS={
 
 def templates():
     rows=[
-        ('research','研究分析','拆解问题、比较证据并形成可验证结论。','先明确目标、受众和时间范围。区分原始证据、推断与未知；引用可核查来源，不编造资料。','问题拆解 → 资料检索 → 比较证据与局限 → 形成可验证结论。',['research-evidence','doc_retrieve'],['public_search','news_search','extract_pdf','extract_text']),
-        ('software','软件工程','设计、实现、测试和审查软件。','明确运行环境与验收标准；修改前理解现有实现，采用最小可审查变更，用真实测试结果说明完成情况。','复现 → 定位 → 实现 → 回归 → 记录风险与交付。',['community-frontend-design','community-mcp-builder'],['mcp_list_files','mcp_read_file','write_text_file','run_terminal','run_python_code']),
-        ('learning','内容与沟通','撰写、改写、总结和面向受众组织表达。','先明确受众、目的、语气和交付格式。保持事实边界，避免空泛表达；重要主张标记依据，缺少信息时明确指出。','澄清目标 → 提取要点 → 组织结构 → 起草 → 校对与压缩。',['doc_retrieve'],['public_search','extract_pdf','extract_word','extract_text','write_text_file']),
+        ('research','研究分析','拆解问题、比较证据并形成可验证结论。','先明确目标、受众和时间范围。区分原始证据、推断与未知；引用可核查来源，不编造资料。','问题拆解 → 资料检索 → 比较证据与局限 → 形成可验证结论。',['research-evidence','doc_retrieve'],['public_search','news_search','web_fetch','github_repository_search','extract_pdf','extract_text']),
+        ('software','软件工程','设计、实现、测试和审查软件。','明确运行环境与验收标准；修改前理解现有实现，采用最小可审查变更，用真实测试结果说明完成情况。','复现 → 定位 → 实现 → 回归 → 记录风险与交付。',['community-frontend-design','community-mcp-builder'],['github_repository_search','web_fetch','mcp_list_files','mcp_read_file','write_text_file','run_terminal','run_python_code']),
+        ('learning','内容与沟通','撰写、改写、总结和面向受众组织表达。','先明确受众、目的、语气和交付格式。保持事实边界，避免空泛表达；重要主张标记依据，缺少信息时明确指出。','澄清目标 → 提取要点 → 组织结构 → 起草 → 校对与压缩。',['doc_retrieve'],['public_search','web_fetch','extract_pdf','extract_word','extract_text','write_text_file']),
         ('data','数据分析','数据质量、指标定义与可复核分析。','先定义指标、单位、时间范围与缺失值规则；区分相关与因果。结论必须能追溯到输入和计算过程。','核查数据 → 明确假设 → 计算 → 敏感性检查 → 报告局限。',['data-quality','project-audit'],['extract_csv','extract_json','extract_jsonl','profile_csv','run_python_code','write_text_file']),
     ]
     return [dict(zip(('id','name','description','prompt','workflow','skills','tools'),row),documents=[],version=1,builtin=True) for row in rows]
@@ -43,7 +43,7 @@ class Experts:
 
     def catalog(self,session):
         self.library.check(session)
-        return {'skills':SkillRegistry(ROOT/'skills').list(),'tools':[t for t in builtin_registry().items() if t['plannable']],
+        return {'skills':registry_for(self.directory).list(),'tools':[t for t in builtin_registry().items() if t['plannable']],
                 'documents':self.library.list(session)}
 
     def profiles(self):
@@ -137,7 +137,7 @@ class Experts:
     def guidance(self,session,*,selected=None):
         selected=self.active(session) if selected is None else selected
         if not selected:return ''
-        registry=SkillRegistry(ROOT/'skills');sections=[]
+        registry=registry_for(self.directory);sections=[]
         for identifier in selected['skills']:
             try:sections.append(identifier+': '+registry.load(identifier)[:1800])
             except (ValueError,LookupError):continue

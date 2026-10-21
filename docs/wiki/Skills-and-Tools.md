@@ -12,7 +12,8 @@ Skill 是 `SKILL.md` 中的工作方法与领域指导；Tool 是实际执行能
 
 | 类别 | 代表工具 | 说明 |
 | --- | --- | --- |
-| 公开检索 | public_search、news_search | Wikipedia 知识资料、Google News 公开 RSS |
+| 公开检索 | public_search、news_search、web_fetch、github_repository_search | Wikipedia 知识资料、Google News 公开 RSS、HTTPS 网页正文、GitHub 公开仓库 |
+| 时间查询 | current_time | 按 IANA 时区查询当前日期与时间 |
 | 文档提取 | extract_pdf、extract_word、extract_pptx、extract_xlsx | 根据格式和本地依赖提取内容 |
 | 结构化数据 | extract_csv、extract_text、extract_json、extract_jsonl、profile_csv | 读取文本与数据，检查 CSV 质量 |
 | 文件服务 | mcp_list_files、mcp_read_file、write_text_file | 官方 Filesystem MCP 的受控适配器 |
@@ -26,7 +27,7 @@ Skill 是 `SKILL.md` 中的工作方法与领域指导；Tool 是实际执行能
 
 `public_search` 使用英文 Wikipedia，适合公开知识主题，不是通用全网搜索。`news_search` 读取 Google News RSS；支持最近 24 小时、北京时间今天、昨天、近 7 天，并按条目发布时间过滤。
 
-两者无需搜索服务密钥，模型服务仍需配置。结果包含真实取得的来源，摘要不表示阅读全文；网络或源限制可能产生空结果。不要将搜索失败的生成性回答当成已核实资讯。
+这些公开检索工具无需搜索服务密钥，模型服务仍需配置。`web_fetch` 只读标准 HTTPS 文本页面并拦截本机、私有及保留地址，适合读取已知来源全文；`github_repository_search` 返回公开仓库的元数据，免登录额度受 GitHub 限制。时间工具使用本机时区数据库。结果包含真实取得的来源；新闻搜索摘要不表示阅读全文。网络或源限制可能产生空结果，不要将搜索失败的生成性回答当成已核实资讯。
 
 ## 文件能力与范围
 
@@ -59,7 +60,9 @@ EXECUTE
 
 ## 技能库
 
-场景技能包括项目对账 `project-audit`、学习进度 `learning-progress`、数据核查 `data-quality`、证据整理 `research-evidence`。仓库也包含文档、沙箱、检索和作业批改等技能，其业务成熟度与依赖各不相同。
+场景技能包括项目对账 `project-audit`、学习进度 `learning-progress`、数据核查 `data-quality`、证据整理 `research-evidence`，以及新加入的 `web-research`、`code-review`、`product-planning`、`incident-response`。仓库也包含文档、沙箱、检索和作业批改等技能，其业务成熟度与依赖各不相同。
+
+侧栏“技能库”下方的“在线 Skill”可搜索 [Anthropic 官方 Skills 仓库](https://github.com/anthropics/skills)的精选目录，点击“安装并挂载”会下载固定版本的文本 Skill 文件到本机数据目录，并加入当前会话。不会静默覆盖已安装内容；下载的 `SOURCE.json` 记录来源、提交和摘要。GitHub 匿名 API 额度用尽时，可通过 Git 引用取得版本，并安装主 `SKILL.md`。CLI 使用 `/skill-search 关键词` 和 `/skill-install anthropic-技能名`，安装后同样挂载到当前会话。安装只增加工作方法，不执行随附脚本，也不授予文件、网络或终端权限。
 
 上游 `community-frontend-design` 与 `community-mcp-builder` 保留来源提交信息和 Apache 2.0 许可证，见对应技能目录的 `SOURCE.json` 与 `LICENSE.txt`。附带脚本不会因为挂载技能而自动执行。
 
