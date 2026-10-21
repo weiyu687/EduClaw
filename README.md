@@ -18,10 +18,10 @@ EduClaw 是一个通用的本地 AI Agent / harness。它把多轮对话、图�
 | 图片理解 | 在普通对话上传 PNG、JPEG、WebP 或 GIF；图片随当前请求进入视觉模型，刷新后仍可查看 |
 | 最新资讯与公开知识 | 在对话中查询新闻或 Wikipedia 资料，返回来源；搜索服务无需密钥，模型服务仍需配置 |
 | 文档与数据处理 | 读取 PDF、Word、PPTX、Excel、CSV、文本、JSON、JSONL，结合 Python 计算和保存结果 |
-| 多步骤交付 | 自动选择已适配工具，展示步骤、依赖、执行状态及结果证据；支持暂停、取消与恢复 |
+| 多步骤交付 | 可点击的流程轨道逐步展示状态、依赖、输入、输出和校验结果；支持暂停、取消与恢复 |
 | 本机项目工作 | 在指定初始目录打开持续 PowerShell 终端，读写文件、运行测试、使用 Git、检查网络 |
 | 控制自动化程度 | 当前对话选择逐步确认、平衡模式或自主执行，随时调整，工具禁用始终优先 |
-| 扩展工作方法 | 浏览与偏好挂载 Skills；通过 MCP 和受信任工具契约接入能力 |
+| 扩展工作方法 | 在技能库浏览已安装和在线 Skills，一键加入当前会话；通过 MCP 和受信任工具契约接入能力 |
 | 长对话与个人资料 | 近期窗口、抽取式历史摘要与相关记忆召回；上传资料，按对话挂载并检索引用 |
 | 专业领域工作 | 专家模式组合提示词、工作流程、Skills、任务工具和资料，支持自定义、版本快照与导入导出 |
 | 持续项目工作 | 用项目归组多个对话，共享项目指令与资料；普通对话和任务沿用同一项目上下文 |
@@ -31,6 +31,8 @@ EduClaw 是一个通用的本地 AI Agent / harness。它把多轮对话、图�
 普通提问和单次搜索直接在对话完成。需要文件、代码或多阶段操作时，助手会提出任务建议，展示结合上下文整理的完整目标。点击“准备任务 · 确认后提交”，可以修改目标，再提交规划。
 
 任务按目标选择工具，不必逐项勾选。已有结果会保留，执行失败或状态不确定时停止推进，不自动重放有副作用的操作。
+
+打开任务的“可视化流程”，点击任一步即可同时核对执行状态、依赖、输入参数和已保存输出。结果不完整、校验失败或执行状态不确定时会明确标为“需核查”。CLI 可用 `/流程 任务编号` 查看同一份记录。
 
 ![任务结果：退出码、实际输出与持久保存的证据](docs/images/task-results.png)
 
@@ -134,7 +136,7 @@ python -m core.usr.main
 | 选择会话 | 左侧历史对话 | `/sessions`、`/use ID` |
 | 管理项目上下文 | 侧栏“项目” | `/projects`、`/project-new`、`/project-use`、`/project-instructions` |
 | 创建自动任务 | 任务模式输入目标 | `/agent 目标` |
-| 查看任务与结果 | 任务列表、执行步骤、结果证据 | `/任务`、`/状态`、`/结果` |
+| 查看任务与结果 | 任务列表、可视化流程、结果证据 | `/任务`、`/流程 任务编号`、`/状态`、`/结果` |
 | 调整审批模式 | 权限与文件 | `/autonomy strict`、`balanced`、`autonomous` |
 | 操作持续终端 | 终端面板 | `/term` 查看用法 |
 | 浏览技能与工具 | 技能库、工具库 | `/skills`、`/tool-sync`、`/permissions` |
@@ -158,6 +160,7 @@ python -m pytest test/test_chat_actions.py test/test_autonomy.py test/test_inter
 python scripts/windows_chat_handoff_e2e.py
 python scripts/windows_autonomy_e2e.py
 python -m scripts.windows_skill_market_e2e
+python -m scripts.windows_skill_flow_e2e
 ```
 
 Windows 验收覆盖真实浏览器交互、CLI、MCP、文件、Docker 计算及持续终端。部分脚本需要模型网络连接和 Docker；详细环境、范围与日志见[测试与开发](https://weiyu687.github.io/EduClaw/Development.html)。

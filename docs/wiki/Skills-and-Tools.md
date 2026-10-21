@@ -62,7 +62,7 @@ EXECUTE
 
 场景技能包括项目对账 `project-audit`、学习进度 `learning-progress`、数据核查 `data-quality`、证据整理 `research-evidence`，以及新加入的 `web-research`、`code-review`、`product-planning`、`incident-response`。仓库也包含文档、沙箱、检索和作业批改等技能，其业务成熟度与依赖各不相同。
 
-侧栏“技能库”下方的“在线 Skill”可搜索 [Anthropic 官方 Skills 仓库](https://github.com/anthropics/skills)的精选目录，点击“安装并挂载”会下载固定版本的文本 Skill 文件到本机数据目录，并加入当前会话。不会静默覆盖已安装内容；下载的 `SOURCE.json` 记录来源、提交和摘要。GitHub 匿名 API 额度用尽时，可通过 Git 引用取得版本，并安装主 `SKILL.md`。CLI 使用 `/skill-search 关键词` 和 `/skill-install anthropic-技能名`，安装后同样挂载到当前会话。安装只增加工作方法，不执行随附脚本，也不授予文件、网络或终端权限。
+侧栏“技能库”可浏览、搜索并阅读已安装 Skill，点击“加入当前会话”即保存，也可筛选已加入项。切换“在线发现”可浏览 [Anthropic 官方 Skills 仓库](https://github.com/anthropics/skills)的精选目录；未安装的可“安装并加入”，本机已有的可直接加入当前会话。安装会下载固定版本的文本 Skill 文件到本机数据目录，不会静默覆盖已安装内容；`SOURCE.json` 记录来源、提交和摘要。GitHub 匿名 API 额度用尽时，可通过 Git 引用取得版本，并安装主 `SKILL.md`。CLI 使用 `/skill-search 关键词` 和 `/skill-install anthropic-技能名`，安装后同样加入当前会话。安装只增加工作方法，不执行随附脚本，也不授予文件、网络或终端权限。
 
 上游 `community-frontend-design` 与 `community-mcp-builder` 保留来源提交信息和 Apache 2.0 许可证，见对应技能目录的 `SOURCE.json` 与 `LICENSE.txt`。附带脚本不会因为挂载技能而自动执行。
 
