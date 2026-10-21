@@ -52,7 +52,7 @@ from core.skills.marketplace import SkillMarketplace
 
 KNOWN_COMMANDS = frozenset(['/help', '/?', '/task-continue', '/task-replan', '/task-status', '/approve', '/deny', '/task-list', '/multi', '/multi-status', '/multi-approve', '/multi-deny', '/flow-code', '/flow-status', '/flow-approve', '/flow-deny', '/auto', '/auto-status', '/code-propose', '/code-approve', '/code-deny', '/code-status', '/permissions', '/permit', '/deny-read', '/allow-read', '/revoke-read', '/skills', '/agent-step-run', '/agent-step-approve', '/agent-step-result', '/step-run', '/step-approve', '/step-result', '/plan-new', '/plans', '/plan', '/plan-approve', '/plan-reject', '/task-new', '/tasks', '/task', '/step', '/task-events', '/task-cancel', '/new', '/use', '/sessions', '/runs', '/events', '/status', '/interrupted', '/resume', '/approve-resume', '/rename-session', '/rename-task', '/task-catalog', '/delete-session', '/delete-task', '/delete-confirm', '/delete-cancel', '/permission-set', '/tool-inbox', '/tool-review', '/tool-sync', '/tool-info', '/permission-info', '/permission-reset', '/permission-requests', '/permission-request', '/permission-confirm', '/permission-cancel', '/agent-pending', '/agent-cancel', '/recovery-status', '/recovery-check', '/multi-result', '/multi-results', '/goal-status', '/goal-spec', '/multi-dag', '/multi-replan', '/multi-replan-status', '/multi-replan-approve', '/multi-replan-deny', '/任务', '/当前', '/结果', '/允许', '/继续', '/拒绝'])
 
-KNOWN_COMMANDS = KNOWN_COMMANDS | CONTEXT_COMMANDS | {'/multi-pause', '/multi-recover', '/multi-cancel', '/multi-diagnose', '/tool-contracts', '/projects', '/project-new', '/project-use', '/project-off', '/project-show', '/project-instructions', '/skill-search', '/skill-install'}
+KNOWN_COMMANDS = KNOWN_COMMANDS | CONTEXT_COMMANDS | {'/multi-pause', '/multi-recover', '/multi-cancel', '/multi-diagnose', '/tool-contracts', '/projects', '/project-new', '/project-use', '/project-off', '/project-show', '/project-instructions', '/skill-search', '/skill-install', '/流程'}
 
 logging.getLogger("httpx").setLevel(logging.WARNING)
 logger = get_logger("USER")
@@ -1591,6 +1591,20 @@ async def run_interactive_app():
             if command == '/skills':
                 for skill in registry_for(db_path().parent).list():
                     console.print(f"{skill['id']}  {skill['name']}  {skill['description']}")
+                continue
+            if command == '/流程' or command.startswith('/流程 '):
+                try:
+                    from core.gui.service import DashboardService
+                    from core.gui.flow_view import render_flow
+                    dashboard=DashboardService(Path(agent.state_manager.path).parent)
+                    tasks=dashboard.tasks(agent.session_id)
+                    parts=command.split()
+                    if len(parts)==2:number=int(parts[1])
+                    elif len(parts)==1 and len(tasks)==1:number=tasks[0]['number']
+                    else:raise ValueError('用法：/流程 <任务编号>；仅一个任务时可省略编号。')
+                    console.print(render_flow(dashboard.detail(agent.session_id,number)),markup=False)
+                except (ValueError,LookupError,PermissionError) as exc:
+                    console.print(f'[yellow]无法查看流程：{exc}[/yellow]')
                 continue
             if command == '/skill-search' or command.startswith('/skill-search '):
                 try:
