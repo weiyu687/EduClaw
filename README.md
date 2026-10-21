@@ -138,6 +138,7 @@ python -m core.usr.main
 | 调整审批模式 | 权限与文件 | `/autonomy strict`、`balanced`、`autonomous` |
 | 操作持续终端 | 终端面板 | `/term` 查看用法 |
 | 浏览技能与工具 | 技能库、工具库 | `/skills`、`/tool-sync`、`/permissions` |
+| 搜索与安装在线 Skill | 技能库 → 在线 Skill → 搜索网络 → 安装并挂载 | `/skill-search 关键词`、`/skill-install anthropic-技能名` |
 | 检查会话记忆 | 会话记忆 | `/memory [检索词]` |
 | 添加与检索资料 | 资料库 | `/library add 路径`、`/library search 问题` |
 | 配置与选择专业领域 | 侧栏“专家配置”；对话/任务输入区逐次选择 | `/expert use ID`、`/expert off`、`/expert import JSON路径` |
@@ -148,12 +149,15 @@ python -m core.usr.main
 
 界面使用 TypeScript、React、Vite；后端使用 Python、LangGraph、MCP 和 SQLite。工具契约与权限网关共同约束调用，任务账本记录执行认领和结果。Skills 提供方法，不授予权限。
 
+工具库现支持网页正文读取 `web_fetch`、GitHub 公开仓库检索 `github_repository_search` 和 IANA 时区时间查询 `current_time`，并保留新闻、Wikipedia、文件、数据、终端等工具。在线 Skill 从 [Anthropic 官方 Skills 仓库](https://github.com/anthropics/skills)的精选目录检索；安装会记录来源版本，保存到本机数据目录。GUI 和 CLI 都会安装并挂载到当前会话。远程 Skill 是外部工作指引，不能自动扩大工具权限，附带脚本也不会因安装或挂载而运行。
+
 ```powershell
 npm test --prefix web
 npm run build --prefix web
 python -m pytest test/test_chat_actions.py test/test_autonomy.py test/test_interactive_terminal.py -q
 python scripts/windows_chat_handoff_e2e.py
 python scripts/windows_autonomy_e2e.py
+python -m scripts.windows_skill_market_e2e
 ```
 
 Windows 验收覆盖真实浏览器交互、CLI、MCP、文件、Docker 计算及持续终端。部分脚本需要模型网络连接和 Docker；详细环境、范围与日志见[测试与开发](https://weiyu687.github.io/EduClaw/Development.html)。

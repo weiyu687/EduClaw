@@ -18,6 +18,7 @@ interface Catalog {
   commands:Command[];
 }
 interface Mounts {skills:string[];tools:string[]}
+interface MarketSkill {id:string;name:string;description:string;source:string;source_url:string;commit:string;installed:boolean}
 interface ExpertProfile {id:string;name:string;description:string;version:number;builtin:boolean}
 interface ExpertView {profiles:ExpertProfile[]}
 interface Attachment {id?:string;name:string;mime:string;bytes:number;data?:string}
@@ -49,6 +50,9 @@ export function Workspace({token,session,onSession,onTask,onAction,onView,mode,o
   const [submissions,setSubmissions]=useState<Submission[]>([]);
   const [search,setSearch]=useState('');
   const [catalogSearch,setCatalogSearch]=useState('');
+  const [marketQuery,setMarketQuery]=useState('');
+  const [market,setMarket]=useState<MarketSkill[]|null>(null);
+  const [marketBusy,setMarketBusy]=useState(false);
   const input=useRef<HTMLTextAreaElement>(null);
   const followReply=useRef(true);
   const lastRendered=useRef('');
@@ -80,6 +84,8 @@ export function Workspace({token,session,onSession,onTask,onAction,onView,mode,o
   async function newSession(){await run(async()=>{const row=await request<{session:string}>(token,'/api/session',{project_id:project?.id??null});onSession(row.session);});}
   async function refreshExperts(){const row=await request<ExpertView>(token,'/api/experts?'+query(session));setExperts(row.profiles);if(selectedExpert&&!row.profiles.some(x=>x.id===selectedExpert))setSelectedExpert('');onRefresh();}
   async function save(){await run(async()=>{const row=await request<Mounts>(token,'/api/mounts',{session,...mounts});setSaved(row);setNotice('挂载已保存，应用于之后提交的新任务。');});}
+  async function searchMarket(refresh=false){if(!session)return;setMarketBusy(true);setError('');try{const params=new URLSearchParams({session,q:marketQuery});if(refresh)params.set('refresh','1');const result=await request<{items:MarketSkill[]}>(token,'/api/skill-market?'+params.toString(),undefined,60000);setMarket(result.items);}catch(e){setError(e instanceof Error?e.message:'无法检索在线 Skill。');}finally{setMarketBusy(false);}}
+  async function installSkill(id:string){if(!session)return;setMarketBusy(true);setError('');try{const result=await request<{catalog:Catalog;mounts:Mounts;skill:{name:string}}>(token,'/api/skill-market',{session,id},120000);setCatalog(result.catalog);setMounts(current=>({...current,skills:[...new Set([...current.skills,id])]}));setSaved(result.mounts);setMarket(rows=>rows?.map(row=>row.id===id?{...row,installed:true}:row)??null);setNotice(`已安装并挂载 ${result.skill.name}，新任务可使用。`);}catch(e){setError(e instanceof Error?e.message:'安装失败。');}finally{setMarketBusy(false);}}
   function toggle(kind:'skills'|'tools',id:string){setMounts(m=>({...m,[kind]:m[kind].includes(id)?m[kind].filter(x=>x!==id):[...m[kind],id]}));}
   async function addImages(files:FileList|null){
     if(!files?.length)return;
@@ -172,6 +178,7 @@ export function Workspace({token,session,onSession,onTask,onAction,onView,mode,o
         <div className="catalog-search"><Icon name="search"/><input aria-label="搜索能力" placeholder={panel==='skills'?'搜索技能名称或用途':'搜索工具名称或用途'} value={catalogSearch} onChange={e=>setCatalogSearch(e.target.value)}/></div>
         <div className="capability-grid">{panel==='skills'?catalog?.skills.filter(s=>matches(s.name+s.id+s.description)).map(s=><article className={'capability-card '+(mounts.skills.includes(s.id)?'is-selected':'')} key={s.id}><div className="capability-top"><span className="capability-symbol"><Icon name="spark"/></span><label><input type="checkbox" aria-label={`挂载技能 ${s.id}`} disabled={!ready||busy} checked={mounts.skills.includes(s.id)} onChange={()=>toggle('skills',s.id)}/><span>偏好</span></label></div><h3>{s.name}</h3><p>{s.description}</p><details><summary>查看技能内容</summary><RichText text={s.content}/>{s.truncated&&<p>展示前 16000 字。</p>}</details></article>):catalog?.tools.filter(t=>matches(t.name+t.description)).map(t=><article className="capability-card" key={t.name}><div className="capability-top"><span className="capability-symbol"><Icon name={t.risk==='public_read'?'globe':t.risk==='path_read'?'file':'tools'}/></span><span className="pill">{t.plannable?'自动选择':'扩展能力'}</span></div><h3>{t.name}</h3><p>{t.description}</p><details><summary>参数与结果格式</summary><pre>{JSON.stringify({input:t.inputSchema,output:t.output_schema},null,2)}</pre></details></article>)}</div>
         {catalog&&!((panel==='skills'?catalog.skills:catalog.tools).some(x=>matches(x.name+('id' in x?x.id:'')+x.description)))&&<div className="empty">没有匹配的能力，试试其他关键词。</div>}
+        {panel==='skills'&&<section className="skill-market"><div className="section-heading"><div><h3>在线 Skill</h3><p className="muted">检索 Anthropic 官方公开目录；安装后保存到本机并挂载到当前会话。</p></div></div><div className="skill-market-controls"><input aria-label="搜索在线 Skill" placeholder="搜索设计、文档、测试、MCP…" value={marketQuery} onChange={e=>setMarketQuery(e.target.value)} onKeyDown={e=>{if(e.key==='Enter')void searchMarket();}}/><button className="primary" disabled={!ready||marketBusy} onClick={()=>void searchMarket()}>{marketBusy?'连接中…':'搜索网络'}</button><button className="secondary" disabled={!ready||marketBusy} onClick={()=>void searchMarket(true)}>刷新源</button></div>{market&&<div className="skill-market-results">{market.map(skill=><article className="capability-card" key={skill.id}><div className="capability-top"><span className="capability-symbol"><Icon name="spark"/></span><span className="pill">{skill.installed?'已安装':'官方源'}</span></div><h3>{skill.name}</h3><p>{skill.description}</p><small>{skill.source} · {skill.commit.slice(0,8)}</small><div className="skill-market-actions"><a href={skill.source_url} target="_blank" rel="noreferrer">查看来源</a><button className="secondary" disabled={marketBusy||skill.installed} onClick={()=>void installSkill(skill.id)}>{skill.installed?'已安装':'安装并挂载'}</button></div></article>)}{!market.length&&<p className="empty">没有找到匹配的 Skill。</p>}</div>}</section>}
         <p className="muted">技能提供工作方法，工具提供执行能力。启用技能不会改变文件或代码权限。</p></div>}
       {panel==='help'&&<div className="command-panel"><p className="muted">更快地找到操作，不必记住所有指令。</p><input aria-label="搜索指令" placeholder="搜索指令或用途…" value={search} onChange={e=>setSearch(e.target.value)}/><div className="command-list">{filtered.map(c=><button className="command-item" key={c.command} disabled={busy} onClick={()=>void command(c)}><code>{c.command}</code><span><strong>{c.title}</strong><small>{c.description}</small></span><em>{c.action==='cli'?'CLI':'工作台'}</em></button>)}{!filtered.length&&<p className="empty">没有匹配指令。</p>}</div></div>}
     </PanelDialog>

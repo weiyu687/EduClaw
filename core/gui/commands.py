@@ -19,6 +19,8 @@ COMMANDS = [
     ('/恢复','解除暂停','确认解除暂停，不会自动执行代码。','resume'),
     ('/取消任务','取消任务','确认取消，已产生的外部效果不保证撤销。','cancel'),
     ('/技能','技能与挂载','查看本地技能内容，选择新任务的指导技能。','skills'),
+    ('/skill-search','在线技能检索','CLI：/skill-search 关键词；查询官方 Skill 目录。GUI 在技能库中搜索。','cli'),
+    ('/skill-install','安装在线技能','CLI：/skill-install anthropic-技能名；安装并挂载到当前会话。','cli'),
     ('/工具','工具库','查看自动选择的可信工具；在权限设置中禁用工具。','tools'),
     ('/agent','自动任务','CLI 用法：/agent 目标；自动规划并推进允许的步骤。','cli'),
     ('/tool-approve','确认工具步骤','CLI 用法：/tool-approve 任务序号；查看参数并确认。','cli'),

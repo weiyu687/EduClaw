@@ -51,7 +51,11 @@ def select_capabilities(goal,skills,existing):
     selected=list(existing)
     terms={'research-evidence':('搜索','研究','资料','search','research'), 'data-quality':('csv','数据','data'),
            'project-audit':('预算','审计','对账'), 'learning-progress':('学习','成绩'),
-           'community-mcp-builder':('开发mcp','构建mcp','mcp服务'), 'community-frontend-design':('网页','界面','html','css')}
+           'community-mcp-builder':('开发mcp','构建mcp','mcp服务'), 'community-frontend-design':('网页','界面','html','css'),
+           'web-research':('联网','来源','新闻','最新','调研','search','research'),
+           'code-review':('审查代码','代码审查','review','回归'),
+           'product-planning':('产品规划','需求分析','产品设计','roadmap'),
+           'incident-response':('故障','宕机','事故','incident','outage')}
     available={s['id'] for s in skills.list()}
     for key,words in terms.items():
         if key in available and key not in selected and any(w in goal.lower() for w in words):selected.append(key)

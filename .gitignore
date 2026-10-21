@@ -26,4 +26,6 @@ web/*.tsbuildinfo
 
 integrations/**/node_modules/
 data/workspace/
+data/installed-skills/
+data/skill-market-cache.json
 data/terminal-broker.*

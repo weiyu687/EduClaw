@@ -16,7 +16,8 @@ class ToolStepService:
     def __init__(self,base):self.base=base
     def preview(self,session,task):
         b=self.base;p=b.flow.pending(session,task);i,s=p['index'],p['step']
-        if s['tool'] not in ('public_search','news_search','write_text_file','run_terminal'):raise PermissionError('此步骤不是搜索、写入或终端操作。')
+        from core.security.policy_engine import PUBLIC_READ
+        if s['tool'] not in PUBLIC_READ|{'write_text_file','run_terminal'}:raise PermissionError('此步骤不是公开读取、写入或终端操作。')
         if b.ledger.control(session,task)!='active' or b.ledger.status(session,task,i) or b.ledger.frozen(session,task) or b.replans.blocking_for(session,task):raise PermissionError('步骤不可执行。')
         b.dags.check(session,task,i,b.results)
         args=dict(s['arguments']);before=''

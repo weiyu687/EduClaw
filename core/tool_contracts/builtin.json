@@ -853,5 +853,103 @@
       }
     },
     "max_output_bytes": 1000000
+  },
+  {
+    "name": "web_fetch",
+    "description": "读取公开 HTTPS 网页正文，返回最终地址、标题、内容类型和受限文本。阻止本机、私有、保留网络及非文本响应。",
+    "inputSchema": {
+      "type": "object",
+      "properties": {
+        "url": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 2048,
+          "pattern": "^https://"
+        },
+        "max_chars": {
+          "type": "integer",
+          "minimum": 1000,
+          "maximum": 50000
+        }
+      },
+      "required": [
+        "url"
+      ],
+      "additionalProperties": false
+    },
+    "version": "1.0.0",
+    "sdk_version": 1,
+    "adapter": "web_fetch",
+    "risk": "public_read",
+    "resource_argument": null,
+    "plannable": true,
+    "extensions": [],
+    "output_encoding": "json",
+    "output_schema": {
+      "type": "object"
+    },
+    "max_output_bytes": 200000
+  },
+  {
+    "name": "github_repository_search",
+    "description": "免密钥搜索 GitHub 公开仓库，返回名称、链接、说明、语言、星标、更新时间和许可证；受公开 API 速率限制。",
+    "inputSchema": {
+      "type": "object",
+      "properties": {
+        "query": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 200
+        },
+        "limit": {
+          "type": "integer",
+          "minimum": 1,
+          "maximum": 10
+        }
+      },
+      "required": [
+        "query"
+      ],
+      "additionalProperties": false
+    },
+    "version": "1.0.0",
+    "sdk_version": 1,
+    "adapter": "github_repository_search",
+    "risk": "public_read",
+    "resource_argument": null,
+    "plannable": true,
+    "extensions": [],
+    "output_encoding": "json",
+    "output_schema": {
+      "type": "object"
+    },
+    "max_output_bytes": 200000
+  },
+  {
+    "name": "current_time",
+    "description": "根据 IANA 时区数据库返回准确的当前日期、时间和 UTC 偏移，不依赖模型猜测。",
+    "inputSchema": {
+      "type": "object",
+      "properties": {
+        "timezone": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 80
+        }
+      },
+      "additionalProperties": false
+    },
+    "version": "1.0.0",
+    "sdk_version": 1,
+    "adapter": "current_time",
+    "risk": "public_read",
+    "resource_argument": null,
+    "plannable": true,
+    "extensions": [],
+    "output_encoding": "json",
+    "output_schema": {
+      "type": "object"
+    },
+    "max_output_bytes": 10000
   }
 ]
