@@ -86,7 +86,7 @@ EXECUTE
 <p><code>approve</code> 仅在存在待审批输入时使用。平衡模式打开时可输入 <code>TRUST</code> 授权连续控制，也可用 <code>/term trust ID</code> 或 <code>/term revoke ID</code> 调整。逐步确认和自主执行模式优先；自主模式的整体权限应通过 <code>/autonomy balanced</code> 撤销。</p>
 <h2 id="section-6">技能库</h2>
 <p>场景技能包括项目对账 <code>project-audit</code>、学习进度 <code>learning-progress</code>、数据核查 <code>data-quality</code>、证据整理 <code>research-evidence</code>，以及新加入的 <code>web-research</code>、<code>code-review</code>、<code>product-planning</code>、<code>incident-response</code>。仓库也包含文档、沙箱、检索和作业批改等技能，其业务成熟度与依赖各不相同。</p>
-<p>侧栏“技能库”下方的“在线 Skill”可搜索 <a href="https://github.com/anthropics/skills">Anthropic 官方 Skills 仓库</a>的精选目录，点击“安装并挂载”会下载固定版本的文本 Skill 文件到本机数据目录，并加入当前会话。不会静默覆盖已安装内容；下载的 <code>SOURCE.json</code> 记录来源、提交和摘要。GitHub 匿名 API 额度用尽时，可通过 Git 引用取得版本，并安装主 <code>SKILL.md</code>。CLI 使用 <code>/skill-search 关键词</code> 和 <code>/skill-install anthropic-技能名</code>，安装后同样挂载到当前会话。安装只增加工作方法，不执行随附脚本，也不授予文件、网络或终端权限。</p>
+<p>侧栏“技能库”可浏览、搜索并阅读已安装 Skill，点击“加入当前会话”即保存，也可筛选已加入项。切换“在线发现”可浏览 <a href="https://github.com/anthropics/skills">Anthropic 官方 Skills 仓库</a>的精选目录；未安装的可“安装并加入”，本机已有的可直接加入当前会话。安装会下载固定版本的文本 Skill 文件到本机数据目录，不会静默覆盖已安装内容；<code>SOURCE.json</code> 记录来源、提交和摘要。GitHub 匿名 API 额度用尽时，可通过 Git 引用取得版本，并安装主 <code>SKILL.md</code>。CLI 使用 <code>/skill-search 关键词</code> 和 <code>/skill-install anthropic-技能名</code>，安装后同样加入当前会话。安装只增加工作方法，不执行随附脚本，也不授予文件、网络或终端权限。</p>
 <p>上游 <code>community-frontend-design</code> 与 <code>community-mcp-builder</code> 保留来源提交信息和 Apache 2.0 许可证，见对应技能目录的 <code>SOURCE.json</code> 与 <code>LICENSE.txt</code>。附带脚本不会因为挂载技能而自动执行。</p>
 <p>新增技能示例：</p>
 <pre><code class="language-markdown">---
