@@ -21,8 +21,13 @@
 <tbody>
 <tr>
 <td>公开检索</td>
-<td>public_search、news_search</td>
-<td>Wikipedia 知识资料、Google News 公开 RSS</td>
+<td>public_search、news_search、web_fetch、github_repository_search</td>
+<td>Wikipedia 知识资料、Google News 公开 RSS、HTTPS 网页正文、GitHub 公开仓库</td>
+</tr>
+<tr>
+<td>时间查询</td>
+<td>current_time</td>
+<td>按 IANA 时区查询当前日期与时间</td>
 </tr>
 <tr>
 <td>文档提取</td>
@@ -59,7 +64,7 @@
 <p>工具库显示实际契约与是否可规划；并非仓库中每个旧模块都可被当前任务规划器调用。</p>
 <h2 id="section-3">搜索范围</h2>
 <p><code>public_search</code> 使用英文 Wikipedia，适合公开知识主题，不是通用全网搜索。<code>news_search</code> 读取 Google News RSS；支持最近 24 小时、北京时间今天、昨天、近 7 天，并按条目发布时间过滤。</p>
-<p>两者无需搜索服务密钥，模型服务仍需配置。结果包含真实取得的来源，摘要不表示阅读全文；网络或源限制可能产生空结果。不要将搜索失败的生成性回答当成已核实资讯。</p>
+<p>这些公开检索工具无需搜索服务密钥，模型服务仍需配置。<code>web_fetch</code> 只读标准 HTTPS 文本页面并拦截本机、私有及保留地址，适合读取已知来源全文；<code>github_repository_search</code> 返回公开仓库的元数据，免登录额度受 GitHub 限制。时间工具使用本机时区数据库。结果包含真实取得的来源；新闻搜索摘要不表示阅读全文。网络或源限制可能产生空结果，不要将搜索失败的生成性回答当成已核实资讯。</p>
 <h2 id="section-4">文件能力与范围</h2>
 <p>默认工作目录为数据目录下的 <code>workspace</code>，可用 <code>EDUCLAW_WORKSPACE_ROOT</code> 配置。官方 Filesystem MCP 仅允许配置根目录范围内操作；网关放行不代表文件服务会解除自己的限制。</p>
 <p>专用写入支持 TXT、MD、JSON、JSONL、CSV、TSV、HTML、CSS、SVG，内容最多 200 KB；平衡模式新建自动执行，覆盖需确认，自主模式可自动覆盖。覆盖仍核对原内容摘要。此适配器不提供通用删除、移动或脚本写入，通用本机操作使用明确授权的终端。</p>
@@ -80,7 +85,8 @@ EXECUTE
 </code></pre>
 <p><code>approve</code> 仅在存在待审批输入时使用。平衡模式打开时可输入 <code>TRUST</code> 授权连续控制，也可用 <code>/term trust ID</code> 或 <code>/term revoke ID</code> 调整。逐步确认和自主执行模式优先；自主模式的整体权限应通过 <code>/autonomy balanced</code> 撤销。</p>
 <h2 id="section-6">技能库</h2>
-<p>场景技能包括项目对账 <code>project-audit</code>、学习进度 <code>learning-progress</code>、数据核查 <code>data-quality</code>、证据整理 <code>research-evidence</code>。仓库也包含文档、沙箱、检索和作业批改等技能，其业务成熟度与依赖各不相同。</p>
+<p>场景技能包括项目对账 <code>project-audit</code>、学习进度 <code>learning-progress</code>、数据核查 <code>data-quality</code>、证据整理 <code>research-evidence</code>，以及新加入的 <code>web-research</code>、<code>code-review</code>、<code>product-planning</code>、<code>incident-response</code>。仓库也包含文档、沙箱、检索和作业批改等技能，其业务成熟度与依赖各不相同。</p>
+<p>侧栏“技能库”下方的“在线 Skill”可搜索 <a href="https://github.com/anthropics/skills">Anthropic 官方 Skills 仓库</a>的精选目录，点击“安装并挂载”会下载固定版本的文本 Skill 文件到本机数据目录，并加入当前会话。不会静默覆盖已安装内容；下载的 <code>SOURCE.json</code> 记录来源、提交和摘要。GitHub 匿名 API 额度用尽时，可通过 Git 引用取得版本，并安装主 <code>SKILL.md</code>。CLI 使用 <code>/skill-search 关键词</code> 和 <code>/skill-install anthropic-技能名</code>，安装后同样挂载到当前会话。安装只增加工作方法，不执行随附脚本，也不授予文件、网络或终端权限。</p>
 <p>上游 <code>community-frontend-design</code> 与 <code>community-mcp-builder</code> 保留来源提交信息和 Apache 2.0 许可证，见对应技能目录的 <code>SOURCE.json</code> 与 <code>LICENSE.txt</code>。附带脚本不会因为挂载技能而自动执行。</p>
 <p>新增技能示例：</p>
 <pre><code class="language-markdown">---
