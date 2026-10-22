@@ -149,6 +149,19 @@ python -m core.usr.main
 
 ## 开发与验证
 
+### 在其他应用中复用 Agent 后端
+
+新增 `educlaw-runtime` Python SDK：通过小内核和可选插件组合聊天、记忆、资料、Skills、工具与应用自己的业务能力。每个应用独立配置模型、凭据和数据目录，可直接嵌入应用，也可启动本机 HTTP 服务接入自己的界面，不依赖 EduClaw 工作台运行。
+
+```powershell
+python -m pip wheel . --no-deps --no-build-isolation -w dist
+python -m pip install dist/educlaw_runtime-0.1.0-py3-none-any.whl
+python -m educlaw init D:\apps\my-agent-app --id my-agent-app --plugins chat,memory,knowledge
+python D:\apps\my-agent-app\main.py
+```
+
+默认离线 demo 仅用于检查安装，真实模型需在应用的 `app.toml` 中配置。详见[独立应用架构与接口](docs/APPLICATION_RUNTIME.md)和[可独立运行的笔记应用](examples/standalone-agent)。现有工作台仍保留原入口；旧任务审批、MCP、终端等尚未全部迁移为 SDK 插件。
+
 界面使用 TypeScript、React、Vite；后端使用 Python、LangGraph、MCP 和 SQLite。工具契约与权限网关共同约束调用，任务账本记录执行认领和结果。Skills 提供方法，不授予权限。
 
 工具库现支持网页正文读取 `web_fetch`、GitHub 公开仓库检索 `github_repository_search` 和 IANA 时区时间查询 `current_time`，并保留新闻、Wikipedia、文件、数据、终端等工具。在线 Skill 从 [Anthropic 官方 Skills 仓库](https://github.com/anthropics/skills)的精选目录检索；安装会记录来源版本，保存到本机数据目录。GUI 和 CLI 都会安装并挂载到当前会话。远程 Skill 是外部工作指引，不能自动扩大工具权限，附带脚本也不会因安装或挂载而运行。

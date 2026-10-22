@@ -1,0 +1,16 @@
+[build-system]
+requires = ["setuptools>=68", "wheel"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "educlaw-runtime"
+version = "0.1.0"
+description = "Embeddable, application-isolated agent runtime for EduClaw"
+requires-python = ">=3.11"
+dependencies = []
+
+[project.scripts]
+educlaw = "educlaw.cli:main"
+
+[tool.setuptools.packages.find]
+include = ["educlaw*"]

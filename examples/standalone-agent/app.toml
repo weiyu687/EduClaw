@@ -1,0 +1,23 @@
+[app]
+id = "independent-notes"
+data_dir = "./.app-data"
+plugins = ["chat", "memory", "knowledge", "tools", "notes"]
+system_prompt = "You are the assistant for this independent notes application. Use find_note to retrieve relevant notes when available. Never claim to have changed a note; writing notes is an explicit application operation."
+
+[model]
+provider = "demo"
+# Replace the section above with these settings to use an actual model:
+# provider = "openai-compatible"
+# name = "your-model"
+# base_url = "https://your-provider.example/v1"
+# api_key_env = "NOTES_APP_MODEL_KEY"
+
+[extensions]
+notes = "notes_app.plugin:plugin"
+
+[plugins.chat]
+max_rounds = 6
+timeout = 180
+
+[plugins.tools]
+allow = ["find_note"]
