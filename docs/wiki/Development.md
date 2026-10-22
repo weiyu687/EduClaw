@@ -4,6 +4,9 @@
 
 | 目录 | 职责 |
 | --- | --- |
+| educlaw | 可独立安装的 SDK、应用内核、插件、模型与 HTTP 适配 |
+| educlaw/_shared | 工作台和 SDK 共用的状态、BM25 与 Skill 原语 |
+| examples/standalone-agent | 独立笔记业务与 agent 工具的组合示例 |
 | web/src | React / TypeScript 工作台 |
 | core/gui | 本机 HTTP 服务、任务应用服务和 worker |
 | core/state | 会话、普通对话、任务建议与历史 |
@@ -25,6 +28,15 @@ python -m pytest test --ignore=test/test_agent_memory_e2e.py --ignore=test/test_
 两个排除的旧记忆文件是手动异步集成脚本，不属于上述回归范围；这不是对记忆系统完整验收的声明。生产验收使用构建后的静态文件与同源 Python API，不依赖开发服务器代理权限。
 
 ## Windows 端到端测试
+
+独立 SDK 的配置、插件契约与隔离边界见[独立应用与插件 SDK](Application-Runtime)。新增 `test/test_app_runtime.py` 覆盖 25 项用例；完整正式回归当前为 588 项通过。`scripts/runtime_e2e.py` 应由安装 wheel 后的干净环境执行，用本机确定性模型协议夹具验证双应用真实 HTTP、工具链、重启和幂等；不把夹具结果冒充真实 LLM 验收。2026-10-22 的真实提供方检查收到 HTTP 402，需解决服务问题后重新验收。
+
+```powershell
+python -m pytest test/test_app_runtime.py -q
+python -I scripts/runtime_e2e.py --example examples/standalone-agent --work logs/runtime-e2e-new --report logs/runtime-verification.json
+```
+
+上述端到端命令要求使用已经安装当前 wheel 的 Python，并为 `--work` 选择尚不存在的目录；不依赖源码的 PYTHONPATH。
 
 需要 Playwright、本机 Edge、当前 Python 环境；按脚本准备真实模型、MCP、Node.js、Docker 和联网。安装浏览器测试库可使用 `python -m pip install playwright`，脚本使用系统 Edge。
 
@@ -57,7 +69,7 @@ python scripts/windows_docs_e2e.py
 
 截图脚本使用当前生产 UI 和隔离演示会话；对话内容明确标记为演示，任务与终端输出实际执行。它只运行无害的示例命令，不使用用户历史、文件或密钥。截图后人工检查可读性、隐私、裁切和界面状态。
 
-文档验收检查十页导航、锚点、搜索、图片加载和窄屏布局。截图更新不是业务功能通过测试的替代品。`scripts/benchmark_retrieval.py` 是 10 条本地检索校准样例，不是独立公开基准；新领域需增加自己的验收集。
+文档验收检查所有已发布页面的导航、锚点、搜索、图片加载和窄屏布局。截图更新不是业务功能通过测试的替代品。`scripts/benchmark_retrieval.py` 是 10 条本地检索校准样例，不是独立公开基准；新领域需增加自己的验收集。
 
 ## 发布
 
