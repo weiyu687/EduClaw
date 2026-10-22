@@ -3,7 +3,7 @@
 <meta name="description" content="EduClaw 文档：项目概览"><title>项目概览 · EduClaw 文档</title>
 <link rel="stylesheet" href="style.css"><script src="search.js" defer></script></head>
 <body><a class="skip" href="#content">跳到正文</a><header><a class="brand" href="index.html">E <strong>EduClaw</strong><span>文档</span></a><div><a href="https://github.com/weiyu687/EduClaw/wiki">Wiki</a><a href="https://github.com/weiyu687/EduClaw">GitHub ↗</a></div></header>
-<div class="layout"><aside><label for="search">搜索文档</label><input id="search" type="search" placeholder="功能、指令、故障…"><nav aria-label="文档目录"><a aria-current="page" href="index.html">项目概览</a><a  href="Getting-Started.html">安装与启动</a><a  href="GUI-Guide.html">GUI 使用指南</a><a  href="Expert-Mode.html">专家模式与检索</a><a  href="Commands.html">指令参考</a><a  href="Skills-and-Tools.html">技能与工具</a><a  href="Architecture.html">架构与安全</a><a  href="Long-Workflows.html">多文件长流程</a><a  href="Development.html">测试与开发</a><a  href="Troubleshooting.html">常见问题</a></nav><p>让每一步，都有据可查。</p></aside>
+<div class="layout"><aside><label for="search">搜索文档</label><input id="search" type="search" placeholder="功能、指令、故障…"><nav aria-label="文档目录"><a aria-current="page" href="index.html">项目概览</a><a  href="Getting-Started.html">安装与启动</a><a  href="GUI-Guide.html">GUI 使用指南</a><a  href="Expert-Mode.html">专家模式与检索</a><a  href="Commands.html">指令参考</a><a  href="Skills-and-Tools.html">技能与工具</a><a  href="Architecture.html">架构与安全</a><a  href="Application-Runtime.html">独立应用与插件 SDK</a><a  href="Long-Workflows.html">多文件长流程</a><a  href="Development.html">测试与开发</a><a  href="Troubleshooting.html">常见问题</a></nav><p>让每一步，都有据可查。</p></aside>
 <main id="content"><div id="search-results" aria-live="polite"></div><article><h1>EduClaw 文档</h1>
 <p><strong>对话、行动、验证，在一个本地工作台完成。</strong> EduClaw 是通用的本地 AI Agent / harness，提供深色工作台和 CLI。</p>
 <p><img src="assets/ui/chat.png" alt="普通对话工作台" /></p>
@@ -46,6 +46,10 @@
 <td><a href="Long-Workflows.html">多文件长流程</a></td>
 </tr>
 <tr>
+<td>用 Agent 后端开发自己的独立应用</td>
+<td><a href="Application-Runtime.html">独立应用与插件 SDK</a></td>
+</tr>
+<tr>
 <td>查命令</td>
 <td><a href="Commands.html">指令参考</a></td>
 </tr>
@@ -63,6 +67,7 @@
 <p>普通对话支持持续追问、图片理解、摘要命名、重命名和删除；简单新闻或资料查询直接在对话完成。需要操作文件、执行代码或分阶段交付时，先展示任务建议，用户编辑并提交后生成计划。</p>
 <p>任务按目标选择已适配工具，保存步骤、依赖与结果证据。持续终端支持本机 PowerShell 输入、交互程序和 Agent 控制。审批程度由用户为当前对话选择，GUI 与 CLI 共用状态和权限。</p>
 <h2 id="section-3">当前版本与范围</h2>
+<p>新增 <code>educlaw-runtime</code> 可安装 SDK：应用可组合聊天、记忆、资料、Skills、工具和自定义业务插件，使用自己的模型与数据目录，通过 Python 或 HTTP 接入自己的界面，无需启动 EduClaw 工作台。详见<a href="Application-Runtime.html">独立应用与插件 SDK</a>。现有工作台的终端、MCP 和复杂任务审批尚未全部迁移到 SDK。</p>
 <p>侧栏提供项目工作区、会话记忆与统一资料库：同一项目归组多个对话，并共享项目指令与明确选择的资料；每个会话仍保留独立历史与记忆。普通对话和任务规划自动获取相关项目资料，保留原文和引用来源。操作步骤与边界见 <a href="GUI-Guide.html">GUI 使用指南</a>。</p>
 <p>当前活跃开发分支为 <code>codex/roadmap-development</code>。主要验证 Windows 本机使用，后端 Python + MCP + LangGraph + SQLite，前端 TypeScript + React + Vite。</p>
 <p>尚未交付桌面安装包、完整 Python 依赖锁定、多用户服务、任意 MCP 工具一键安装或完整生产安全审计。本机终端的起始目录不是沙箱；公开搜索不保证全网覆盖。</p>

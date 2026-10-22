@@ -1,0 +1,259 @@
+<!doctype html>
+<html lang="zh-CN"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<meta name="description" content="EduClaw 文档：独立应用与插件 SDK"><title>独立应用与插件 SDK · EduClaw 文档</title>
+<link rel="stylesheet" href="style.css"><script src="search.js" defer></script></head>
+<body><a class="skip" href="#content">跳到正文</a><header><a class="brand" href="index.html">E <strong>EduClaw</strong><span>文档</span></a><div><a href="https://github.com/weiyu687/EduClaw/wiki">Wiki</a><a href="https://github.com/weiyu687/EduClaw">GitHub ↗</a></div></header>
+<div class="layout"><aside><label for="search">搜索文档</label><input id="search" type="search" placeholder="功能、指令、故障…"><nav aria-label="文档目录"><a  href="index.html">项目概览</a><a  href="Getting-Started.html">安装与启动</a><a  href="GUI-Guide.html">GUI 使用指南</a><a  href="Expert-Mode.html">专家模式与检索</a><a  href="Commands.html">指令参考</a><a  href="Skills-and-Tools.html">技能与工具</a><a  href="Architecture.html">架构与安全</a><a aria-current="page" href="Application-Runtime.html">独立应用与插件 SDK</a><a  href="Long-Workflows.html">多文件长流程</a><a  href="Development.html">测试与开发</a><a  href="Troubleshooting.html">常见问题</a></nav><p>让每一步，都有据可查。</p></aside>
+<main id="content"><div id="search-results" aria-live="polite"></div><article><h1>用 EduClaw 构建独立应用</h1>
+<h2 id="section-1">设计决策</h2>
+<p>采用 <strong>小内核、可选能力插件、应用自己的组合入口</strong>。EduClaw 工作台是产品；<code>educlaw-runtime</code> 是可嵌入其他产品的后端库。应用可以直接导入 SDK，也可以把相同运行时放在 HTTP 服务后面。运行应用不需要先启动工作台，界面可由 React、Vue、桌面框架、移动端或应用原有后端提供。</p>
+<p>参考 <a href="https://github.com/deepseek-ai/deepseek-harness">DeepSeek Harness</a> 的插件组合思路，借鉴其可替换能力与生命周期，不引入 Cordis/TypeScript 作为现有 Python 后端的强制依赖。数据所有权、能力检查和运行记录保留在内核，业务与模型适配留给应用作者。</p>
+<pre><code class="language-text">应用自己的界面 / CLI / 后端
+  └─ Python SDK 或可选 HTTP 接口
+      └─ Application（每个应用一个实例）
+          ├─ 内核：配置、生命周期、能力检查、运行事件
+          ├─ chat：模型适配器 + 允许的工具
+          ├─ memory / knowledge / skills：可选上下文
+          ├─ 业务插件：自定义 API、工具、业务存储
+          └─ 应用自己的数据目录
+              ├─ agent/：会话、运行、事件
+              ├─ plugins/：插件数据
+              └─ business/：业务数据库和文件
+
+EduClaw 工作台 → 平台自己的数据目录
+独立应用 B    → 应用 B 自己的数据目录
+</code></pre>
+<h2 id="section-2">已实现的范围</h2>
+<table>
+<thead>
+<tr>
+<th>部分</th>
+<th>能力</th>
+<th>关闭后的行为</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>内核</td>
+<td>应用数据归属、进程锁、生命周期、请求幂等、事件记录</td>
+<td>不可绕过的基础能力</td>
+</tr>
+<tr>
+<td>chat</td>
+<td>会话、持久历史、有界模型/工具循环、失败与中断状态</td>
+<td>所有聊天接口不可用</td>
+</tr>
+<tr>
+<td>memory</td>
+<td>当前会话近期 4 轮、较早记录 BM25 召回</td>
+<td>历史继续保存，但不再发送给模型</td>
+</tr>
+<tr>
+<td>knowledge</td>
+<td>文本资料导入、按会话挂载、本地 BM25 检索</td>
+<td>资料接口关闭且不再注入模型</td>
+</tr>
+<tr>
+<td>skills</td>
+<td>从应用显式指定的目录浏览、读取、选择 Skill</td>
+<td>接口和指导注入关闭</td>
+</tr>
+<tr>
+<td>tools</td>
+<td>应用显式白名单内的已注册工具</td>
+<td>不暴露工具规格，也拒绝模型调用</td>
+</tr>
+<tr>
+<td>自定义插件</td>
+<td>注册业务 API、模型工具、上下文提供器</td>
+<td>注销对应 API、工具和上下文</td>
+</tr>
+<tr>
+<td>HTTP</td>
+<td>本机 JSON API、Bearer token、显式 CORS 来源</td>
+<td>不启动 HTTP 时仍可直接使用 SDK</td>
+</tr>
+</tbody>
+</table>
+<p>现有 <code>StateManager</code> 会话/运行/事件记录、检索分块与 BM25、SkillRegistry 的实现提取到 <code>educlaw._shared</code>，旧导入路径保留兼容转发，工作台与 SDK 使用同一份实现。wheel 只导出 <code>educlaw</code> 命名空间，不把容易与应用冲突的 <code>core</code> 包安装进环境。没有复制用户数据。SDK 不导入旧工作台服务、MCP 启动器、全局模型工厂或平台 <code>.env</code>。</p>
+<p>这是新的可用 SDK 边界，<strong>不代表旧工作台全部模块已经迁移成插件</strong>。旧任务规划/审批、MCP、终端、专家模式、混合语义模型和 GUI 暂时沿用原入口。它们没有作为不完整的开关暴露在独立应用中，也不应直接把旧全局服务包装进插件。后续接入要先显式注入存储、权限与进程环境，再运行隔离测试。SDK 的 memory/knowledge 当前采用本地关键词检索，不承诺工作台全部检索能力。</p>
+<h2 id="section-3">安装与创建</h2>
+<p>运行时要求 Python 3.11+，基础 SDK 没有第三方运行依赖。可用 Conda、venv 或应用既有环境。构建 wheel 需要 setuptools 68+ 与 wheel；这些是构建工具，不是 SDK 运行依赖。当前未向 PyPI 发布，请从开发分支构建安装。</p>
+<pre><code class="language-powershell"># 在 EduClaw 源码目录构建 wheel
+python -m pip install &quot;setuptools&gt;=68&quot; wheel
+python -m pip wheel . --no-deps --no-build-isolation -w dist
+
+# 在应用自己的环境安装；无需平台源目录
+python -m pip install C:\path\educlaw_runtime-0.1.0-py3-none-any.whl
+
+# 新目录，拒绝覆盖现有应用
+python -m educlaw init D:\apps\research-helper --id research-helper --plugins chat,memory,knowledge,skills
+python D:\apps\research-helper\main.py
+</code></pre>
+<p><code>init</code> 生成 <code>app.toml</code>、独立入口、Skills 目录及说明。默认模型是明确标注的离线回声，仅用于检查安装；连接真实模型后才有 LLM 能力。<a href="https://github.com/weiyu687/EduClaw/tree/codex/roadmap-development/examples/standalone-agent">独立笔记应用源码</a>展示业务 API 与只读 agent 工具的组合。</p>
+<h2 id="section-4">配置与隔离</h2>
+<pre><code class="language-toml">[app]
+id = &quot;research-helper&quot;
+data_dir = &quot;./.app-data&quot;
+plugins = [&quot;chat&quot;, &quot;memory&quot;, &quot;knowledge&quot;, &quot;skills&quot;, &quot;tools&quot;, &quot;mybusiness&quot;]
+system_prompt = &quot;You are the research assistant for this application.&quot;
+
+[model]
+provider = &quot;openai-compatible&quot;
+name = &quot;your-model&quot;
+base_url = &quot;https://your-provider.example/v1&quot;
+api_key_env = &quot;RESEARCH_APP_MODEL_KEY&quot;
+
+[plugins.chat]
+max_rounds = 6
+timeout = 180
+
+[plugins.tools]
+allow = [&quot;lookup_record&quot;]
+
+[plugins.skills]
+directory = &quot;./skills&quot;
+selected = [&quot;research&quot;]
+
+[extensions]
+mybusiness = &quot;your_installed_package.plugin:plugin&quot;
+</code></pre>
+<p>相对路径始终以 manifest 所在目录解析，切换工作目录不会改变数据位置。不同应用必须使用不同数据目录；归属文件记录 <code>app_id</code> 和存储版本，阻止其他 app_id 接管、不接管已有非空目录、不允许嵌套应用目录。单目录只允许一个运行时持有进程锁，避免重启恢复影响另一个活跃实例。</p>
+<pre><code class="language-text">.app-data/
+  .educlaw-app.json       应用归属与存储版本
+  .runtime.lock          进程生命周期锁
+  agent/state.sqlite3    会话、请求、运行、事件
+  plugins/&lt;plugin&gt;/      插件自己的持久数据
+  business/              应用业务数据库和文件
+</code></pre>
+<p>模型密钥通过应用指定的环境变量提供，不自动加载任何 <code>.env</code>、平台配置或聊天记录。HTTP token 每次启动重新生成；不要把它或模型密钥写入前端构建产物。</p>
+<p>这是单用户应用间的默认存储隔离，不是同进程恶意代码沙箱或多租户身份隔离。Python 插件有宿主进程权限；不可信插件需放到独立进程/容器并设计受限 RPC。SDK 不提供多用户鉴权、远程发布或权限审批平台。</p>
+<h2 id="section-5">Python SDK</h2>
+<pre><code class="language-python">import asyncio
+from educlaw import Application
+
+async def main():
+    with Application.load(&quot;app.toml&quot;) as app:
+        session = await app.invoke(&quot;chat.create_session&quot;)
+        result = await app.chat(session[&quot;session&quot;], &quot;请帮我分析需求&quot;, request_id=&quot;request_20261022_001&quot;)
+        print(result[&quot;answer&quot;])
+        events = await app.invoke(&quot;chat.events&quot;, {&quot;run_id&quot;: result[&quot;run_id&quot;]})
+        print(events)
+        app.set_enabled(&quot;memory&quot;, False)
+
+asyncio.run(main())
+</code></pre>
+<p>插件依赖在启动前排序校验；缺少依赖或存在环直接失败，不擅自打开用户关闭的功能。正在运行操作时禁止切换插件或关闭应用。停用依赖项前须先停用依赖它的插件；停用不删除历史数据，再启用可继续读取。<code>set_enabled()</code> 只改变当前实例；重启选项以 manifest 为准。插件启用失败会撤销已注册能力；插件自身在 setup 中创建的外部资源应在异常时自行清理。正常 setup 可返回同步清理函数，按相反顺序执行。</p>
+<p>应用可传 <code>Application(config, model=your_model, plugins=[your_plugin])</code>；模型实现 <code>async complete(messages, tools) -&gt; dict</code>，返回 OpenAI 风格 assistant message，支持 <code>content</code> 和 <code>tool_calls</code>。无需让应用自定义模型继承某个框架。</p>
+<h2 id="section-6">编写插件</h2>
+<pre><code class="language-python">from educlaw import Plugin, Tool
+
+def setup(ctx):
+    # ctx.data_dir：当前应用当前插件的目录
+    # ctx.application.business_dir：应用自有业务目录
+    # ctx.config：manifest 的 [plugins.mybusiness] 参数
+    def lookup(record_id):
+        return {&quot;id&quot;: record_id, &quot;status&quot;: &quot;ready&quot;}
+
+    ctx.operation(&quot;lookup&quot;, lookup, description=&quot;查询业务记录&quot;)
+    ctx.tool(Tool(
+        &quot;lookup_record&quot;, &quot;Read an application record&quot;, lookup,
+        {&quot;type&quot;: &quot;object&quot;, &quot;properties&quot;: {&quot;record_id&quot;: {&quot;type&quot;: &quot;string&quot;, &quot;maxLength&quot;: 80}},
+         &quot;required&quot;: [&quot;record_id&quot;], &quot;additionalProperties&quot;: False},
+    ))
+    return lambda: None  # 关闭连接等清理动作
+
+plugin = Plugin(&quot;mybusiness&quot;, setup, api_version=1)
+</code></pre>
+<p><code>mybusiness.lookup</code> 是应用 API，不自动成为模型工具；只有 <code>ctx.tool()</code> 注册且 <code>tools.allow</code> 列出的工具才能进入模型循环。默认无工具权限，也没有隐含的终端/文件/联网工具。业务 API 面向持有应用访问凭据的客户端，写操作权限需由应用作者设计。</p>
+<p><code>ctx.context(provider)</code> 可注册 <code>provider(session, query)</code>，返回 JSON 可序列化的参考数据；此内容标为不可信参考，不授予工具权限。每插件最多 12,000 字符，整个消息上下文最多 64,000 字符。工具输入在整批执行前验证；每批最多 8 个调用，每个工具输出最多 16,000 字符。超限直接失败，不悄悄截断成有效结果。大型输出应由插件保存为应用 artifact，并返回引用。</p>
+<p>工具 schema 支持显式 <code>type</code>（object/array/string/integer/number/boolean/null）、properties、required、additionalProperties 布尔值、items、enum、minimum/maximum、minLength/maxLength、minItems/maxItems，和说明元数据；不支持的 schema 关键字会拒绝注册，不会静默跳过验证。插件 handler 可以同步或异步；同步 handler 应短小无阻塞，长操作使用 async，宿主无法强制终止任意 Python 代码。</p>
+<p>插件必须显式通过 SDK 对象传入或在 <code>[extensions]</code> 声明已安装模块。关闭的扩展不会导入。没有扫描下载目录并自动执行代码，也没有远程自动安装插件。</p>
+<p>插件的可变状态应放在 <code>setup()</code> 的实例闭包、<code>ctx.data_dir</code> 或应用业务存储中，不要放在模块级全局变量里。Python 的模块导入缓存可跨应用共享代码，第三方插件若自行使用全局变量或硬编码外部路径，仍可能破坏自己的隔离约定。</p>
+<h2 id="section-7">HTTP 与界面接入</h2>
+<pre><code class="language-powershell">python -m educlaw serve app.toml --port 8765 --origin http://localhost:5173
+</code></pre>
+<p>所有接口都需要 <code>Authorization: Bearer &lt;本次启动 token&gt;</code>。<code>GET /v1/app</code> 返回应用标识、插件开关、可用操作和允许的工具规格；<code>GET /health</code> 返回存活状态。实际功能统一为 <code>POST /v1/operations/&lt;operation&gt;</code>，JSON 参数对象，成功返回 <code>{&quot;result&quot;: ...}</code>。</p>
+<table>
+<thead>
+<tr>
+<th>operation</th>
+<th>参数</th>
+<th>结果</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>chat.create_session</td>
+<td><code>{}</code></td>
+<td><code>{session}</code></td>
+</tr>
+<tr>
+<td>chat.sessions</td>
+<td><code>{}</code></td>
+<td>当前应用会话列表</td>
+</tr>
+<tr>
+<td>chat.send</td>
+<td><code>{session,message,request_id?}</code></td>
+<td>request_id、run_id、answer、status、reused</td>
+</tr>
+<tr>
+<td>chat.history</td>
+<td><code>{session}</code></td>
+<td>当前会话历史运行</td>
+</tr>
+<tr>
+<td>chat.events</td>
+<td><code>{run_id}</code></td>
+<td>有序事件、输入/输出、状态</td>
+</tr>
+<tr>
+<td>knowledge.add</td>
+<td><code>{session,name,text}</code></td>
+<td>文档 id；自动挂载到该会话</td>
+</tr>
+<tr>
+<td>knowledge.mount</td>
+<td><code>{session,document,enabled}</code></td>
+<td>挂载状态</td>
+</tr>
+<tr>
+<td>knowledge.search</td>
+<td><code>{session,query}</code></td>
+<td>相关片段与分数</td>
+</tr>
+<tr>
+<td>knowledge.list</td>
+<td><code>{session}</code></td>
+<td>已挂载文档列表</td>
+</tr>
+<tr>
+<td>skills.list</td>
+<td><code>{}</code></td>
+<td>应用 Skill 目录</td>
+</tr>
+<tr>
+<td>skills.read</td>
+<td><code>{skill_id}</code></td>
+<td>正文</td>
+</tr>
+<tr>
+<td>tools.list</td>
+<td><code>{}</code></td>
+<td>当前允许的模型工具</td>
+</tr>
+</tbody>
+</table>
+<p>事件包括 <code>run.started</code>、<code>model.started/completed</code>、<code>tool.started/completed</code>、<code>run.completed/failed/interrupted</code>，可供应用自行画流程图。当前 HTTP 请求等待该轮完成；事件接口可查询已保存记录，尚未提供 token 级 SSE 流式传输或后台任务调度。</p>
+<p>关闭的接口返回 403；无此会话/运行返回 404；非法参数 400；运行冲突 409；提供方等执行故障 502。错误响应不回显提供方的原始异常，以免泄露密钥。CORS 默认关闭，仅按明确指定来源放行。适配器固定绑定本机，不应作为互联网多用户服务直接发布；需要远程应用时，可自行实现带身份、授权、限流和 TLS 的部署适配器。</p>
+<p>同一 <code>request_id</code> 与相同消息重复请求只返回已有成功结果，不重复模型或工具调用。相同 ID 变更内容会拒绝。失败、超时、中断或重启后未完成的请求不会自动重放；应检查事件，再决定是否用新 ID 发起新运行。<code>tool.started</code> 后缺少 <code>tool.completed</code> 表示实际副作用可能未知，不能据此推断操作没有发生。</p>
+<h2 id="section-8">验证与迁移路线</h2>
+<pre><code class="language-powershell">python -m pytest test/test_app_runtime.py -q
+</code></pre>
+<p>测试覆盖两个应用使用相同会话 ID 时的历史、资料、事件隔离；插件开关；自定义工具与白名单；整个工具批次预验证；取消与重启；请求幂等；生命周期回滚；HTTP 鉴权、CORS 及真实本机模型协议请求。打包验收另外在不含平台依赖的独立 venv 安装 wheel、启动多个应用、从 HTTP 调用示例业务与 agent API。</p>
+<p>接下来迁移旧能力时遵循同一验收标准：先显式注入应用上下文，再移除模块级全局状态，最后以两个应用并行测试证明隔离。工作台最终可以成为使用同一 SDK 的默认应用；这一步不能用直接更换平台数据目录代替。</p>
+<h2 id="section-9">本次验证记录（2026-10-22）</h2>
+<p>正式 Python 回归 588 项通过，其中新增 SDK 测试 25 项；两个已有手动异步记忆脚本按项目原约定排除。独立 venv 中安装 wheel 后，两个应用进程经真实本机 HTTP 与确定性模型协议夹具完成并行工具调用、业务数据与会话隔离、事件记录、重启及请求幂等验证。安装包只包含 <code>educlaw</code> 命名空间和分发元数据，无平台数据库、密钥或缓存。</p>
+<p>这项验收证明后端协议、工具链和隔离行为；模型夹具不等于真实 LLM。现有真实模型提供方检查返回 HTTP 402，真实模型验收未通过，需解决提供方计费或访问问题后重试。完整开发记录见<a href="https://github.com/weiyu687/EduClaw/blob/codex/roadmap-development/docs/DEVELOPMENT_STATUS.md">源码中的阶段记录</a>。</p>
+</article><footer>EduClaw · 当前开发版本 · Markdown 与 GitHub Wiki 同源<br><a href="https://github.com/weiyu687/EduClaw/tree/codex/roadmap-development/docs/wiki">查看文档源文件</a></footer></main><nav class="toc" aria-label="本页目录"><strong>本页内容</strong><a href="#section-1">设计决策</a><a href="#section-2">已实现的范围</a><a href="#section-3">安装与创建</a><a href="#section-4">配置与隔离</a><a href="#section-5">Python SDK</a><a href="#section-6">编写插件</a><a href="#section-7">HTTP 与界面接入</a><a href="#section-8">验证与迁移路线</a><a href="#section-9">本次验证记录（2026-10-22）</a></nav></div></body></html>

@@ -3,12 +3,15 @@
 <meta name="description" content="EduClaw 文档：架构与安全"><title>架构与安全 · EduClaw 文档</title>
 <link rel="stylesheet" href="style.css"><script src="search.js" defer></script></head>
 <body><a class="skip" href="#content">跳到正文</a><header><a class="brand" href="index.html">E <strong>EduClaw</strong><span>文档</span></a><div><a href="https://github.com/weiyu687/EduClaw/wiki">Wiki</a><a href="https://github.com/weiyu687/EduClaw">GitHub ↗</a></div></header>
-<div class="layout"><aside><label for="search">搜索文档</label><input id="search" type="search" placeholder="功能、指令、故障…"><nav aria-label="文档目录"><a  href="index.html">项目概览</a><a  href="Getting-Started.html">安装与启动</a><a  href="GUI-Guide.html">GUI 使用指南</a><a  href="Expert-Mode.html">专家模式与检索</a><a  href="Commands.html">指令参考</a><a  href="Skills-and-Tools.html">技能与工具</a><a aria-current="page" href="Architecture.html">架构与安全</a><a  href="Long-Workflows.html">多文件长流程</a><a  href="Development.html">测试与开发</a><a  href="Troubleshooting.html">常见问题</a></nav><p>让每一步，都有据可查。</p></aside>
+<div class="layout"><aside><label for="search">搜索文档</label><input id="search" type="search" placeholder="功能、指令、故障…"><nav aria-label="文档目录"><a  href="index.html">项目概览</a><a  href="Getting-Started.html">安装与启动</a><a  href="GUI-Guide.html">GUI 使用指南</a><a  href="Expert-Mode.html">专家模式与检索</a><a  href="Commands.html">指令参考</a><a  href="Skills-and-Tools.html">技能与工具</a><a aria-current="page" href="Architecture.html">架构与安全</a><a  href="Application-Runtime.html">独立应用与插件 SDK</a><a  href="Long-Workflows.html">多文件长流程</a><a  href="Development.html">测试与开发</a><a  href="Troubleshooting.html">常见问题</a></nav><p>让每一步，都有据可查。</p></aside>
 <main id="content"><div id="search-results" aria-live="polite"></div><article><h1>架构与安全</h1>
-<h2 id="section-1">调用链</h2>
+<h2 id="section-1">工作台与可嵌入后端</h2>
+<p>EduClaw 现在同时提供完整工作台和 <code>educlaw-runtime</code> SDK。工作台继续使用下述审批、MCP 与终端链路；SDK 用小内核、可选插件和应用自己的组合入口支持独立产品。新应用的数据归属、模型配置、业务存储与平台分离，关闭能力会同时撤下 API、模型工具和上下文注入。详见<a href="Application-Runtime.html">独立应用与插件 SDK</a>。</p>
+<p>SDK 不自动继承工作台权限或接入全部旧工具。其插件是可信 Python 代码，目录隔离不是操作系统沙箱；单用户本机 HTTP 适配器也不等于多租户公网服务。</p>
+<h2 id="section-2">调用链</h2>
 <p>GUI（TypeScript / React）或 CLI 接收用户输入，Python 服务读取会话和权限。普通对话使用共享历史与受限搜索；任务规划器选择已适配工具并生成最多 12 步计划。调用在 MCP 传输前经过权限网关和参数契约校验，结果写入 SQLite 账本及结果仓库。</p>
 <p>持续终端由独立本机服务维护 ConPTY 会话，GUI 与 CLI 共享终端 ID。终端 Agent 观察实际输出，再提出输入、等待或结束；原有任务规划使用单次 <code>run_terminal</code>，两条入口并存。</p>
-<h2 id="section-2">用户控制的审批策略</h2>
+<h2 id="section-3">用户控制的审批策略</h2>
 <table>
 <thead>
 <tr>
@@ -41,15 +44,15 @@
 </table>
 <p><code>core/security/autonomy.py</code> 保存模式和变更记录。模型工具中没有修改审批模式的入口。逐步确认收紧自动调用；平衡模式保留低风险自动执行；自主执行需用户明确确认后放开已适配工具的逐步审批。</p>
 <p>自主执行可以通过通用终端读写或删除本机文件、联网、安装程序及修改用户有权限修改的系统配置。<strong>目录不是终端沙箱，模型对敏感操作的判断也不是隔离保证。</strong> 选择自主模式即授予这个对话相应本机能力。</p>
-<h2 id="section-3">人工确认与策略授权</h2>
+<h2 id="section-4">人工确认与策略授权</h2>
 <p>人工审批先展示真实参数，再签发短期票据；票据绑定会话、任务、步骤和内容摘要，过期或参数变化需重新预览。Python 代码审批与实际解析后的代码绑定。</p>
 <p>自动任务和终端 Agent 在调用前重新检查策略。按策略自动执行记录为策略授权，不伪造人工审批事件。改变模式不会重放已有待审批输入，不撤销已发生的文件或网络效果；已开始的操作需单独停止。</p>
-<h2 id="section-4">防止重复执行</h2>
+<h2 id="section-5">防止重复执行</h2>
 <p>任务调用前持久认领。结果不确定或写入结果失败时，保留认领并停止，不通过重试工具来掩盖未知状态。结果保存摘要用于核验；先保存结果，再推进检查点。文件覆盖绑定原内容摘要，避免静默覆盖预览后变化的内容。</p>
 <p>终端输入有请求标识，同一请求重试不重复写入；相同标识换参数会被拒绝。关闭终端使用 Windows Job Object 清理其进程树，但不回滚已产生的外部效果。</p>
-<h2 id="section-5">本机服务与数据</h2>
+<h2 id="section-6">本机服务与数据</h2>
 <p>GUI 仅监听回环地址，启动凭据通过地址片段交给前端后从地址栏移除。重启会轮换凭据。终端服务同样仅本机连接并验证凭据；它不是远程共享终端。</p>
 <p>数据目录保存会话、规划、任务状态、结果、权限与终端记录。不要把运行数据库或凭据提交 Git。备份需保证整个目录一致；删除会话使用软删除并清理所属终端，历史审计不会物理清空。</p>
-<h2 id="section-6">仍需完善</h2>
+<h2 id="section-7">仍需完善</h2>
 <p>尚无完整生产安全审计、插件签名、多用户鉴权、第三方工具通用进程隔离或副作用自动补偿。任意 MCP 服务器的发现结果、Skill 文本、文件和网页内容都不能作为执行授权。</p>
-</article><footer>EduClaw · 当前开发版本 · Markdown 与 GitHub Wiki 同源<br><a href="https://github.com/weiyu687/EduClaw/tree/codex/roadmap-development/docs/wiki">查看文档源文件</a></footer></main><nav class="toc" aria-label="本页目录"><strong>本页内容</strong><a href="#section-1">调用链</a><a href="#section-2">用户控制的审批策略</a><a href="#section-3">人工确认与策略授权</a><a href="#section-4">防止重复执行</a><a href="#section-5">本机服务与数据</a><a href="#section-6">仍需完善</a></nav></div></body></html>
+</article><footer>EduClaw · 当前开发版本 · Markdown 与 GitHub Wiki 同源<br><a href="https://github.com/weiyu687/EduClaw/tree/codex/roadmap-development/docs/wiki">查看文档源文件</a></footer></main><nav class="toc" aria-label="本页目录"><strong>本页内容</strong><a href="#section-1">工作台与可嵌入后端</a><a href="#section-2">调用链</a><a href="#section-3">用户控制的审批策略</a><a href="#section-4">人工确认与策略授权</a><a href="#section-5">防止重复执行</a><a href="#section-6">本机服务与数据</a><a href="#section-7">仍需完善</a></nav></div></body></html>
