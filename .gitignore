@@ -26,4 +26,12 @@ web/*.tsbuildinfo
 
 integrations/**/node_modules/
 data/workspace/
+data/installed-skills/
+data/skill-market-cache.json
 data/terminal-broker.*
+
+# Independent application runtime and distribution build outputs
+.app-data/
+build/
+dist/
+*.egg-info/

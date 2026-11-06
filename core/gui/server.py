@@ -108,6 +108,8 @@ class Handler(BaseHTTPRequestHandler):
                 result=Experts(service.directory).view(params['session'])
             elif path.path == '/api/catalog' and not params:
                 result = self.server.workspace.catalog()
+            elif path.path == '/api/skill-market' and set(params) in ({'session'},{'session','q'},{'session','refresh'},{'session','q','refresh'}):
+                result = self.server.workspace.skill_market(params['session'],params.get('q',''),params.get('refresh')=='1')
             elif path.path == '/api/mounts' and set(params) == {'session'}:
                 result = self.server.workspace.mounts(params['session'])
             elif path.path == '/api/permissions' and set(params) == {'session'}:
@@ -166,6 +168,8 @@ class Handler(BaseHTTPRequestHandler):
                 result=operate(service.directory,body['session'],body['action'],body['arguments'])
             elif self.path == '/api/mounts' and set(body) == {'session','skills','tools'}:
                 result = self.server.workspace.save_mounts(body['session'],body['skills'],body['tools'])
+            elif self.path == '/api/skill-market' and set(body) == {'session','id'}:
+                result = self.server.workspace.install_skill(body['session'],body['id'])
             elif self.path == '/api/submit' and set(body) in ({'session','text','request_id'},{'session','text','request_id','expert_id'}):
                 result = self.server.workspace.submit(body['session'],body['text'],body['request_id'],body.get('expert_id'))
             elif self.path == '/api/chat' and set(body) in ({'session','text','request_id'},{'session','text','request_id','expert_id'},{'session','text','request_id','attachments'},{'session','text','request_id','expert_id','attachments'}):
