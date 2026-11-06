@@ -2,6 +2,7 @@
 import asyncio
 import json
 from pathlib import Path
+import socket
 import threading
 from urllib.error import HTTPError
 from urllib.request import Request, urlopen
@@ -396,3 +397,139 @@ def test_provider_does_not_forward_secret_on_redirect(monkeypatch):
         finally:
             server.shutdown()
             worker.join()
+
+def test_http_rejects_invalid_token_and_host(tmp_path):
+    token = "t" * 40
+
+    with Application(config(tmp_path), model=Model()) as app:
+        with ApplicationServer(app, token=token) as server:
+            thread = threading.Thread(target=server.serve_forever)
+            thread.start()
+            base = f"http://127.0.0.1:{server.server_port}"
+
+            def request(headers):
+                req = Request(base + "/v1/app", headers=headers)
+                try:
+                    with urlopen(req) as response:
+                        return response.status
+                except HTTPError as error:
+                    return error.code
+
+            try:
+                assert request({
+                    "Authorization": "Bearer wrong-token"
+                }) == 401
+
+                assert request({
+                    "Authorization": "Bearer " + token,
+                    "Host": "evil.invalid"
+                }) == 403
+
+            finally:
+                server.shutdown()
+                thread.join()
+
+
+def test_http_rejects_invalid_content_type_and_json(tmp_path):
+    token = "t" * 40
+
+    with Application(config(tmp_path), model=Model()) as app:
+        with ApplicationServer(app, token=token) as server:
+            thread = threading.Thread(target=server.serve_forever)
+            thread.start()
+            base = f"http://127.0.0.1:{server.server_port}"
+
+            def request(body, content_type):
+                req = Request(
+                    base + "/v1/operations/chat.create_session",
+                    data=body,
+                    headers={
+                        "Authorization": "Bearer " + token,
+                        "Content-Type": content_type
+                    },
+                    method="POST"
+                )
+                try:
+                    with urlopen(req) as response:
+                        return response.status
+                except HTTPError as error:
+                    return error.code
+
+            try:
+                assert request(b"{}", "text/plain") == 415
+                assert request(b"{invalid json", "application/json") == 400
+
+            finally:
+                server.shutdown()
+                thread.join()
+
+
+def test_http_rejects_invalid_body_size_and_query(tmp_path):
+    token = "t" * 40
+
+    with Application(config(tmp_path), model=Model()) as app:
+        with ApplicationServer(app, token=token) as server:
+            thread = threading.Thread(target=server.serve_forever)
+            thread.start()
+            base = f"http://127.0.0.1:{server.server_port}"
+
+            def request(path, body=None):
+                req = Request(
+                    base + path,
+                    data=body,
+                    headers={
+                    "Authorization": "Bearer " + token,
+                    "Content-Type": "application/json",
+                },
+                    method="POST" if body is not None else "GET"
+                )
+                try:
+                    with urlopen(req) as response:
+                        return response.status
+                except HTTPError as error:
+                    return error.code
+
+            try:
+                # Empty POST body
+                assert request(
+                    "/v1/operations/chat.create_session", b""
+                ) == 413
+
+                # Request body exceeds the 1 MB limit
+# Declare a body larger than 1 MB without transmitting it.
+# The server should reject the request from Content-Length alone.
+                with socket.create_connection(
+                    ("127.0.0.1", server.server_port),
+                    timeout=5
+                ) as sock:
+                    request_headers = (
+                        "POST /v1/operations/chat.create_session HTTP/1.1\r\n"
+                        f"Host: 127.0.0.1:{server.server_port}\r\n"
+                        f"Authorization: Bearer {token}\r\n"
+                        "Content-Type: application/json\r\n"
+                        "Content-Length: 1000001\r\n"
+                        "Connection: close\r\n"
+                        "\r\n"
+                    )
+
+                    sock.sendall(request_headers.encode("ascii"))
+
+                    response = b""
+                    while True:
+                        chunk = sock.recv(4096)
+                        if not chunk:
+                            break
+                        response += chunk
+
+                    status_line = response.split(b"\r\n", 1)[0]
+                    assert b" 413 " in status_line
+
+                # Query parameters are not accepted
+                assert request("/v1/app?token=abc") == 400
+
+                # Unknown endpoint
+                assert request("/v1/unknown") == 404
+
+            finally:
+                server.shutdown()
+                thread.join()
